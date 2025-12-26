@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: sans-serif; background: #e5ddd5; display: flex; flex-direction: column; align-items: center; }
+        #chat { width: 350px; height: 500px; background: white; border-radius: 10px; padding: 15px; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .input-area { margin-top: 15px; display: flex; gap: 10px; }
+        input { padding: 10px; border-radius: 5px; border: 1px solid #ccc; width: 200px; }
+        button { background: #25d366; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h3>C++ Cloud Messenger</h3>
+    <div id="chat">Загрузка сообщений...</div>
+    <div class="input-area">
+        <input type="text" id="m" placeholder="Привет!">
+        <button onclick="send()">></button>
+    </div>
+    <script>
+        async function load() {
+            const res = await fetch('/api/index');
+            const data = await res.json();
+            if (data.result) {
+                document.getElementById('chat').innerHTML = data.result.map(msg => `<div>• ${decodeURIComponent(msg)}</div>`).join('');
+            }
+        }
+        async function send() {
+            const el = document.getElementById('m');
+            await fetch('/api/index', { method: 'POST', body: encodeURIComponent(el.value) });
+            el.value = '';
+            load();
+        }
+        setInterval(load, 2000);
+        load();
+    </script>
+</body>
+</html>
