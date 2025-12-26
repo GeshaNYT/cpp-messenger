@@ -1,0 +1,7 @@
+{
+  "functions": { "api/*.cpp": { "runtime": "vercel-cpp@1.1.1" } },
+  "routes": [
+    { "src": "/api/index", "dest": "/api/index.cpp" },
+    { "src": "/(.*)", "dest": "/public/$1" }
+  ]
+}
