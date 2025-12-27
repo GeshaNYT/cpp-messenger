@@ -3,184 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeLink Ultra Enterprise Edition | Version 12.0.4</title>
+    <title>GeLink Professional | Ultra Enterprise v14.0</title>
     
     <style>
-        /* 1. CSS VARIABLES & DESIGN TOKENS 
-           Здесь определены все константы системы для легкого брендирования
+        /* =======================================================================
+           SECTION 1: DESIGN TOKENS & DYNAMIC VARIABLES
+           =======================================================================
         */
         :root {
-            /* Primary Colors */
-            --ge-color-primary: #0084ff;
-            --ge-color-primary-rgb: 0, 132, 255;
-            --ge-color-primary-dark: #0073e6;
-            --ge-color-primary-light: #4dabff;
-            --ge-color-primary-soft: rgba(0, 132, 255, 0.12);
+            /* Primary Brand Colors */
+            --ge-color-blue: #0084ff;
+            --ge-color-blue-dark: #0073e6;
+            --ge-color-blue-light: #e7f3ff;
+            --ge-color-blue-soft: rgba(0, 132, 255, 0.1);
             
-            /* UI Colors */
+            /* Status Colors */
             --ge-color-success: #31a24c;
             --ge-color-danger: #fa3e3e;
-            --ge-color-danger-dark: #d93030;
+            --ge-color-danger-hover: #d93030;
             --ge-color-warning: #f7b928;
-            --ge-color-info: #1877f2;
             
-            /* Theme: Light Mode (Default) */
-            --ge-bg-main: #f0f2f5;
-            --ge-bg-panel: #ffffff;
+            /* Backgrounds (Light Mode) */
+            --ge-bg-body: #f0f2f5;
+            --ge-bg-surface: #ffffff;
             --ge-bg-header: #ffffff;
             --ge-bg-input: #f0f2f5;
+            --ge-bg-active: #e7f3ff;
             --ge-bg-hover: #f5f6f7;
             
-            --ge-text-main: #1c1e21;
+            /* Text Colors (Light Mode) */
+            --ge-text-primary: #1c1e21;
             --ge-text-secondary: #65676b;
-            --ge-text-placeholder: #8a8d91;
+            --ge-text-muted: #8a8d91;
             --ge-text-white: #ffffff;
             
+            /* Borders & Shadows */
             --ge-border-color: #dddfe2;
-            --ge-border-soft: rgba(0, 0, 0, 0.08);
+            --ge-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+            --ge-shadow-md: 0 8px 16px rgba(0, 0, 0, 0.08);
+            --ge-shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.12);
             
-            /* Shadow System */
-            --ge-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
-            --ge-shadow-md: 0 8px 16px rgba(0, 0, 0, 0.1);
-            --ge-shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.2);
-            --ge-shadow-xl: 0 24px 50px rgba(0, 0, 0, 0.25);
-            --ge-shadow-call: 0 0 60px rgba(0, 84, 160, 0.4);
-            
-            /* Geometry */
+            /* Shapes */
             --ge-radius-sm: 8px;
-            --ge-radius-md: 14px;
-            --ge-radius-lg: 22px;
-            --ge-radius-xl: 32px;
+            --ge-radius-md: 12px;
+            --ge-radius-lg: 20px;
+            --ge-radius-xl: 30px;
             --ge-radius-circle: 50%;
             --ge-radius-pill: 1000px;
             
-            /* Animations */
-            --ge-anim-speed: 0.3s;
-            --ge-anim-curve: cubic-bezier(0.4, 0, 0.2, 1);
-            --ge-anim-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            /* Motion */
+            --ge-transition-fast: 0.2s ease;
+            --ge-transition-base: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 2. DARK MODE OVERRIDES */
+        /* Dark Mode Configuration */
         [data-theme="dark"] {
-            --ge-bg-main: #18191a;
-            --ge-bg-panel: #242526;
+            --ge-bg-body: #18191a;
+            --ge-bg-surface: #242526;
             --ge-bg-header: #242526;
             --ge-bg-input: #3a3b3c;
-            --ge-bg-hover: #303031;
+            --ge-bg-active: #303031;
+            --ge-bg-hover: #3a3b3c;
             
-            --ge-text-main: #e4e6eb;
+            --ge-text-primary: #e4e6eb;
             --ge-text-secondary: #b0b3b8;
-            --ge-text-placeholder: #8a8d91;
+            --ge-text-muted: #8a8d91;
             
             --ge-border-color: #3e4042;
-            --ge-border-soft: rgba(255, 255, 255, 0.08);
         }
 
-        /* 3. BASE RESET & TYPOGRAPHY */
+        /* =======================================================================
+           SECTION 2: GLOBAL RESET & BASE STYLES
+           =======================================================================
+        */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
             outline: none;
-            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
         }
 
-        html, body {
-            height: 100%;
-            width: 100%;
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background-color: var(--ge-bg-main);
-            color: var(--ge-text-main);
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--ge-bg-body);
+            color: var(--ge-text-primary);
+            height: 100vh;
+            width: 100vw;
             overflow: hidden;
-            font-size: 16px;
-            line-height: 1.5;
-            transition: background-color var(--ge-anim-speed) ease;
+            display: flex;
+            flex-direction: column;
+            transition: background-color var(--ge-transition-base);
         }
 
-        ul, ol { list-style: none; }
-        a { text-decoration: none; color: inherit; }
-        img { max-width: 100%; display: block; }
-        
         button {
             border: none;
             background: none;
             cursor: pointer;
             font-family: inherit;
-            transition: all var(--ge-anim-speed) var(--ge-anim-curve);
+            transition: var(--ge-transition-base);
         }
 
-        input, textarea {
-            font-family: inherit;
+        input {
             border: none;
-            transition: all var(--ge-anim-speed) var(--ge-anim-curve);
+            font-family: inherit;
         }
 
-        /* 4. CUSTOM SCROLLBAR */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #bcc0c4;
-            border-radius: 20px;
-            border: 2px solid transparent;
-            background-clip: padding-box;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #8d949e;
-        }
-
-        /* 5. CALL OVERLAY (FULLSCREEN MODULE) */
-        .ge-call-module {
+        /* =======================================================================
+           SECTION 3: CALL INTERFACE (OVERLAY)
+           =======================================================================
+        */
+        .ge-call-overlay {
             position: fixed;
             top: 0;
             left: 0;
-            width: 100vw;
-            height: 100vh;
-            z-index: 500000;
-            background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(20,20,20,0.95) 100%);
-            backdrop-filter: blur(30px);
-            display: none; /* Controlled by JS */
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(20px);
+            z-index: 1000000;
+            display: none; /* Controlled by Engine */
             flex-direction: column;
             align-items: center;
             justify-content: center;
             color: var(--ge-text-white);
-            animation: ge-fade-in 0.6s var(--ge-anim-curve);
+            animation: fadeIn 0.5s ease-out;
         }
 
-        @keyframes ge-fade-in {
+        @keyframes fadeIn {
             from { opacity: 0; transform: scale(1.05); }
             to { opacity: 1; transform: scale(1); }
         }
 
-        .ge-call-identity {
-            text-align: center;
-            margin-bottom: 60px;
-        }
-
-        .ge-call-avatar-wrapper {
+        .ge-call-avatar-container {
+            margin-bottom: 40px;
             position: relative;
-            width: 180px;
-            height: 180px;
-            margin: 0 auto 30px;
         }
 
-        .ge-call-avatar-main {
-            width: 100%;
-            height: 100%;
+        .ge-call-avatar {
+            width: 160px;
+            height: 160px;
             border-radius: var(--ge-radius-circle);
-            background: var(--ge-color-primary);
+            background: var(--ge-color-blue);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 70px;
-            font-weight: 900;
-            box-shadow: var(--ge-shadow-call);
-            position: relative;
-            z-index: 2;
+            font-size: 64px;
+            font-weight: 800;
+            box-shadow: 0 0 50px rgba(0, 132, 255, 0.4);
         }
 
         .ge-call-pulse {
@@ -189,307 +159,237 @@
             left: 0;
             width: 100%;
             height: 100%;
-            border-radius: 50%;
-            background: var(--ge-color-primary);
-            opacity: 0.5;
-            z-index: 1;
-            animation: ge-ring-pulse 2s infinite;
+            border-radius: var(--ge-radius-circle);
+            border: 2px solid var(--ge-color-blue);
+            animation: pulseAnim 2s infinite;
         }
 
-        @keyframes ge-ring-pulse {
-            0% { transform: scale(1); opacity: 0.6; }
-            100% { transform: scale(2.2); opacity: 0; }
+        @keyframes pulseAnim {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.8); opacity: 0; }
         }
 
-        .ge-call-name {
-            font-size: 42px;
+        .ge-call-info {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .ge-call-title {
+            font-size: 38px;
             font-weight: 800;
-            margin-bottom: 12px;
-            letter-spacing: -1px;
+            margin-bottom: 10px;
         }
 
-        .ge-call-status-label {
-            font-size: 16px;
-            color: var(--ge-color-primary-light);
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            font-weight: 800;
+        .ge-call-timer {
+            font-size: 20px;
+            opacity: 0.7;
+            font-weight: 600;
         }
 
-        .ge-call-controls {
+        .ge-call-actions {
             display: flex;
-            gap: 30px;
-            align-items: center;
+            gap: 25px;
         }
 
         .ge-call-btn {
-            width: 80px;
-            height: 80px;
+            width: 75px;
+            height: 75px;
             border-radius: var(--ge-radius-circle);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 32px;
+            font-size: 28px;
             background: rgba(255, 255, 255, 0.1);
             color: white;
-            transition: all var(--ge-anim-speed) var(--ge-anim-bounce);
         }
 
         .ge-call-btn:hover {
             background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.1);
+            transform: translateY(-5px);
         }
 
-        .ge-call-btn.end-call {
+        .ge-call-btn.decline {
             background: var(--ge-color-danger);
             transform: rotate(135deg);
         }
 
-        .ge-call-btn.end-call:hover {
-            background: var(--ge-color-danger-dark);
-            transform: rotate(135deg) scale(1.15);
+        .ge-call-btn.decline:hover {
+            background: var(--ge-color-danger-hover);
+            transform: rotate(135deg) scale(1.1);
         }
 
-        /* 6. AUTHENTICATION MODULE */
-        .ge-auth-wrapper {
+        /* =======================================================================
+           SECTION 4: AUTHENTICATION MODULE
+           =======================================================================
+        */
+        .ge-auth-root {
             position: fixed;
-            inset: 0;
-            z-index: 400000;
-            background: var(--ge-bg-main);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--ge-bg-body);
             display: flex;
             align-items: center;
             justify-content: center;
-            background-image: 
-                radial-gradient(at 0% 0%, var(--ge-color-primary-soft) 0, transparent 45%),
-                radial-gradient(at 100% 100%, var(--ge-color-primary-soft) 0, transparent 45%);
+            z-index: 500000;
         }
 
-        .ge-auth-box {
-            background: var(--ge-bg-panel);
+        .ge-auth-card {
+            background: var(--ge-bg-surface);
             width: 100%;
-            max-width: 520px;
-            padding: 70px 60px;
+            max-width: 500px;
+            padding: 70px 50px;
             border-radius: var(--ge-radius-xl);
-            box-shadow: var(--ge-shadow-xl);
-            border: 1px solid var(--ge-border-color);
+            box-shadow: var(--ge-shadow-lg);
             text-align: center;
-            animation: ge-auth-appear 0.8s var(--ge-anim-bounce);
+            border: 1px solid var(--ge-border-color);
         }
 
-        @keyframes ge-auth-appear {
-            from { opacity: 0; transform: translateY(50px); }
-            to { opacity: 1; transform: translateY(0); }
+        .ge-logo-text {
+            font-size: 68px;
+            font-weight: 950;
+            color: var(--ge-color-blue);
+            letter-spacing: -4px;
+            margin-bottom: 15px;
         }
 
-        .ge-auth-brand {
-            font-size: 76px;
-            font-weight: 900;
-            color: var(--ge-color-primary);
-            letter-spacing: -5px;
-            margin-bottom: 10px;
-        }
-
-        .ge-auth-desc {
-            font-size: 18px;
+        .ge-auth-subtitle {
             color: var(--ge-text-secondary);
-            margin-bottom: 50px;
-        }
-
-        .ge-auth-nav {
-            display: flex;
-            justify-content: center;
-            gap: 40px;
+            font-size: 18px;
             margin-bottom: 45px;
-            border-bottom: 2px solid var(--ge-border-soft);
         }
 
-        .ge-auth-nav-item {
-            padding: 15px 0;
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--ge-text-placeholder);
-            position: relative;
-        }
-
-        .ge-auth-nav-item.active {
-            color: var(--ge-color-primary);
-        }
-
-        .ge-auth-nav-item.active::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: var(--ge-color-primary);
-            border-radius: 10px;
-        }
-
-        .ge-auth-form {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
+        .ge-form-group {
             text-align: left;
+            margin-bottom: 22px;
         }
 
-        .ge-input-field {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .ge-input-label {
-            font-size: 11px;
+        .ge-form-label {
+            display: block;
+            font-size: 12px;
             font-weight: 800;
-            color: var(--ge-text-secondary);
+            color: var(--ge-text-muted);
             text-transform: uppercase;
-            letter-spacing: 1px;
+            margin-bottom: 10px;
             padding-left: 5px;
         }
 
-        .ge-input-element {
+        .ge-form-input {
             width: 100%;
-            padding: 20px 25px;
+            padding: 18px 24px;
             background: var(--ge-bg-input);
             border: 2px solid transparent;
             border-radius: var(--ge-radius-md);
-            color: var(--ge-text-main);
             font-size: 16px;
-            font-weight: 500;
+            color: var(--ge-text-primary);
         }
 
-        .ge-input-element:focus {
-            background: var(--ge-bg-panel);
-            border-color: var(--ge-color-primary);
-            box-shadow: 0 0 0 6px var(--ge-color-primary-soft);
+        .ge-form-input:focus {
+            border-color: var(--ge-color-blue);
+            background: var(--ge-bg-surface);
         }
 
-        .ge-auth-btn {
+        .ge-auth-button {
             width: 100%;
-            padding: 22px;
-            background: var(--ge-color-primary);
+            padding: 20px;
+            background: var(--ge-color-blue);
             color: white;
             border-radius: var(--ge-radius-md);
-            font-size: 19px;
+            font-size: 18px;
             font-weight: 800;
+            margin-top: 30px;
             box-shadow: var(--ge-shadow-md);
-            margin-top: 15px;
         }
 
-        .ge-auth-btn:hover {
-            background: var(--ge-color-primary-dark);
-            transform: translateY(-2px);
-            box-shadow: var(--ge-shadow-lg);
-        }
-
-        /* 7. APP INTERFACE LAYOUT */
+        /* =======================================================================
+           SECTION 5: APP CORE LAYOUT
+           =======================================================================
+        */
         .ge-app-container {
-            display: none; /* Shown after Login */
-            width: 100vw;
-            height: 100vh;
+            display: none; /* Revealed by Engine */
+            width: 100%;
+            height: 100%;
             flex-direction: row;
         }
 
-        /* SIDEBAR MODULE */
-        .ge-app-sidebar {
-            width: 440px;
-            background: var(--ge-bg-panel);
+        /* Sidebar Architecture */
+        .ge-sidebar {
+            width: 420px;
+            background: var(--ge-bg-surface);
             border-right: 1px solid var(--ge-border-color);
             display: flex;
             flex-direction: column;
             z-index: 100;
         }
 
-        .ge-sidebar-top {
-            padding: 45px 35px;
-            border-bottom: 1px solid var(--ge-border-soft);
+        .ge-sidebar-header {
+            padding: 40px 30px;
+            border-bottom: 1px solid var(--ge-border-color);
         }
 
-        .ge-profile-widget {
+        .ge-profile-section {
             display: flex;
             align-items: center;
-            gap: 22px;
-            margin-bottom: 35px;
+            gap: 18px;
+            margin-bottom: 30px;
         }
 
-        .ge-avatar-lg {
-            width: 70px;
-            height: 70px;
-            border-radius: 24px;
-            background: linear-gradient(135deg, var(--ge-color-primary) 0%, #00c6ff 100%);
+        .ge-user-avatar {
+            width: 65px;
+            height: 65px;
+            border-radius: 20px;
+            background: var(--ge-color-blue);
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 30px;
+            font-size: 28px;
             font-weight: 900;
-            box-shadow: var(--ge-shadow-sm);
         }
 
-        .ge-sidebar-nav {
-            display: flex;
-            background: var(--ge-bg-main);
-            padding: 6px;
-            border-radius: var(--ge-radius-md);
-        }
-
-        .ge-nav-btn {
-            flex: 1;
-            padding: 14px;
-            text-align: center;
-            font-weight: 800;
-            font-size: 13px;
-            color: var(--ge-text-secondary);
-            border-radius: 10px;
-        }
-
-        .ge-nav-btn.active {
-            background: var(--ge-bg-panel);
-            color: var(--ge-color-primary);
-            box-shadow: var(--ge-shadow-sm);
-        }
-
-        .ge-list-container {
+        .ge-chat-list {
             flex: 1;
             overflow-y: auto;
         }
 
         .ge-chat-card {
-            padding: 25px 35px;
+            padding: 24px 30px;
+            border-bottom: 1px solid var(--ge-border-color);
+            cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 20px;
-            border-bottom: 1px solid var(--ge-border-soft);
-            cursor: pointer;
-            transition: var(--ge-anim-speed);
+            gap: 15px;
         }
 
-        .ge-chat-card:hover { background: var(--ge-bg-hover); }
-        .ge-chat-card.active { background: var(--ge-color-primary-soft); border-left: 6px solid var(--ge-color-primary); }
+        .ge-chat-card:hover {
+            background: var(--ge-bg-hover);
+        }
 
-        .ge-chat-meta b { display: block; font-size: 17px; margin-bottom: 4px; }
-        .ge-chat-meta span { font-size: 13px; color: var(--ge-text-secondary); }
+        .ge-chat-card.active {
+            background: var(--ge-color-blue-soft);
+            border-left: 5px solid var(--ge-color-blue);
+        }
 
-        /* MAIN VIEWPORT */
-        .ge-app-main {
+        /* Main Viewport Architecture */
+        .ge-viewport {
             flex: 1;
             display: flex;
             flex-direction: column;
-            background: var(--ge-bg-main);
+            background: var(--ge-bg-body);
         }
 
-        .ge-main-header {
+        .ge-viewport-header {
             height: 100px;
             background: var(--ge-bg-header);
             border-bottom: 1px solid var(--ge-border-color);
-            padding: 0 45px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            padding: 0 45px;
         }
 
-        .ge-active-user {
+        .ge-header-title-box {
             display: flex;
             align-items: center;
             gap: 20px;
@@ -497,29 +397,30 @@
 
         .ge-header-actions {
             display: flex;
-            gap: 15px;
+            gap: 12px;
         }
 
-        .ge-action-icon {
+        .ge-action-btn {
             width: 50px;
             height: 50px;
             border-radius: 14px;
             background: var(--ge-bg-input);
-            color: var(--ge-color-primary);
+            color: var(--ge-color-blue);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 20px;
         }
 
-        .ge-action-icon:hover {
-            background: var(--ge-color-primary);
+        .ge-action-btn:hover {
+            background: var(--ge-color-blue);
             color: white;
             transform: translateY(-3px);
             box-shadow: var(--ge-shadow-md);
         }
 
-        .ge-messages-stage {
+        /* Messages Space */
+        .ge-messages-box {
             flex: 1;
             padding: 40px 50px;
             overflow-y: auto;
@@ -530,298 +431,221 @@
 
         .ge-bubble {
             max-width: 65%;
-            padding: 18px 25px;
-            border-radius: 24px;
+            padding: 18px 24px;
+            border-radius: var(--ge-radius-lg);
             font-size: 16px;
             line-height: 1.6;
             box-shadow: var(--ge-shadow-sm);
-            animation: ge-msg-in 0.4s var(--ge-anim-curve);
-        }
-
-        @keyframes ge-msg-in {
-            from { opacity: 0; transform: translateY(15px) scale(0.95); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
         .ge-bubble.me {
             align-self: flex-end;
-            background: var(--ge-color-primary);
+            background: var(--ge-color-blue);
             color: white;
             border-bottom-right-radius: 4px;
         }
 
         .ge-bubble.them {
             align-self: flex-start;
-            background: var(--ge-bg-panel);
-            color: var(--ge-text-main);
+            background: var(--ge-bg-surface);
+            color: var(--ge-text-primary);
             border-bottom-left-radius: 4px;
         }
 
-        .ge-bubble-author {
-            display: block;
-            font-size: 10px;
-            font-weight: 900;
-            text-transform: uppercase;
-            margin-bottom: 6px;
-            opacity: 0.7;
-        }
-
+        /* Message Input Composer */
         .ge-composer {
-            padding: 35px 50px;
+            padding: 30px 45px;
             background: var(--ge-bg-header);
             border-top: 1px solid var(--ge-border-color);
             display: flex;
-            align-items: center;
-            gap: 25px;
+            gap: 20px;
         }
 
         .ge-composer-input {
             flex: 1;
-            padding: 20px 35px;
+            padding: 20px 30px;
             background: var(--ge-bg-input);
             border-radius: var(--ge-radius-pill);
             font-size: 16px;
-            border: 2px solid transparent;
         }
 
-        .ge-composer-input:focus {
-            background: var(--ge-bg-header);
-            border-color: var(--ge-color-primary);
-        }
-
-        .ge-send-btn {
-            width: 65px;
-            height: 65px;
+        .ge-send-button {
+            width: 60px;
+            height: 60px;
             border-radius: var(--ge-radius-circle);
-            background: var(--ge-color-primary);
+            background: var(--ge-color-blue);
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 26px;
+            font-size: 24px;
             box-shadow: var(--ge-shadow-md);
         }
 
-        .ge-send-btn:hover {
-            transform: scale(1.1);
-            background: var(--ge-color-primary-dark);
-        }
-
-        .ge-sidebar-footer {
-            padding: 30px;
-            border-top: 1px solid var(--ge-border-soft);
-        }
-
-        .ge-logout-btn {
-            width: 100%;
-            padding: 16px;
-            color: var(--ge-color-danger);
+        /* =======================================================================
+           SECTION 6: UTILITY CLASSES
+           =======================================================================
+        */
+        .u-hidden { display: none !important; }
+        .u-flex { display: flex !important; }
+        
+        .ge-theme-trigger {
+            position: fixed;
+            top: 25px;
+            right: 25px;
+            z-index: 2000000;
+            padding: 12px 20px;
+            border-radius: 50px;
+            background: var(--ge-bg-surface);
+            border: 1px solid var(--ge-color-blue);
+            color: var(--ge-color-blue);
             font-weight: 800;
-            font-size: 14px;
-            border: 2px solid var(--ge-color-danger);
-            border-radius: var(--ge-radius-md);
-        }
-
-        .ge-logout-btn:hover {
-            background: var(--ge-color-danger);
-            color: white;
-        }
-
-        /* 8. HELPERS */
-        .ge-hide { display: none !important; }
-        .ge-flex { display: flex !important; }
-        .ge-theme-toggler {
-            position: fixed; top: 25px; right: 25px; z-index: 600000;
-            padding: 14px 25px; background: var(--ge-bg-panel);
-            border: 2px solid var(--ge-color-primary); border-radius: 50px;
-            font-weight: 900; font-size: 12px; color: var(--ge-color-primary);
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
 
-    <button class="ge-theme-toggler" onclick="geApp.ui.toggleTheme()">🌓 TOGGLE THEME</button>
+    <button class="ge-theme-trigger" onclick="geEngine.ui.toggleTheme()">🌓 MODE</button>
 
-    <div id="call-overlay" class="ge-call-module">
-        <div class="ge-call-identity">
-            <div class="ge-call-avatar-wrapper">
-                <div id="call-av" class="ge-call-avatar-main">?</div>
-                <div class="ge-call-pulse"></div>
-            </div>
-            <h1 id="call-name" class="ge-call-name">User Name</h1>
-            <p id="call-status" class="ge-call-status-label">Connecting...</p>
-            <div id="call-timer" style="margin-top: 20px; font-size: 22px; font-weight: 300;">00:00</div>
+    <div id="call-portal" class="ge-call-overlay">
+        <div class="ge-call-avatar-container">
+            <div id="call-ui-av" class="ge-call-avatar">?</div>
+            <div class="ge-call-pulse"></div>
+        </div>
+        
+        <div class="ge-call-info">
+            <h1 id="call-ui-name" class="ge-call-title">Chat Room</h1>
+            <p id="call-ui-status" style="color: var(--ge-color-blue); font-weight: 800;">CONNECTING</p>
+            <div id="call-ui-timer" class="ge-call-timer">00:00</div>
         </div>
 
-        <div class="ge-call-controls">
-            <button class="ge-call-btn" title="Toggle Mic">🎤</button>
-            <button id="call-vid-btn" class="ge-call-btn" title="Toggle Camera">📷</button>
-            <button class="ge-call-btn end-call" onclick="geApp.calls.hangup()">📞</button>
-            <button class="ge-call-btn" title="Share Screen">🖥️</button>
+        <div class="ge-call-actions">
+            <button class="ge-call-btn" title="Microphone">🎤</button>
+            <button id="call-ui-vid-btn" class="ge-call-btn" title="Camera">📹</button>
+            <button class="ge-call-btn decline" onclick="geEngine.calls.hangup()">📞</button>
+            <button class="ge-call-btn" title="Settings">⚙️</button>
         </div>
     </div>
 
-    <section id="auth-root" class="ge-auth-wrapper">
-        <div class="ge-auth-box">
-            <div class="ge-auth-brand">GeLink</div>
-            <p class="ge-auth-desc">Universal Secure Messenger v12.0.4</p>
+    <section id="auth-portal" class="ge-auth-root">
+        <div class="ge-auth-card">
+            <div class="ge-logo-text">GeLink</div>
+            <p class="ge-auth-subtitle">Professional Secure Communication</p>
             
-            <div class="ge-auth-nav">
-                <button id="nav-login" class="ge-auth-nav-item active" onclick="geApp.auth.switch('login')">Вход</button>
-                <button id="nav-reg" class="ge-auth-nav-item" onclick="geApp.auth.switch('reg')">Регистрация</button>
-            </div>
-
-            <div id="form-login" class="ge-auth-form">
-                <div class="ge-input-field">
-                    <label class="ge-input-label">Email Address</label>
-                    <input type="email" id="log-email" class="ge-input-element" placeholder="ivanov@example.com">
+            <div id="auth-form-register">
+                <div class="ge-form-group">
+                    <label class="ge-form-label">Full Name</label>
+                    <input type="text" id="reg-name" class="ge-form-input" placeholder="Alexander Petrov">
                 </div>
-                <div class="ge-input-field">
-                    <label class="ge-input-label">Password</label>
-                    <input type="password" id="log-pass" class="ge-input-element" placeholder="••••••••">
+                <div class="ge-form-group">
+                    <label class="ge-form-label">Email Address</label>
+                    <input type="email" id="reg-email" class="ge-form-input" placeholder="alex@gelink.io">
                 </div>
-                <button class="ge-auth-btn" onclick="geApp.auth.process('login')">ВОЙТИ</button>
-            </div>
-
-            <div id="form-reg" class="ge-auth-form ge-hide">
-                <div class="ge-input-field">
-                    <label class="ge-input-label">Your Name</label>
-                    <input type="text" id="reg-name" class="ge-input-element" placeholder="Александр Пушкин">
+                <div class="ge-form-group">
+                    <label class="ge-form-label">Create Password</label>
+                    <input type="password" id="reg-pass" class="ge-form-input" placeholder="••••••••">
                 </div>
-                <div class="ge-input-field">
-                    <label class="ge-input-label">Email Address</label>
-                    <input type="email" id="reg-email" class="ge-input-element" placeholder="alex@domain.ru">
+                <div class="ge-form-group">
+                    <label class="ge-form-label">Confirm Password</label>
+                    <input type="password" id="reg-confirm" class="ge-form-input" placeholder="••••••••">
                 </div>
-                <div class="ge-input-field">
-                    <label class="ge-input-label">Password</label>
-                    <input type="password" id="reg-pass" class="ge-input-element" placeholder="At least 6 characters">
-                </div>
-                <div class="ge-input-field">
-                    <label class="ge-input-label">Confirm Password</label>
-                    <input type="password" id="reg-confirm" class="ge-input-element" placeholder="Repeat password">
-                </div>
-                <button class="ge-auth-btn" onclick="geApp.auth.process('reg')">СОЗДАТЬ АККАУНТ</button>
+                <button class="ge-auth-button" onclick="geEngine.auth.submit()">GET STARTED</button>
             </div>
             
-            <div style="margin-top: 40px; font-size: 13px; color: var(--ge-text-placeholder); line-height: 1.6;">
-                By using GeLink, you agree to our <b>Terms of Service</b> <br> and <b>Privacy Protection Protocol</b>.
-            </div>
+            <p style="margin-top: 40px; font-size: 12px; color: var(--ge-text-muted);">
+                By continuing, you agree to our terms of service and data privacy protocols.
+            </p>
         </div>
     </section>
 
-    <main id="app-root" class="ge-app-container">
-        
-        <aside class="ge-app-sidebar">
-            <div class="ge-sidebar-top">
-                <div class="ge-profile-widget">
-                    <div id="my-av" class="ge-avatar-lg">?</div>
+    <main id="app-portal" class="ge-app-container">
+        <aside class="ge-sidebar">
+            <div class="ge-sidebar-header">
+                <div class="ge-profile-section">
+                    <div id="my-profile-av" class="ge-user-avatar">?</div>
                     <div>
-                        <b id="my-name" style="font-size: 22px;">User Name</b>
-                        <div style="font-size: 13px; color: var(--ge-color-success); font-weight: 800;">● ОНЛАЙН</div>
+                        <b id="my-profile-name" style="font-size: 20px;">User Name</b>
+                        <div style="font-size: 12px; color: var(--ge-color-success); font-weight: 800;">● ONLINE</div>
                     </div>
                 </div>
-
-                <div class="ge-sidebar-nav">
-                    <button id="nav-chats" class="ge-nav-btn active">ЧАТЫ</button>
-                    <button id="nav-calls" class="ge-nav-btn">ЗВОНКИ</button>
-                    <button id="nav-settings" class="ge-nav-btn">ОПЦИИ</button>
-                </div>
-                
-                <button class="ge-auth-btn" style="padding: 15px; font-size: 14px; margin-top: 25px;" onclick="geApp.chat.add()">+ НОВАЯ ГРУППА</button>
+                <button class="ge-auth-button" style="padding: 15px; font-size: 13px; margin-top: 20px;" onclick="geEngine.chat.createNew()">+ NEW CONVERSATION</button>
             </div>
-
-            <div id="chat-scroller" class="ge-list-container">
+            
+            <div id="sidebar-chat-list" class="ge-chat-list">
                 </div>
-
-            <div class="ge-sidebar-footer">
-                <button class="ge-logout-btn" onclick="geApp.auth.logout()">ВЫЙТИ ИЗ СИСТЕМЫ</button>
+            
+            <div style="padding: 25px; border-top: 1px solid var(--ge-border-color);">
+                <button style="color: var(--ge-color-danger); font-weight: 800; font-size: 13px;" onclick="geEngine.auth.logout()">LOGOUT SYSTEM</button>
             </div>
         </aside>
 
-        <section class="ge-app-main">
-            <header class="ge-main-header">
-                <div class="ge-active-user">
-                    <div id="active-av" class="ge-avatar-lg" style="width: 55px; height: 55px; background: #555;">#</div>
+        <section class="ge-viewport">
+            <header class="ge-viewport-header">
+                <div class="ge-header-title-box">
+                    <div id="active-chat-av" class="ge-user-avatar" style="width: 55px; height: 55px; background: #444;">#</div>
                     <div>
-                        <b id="active-title" style="font-size: 22px;">Выберите чат</b>
-                        <div style="font-size: 13px; opacity: 0.6;">End-to-End Encryption Active</div>
+                        <b id="active-chat-name" style="font-size: 22px;">System Console</b>
+                        <div style="font-size: 12px; opacity: 0.6;">Secure Encryption Protocol Active</div>
                     </div>
                 </div>
 
                 <div class="ge-header-actions">
-                    <button class="ge-action-icon" onclick="geApp.calls.start('audio')" title="Voice Call">📞</button>
-                    <button class="ge-action-icon" onclick="geApp.calls.start('video')" title="Video Call">📹</button>
-                    <button class="ge-action-icon" title="Search Message">🔍</button>
-                    <button class="ge-action-icon" title="Chat Info">⋮</button>
+                    <button class="ge-action-btn" onclick="geEngine.calls.init('audio')" title="Voice Call">📞</button>
+                    <button class="ge-action-btn" onclick="geEngine.calls.init('video')" title="Video Call">📹</button>
+                    <button class="ge-action-btn" title="Search">🔍</button>
+                    <button class="ge-action-btn" title="Settings">⋮</button>
                 </div>
             </header>
 
-            <div id="messages-box" class="ge-messages-stage">
+            <div id="messages-display" class="ge-messages-box">
                 </div>
 
             <footer class="ge-composer">
-                <button class="ge-action-icon" style="background:none;">📎</button>
-                <input type="text" id="main-input" class="ge-composer-input" placeholder="Напишите сообщение...">
-                <button class="ge-action-icon" style="background:none;">😀</button>
-                <button class="ge-send-btn" onclick="geApp.chat.send()">➤</button>
+                <input type="text" id="composer-input" class="ge-composer-input" placeholder="Write your message here...">
+                <button class="ge-send-button" onclick="geEngine.chat.sendMessage()">➤</button>
             </footer>
         </section>
     </main>
 
     <script>
         /**
-         * Монолитный объект управления приложением
+         * GeLink Core Engine v14.0
+         * Handles State Management, API Sync, and UI Controllers
          */
-        const geApp = {
+        const geEngine = {
             state: {
                 user: null,
                 room: "General",
-                timerInterval: null,
-                seconds: 0
+                callInterval: null,
+                callSeconds: 0
             },
 
             /**
-             * Подсистема аутентификации
+             * Auth Module: Handles User Session
              */
             auth: {
-                switch(mode) {
-                    console.log(`[AuthService] Switching to mode: ${mode}`);
-                    document.getElementById('nav-login').classList.toggle('active', mode === 'login');
-                    document.getElementById('nav-reg').classList.toggle('active', mode === 'reg');
-                    document.getElementById('form-login').classList.toggle('ge-hide', mode !== 'login');
-                    document.getElementById('form-reg').classList.toggle('ge-hide', mode !== 'reg');
-                },
+                submit() {
+                    const name = document.getElementById('reg-name').value.trim();
+                    const email = document.getElementById('reg-email').value.trim();
+                    const pass = document.getElementById('reg-pass').value.trim();
+                    const conf = document.getElementById('reg-confirm').value.trim();
 
-                process(type) {
-                    let name, email, pass, confirm;
-                    
-                    if (type === 'reg') {
-                        name = document.getElementById('reg-name').value.trim();
-                        email = document.getElementById('reg-email').value.trim();
-                        pass = document.getElementById('reg-pass').value.trim();
-                        confirm = document.getElementById('reg-confirm').value.trim();
-
-                        if (!name || !email || pass.length < 6) {
-                            return alert("Пожалуйста, заполните все поля (пароль от 6 символов)!");
-                        }
-                        if (pass !== confirm) {
-                            return alert("Пароли не совпадают!");
-                        }
-                    } else {
-                        email = document.getElementById('log-email').value.trim();
-                        pass = document.getElementById('log-pass').value.trim();
-                        if (!email || !pass) return alert("Введите данные для входа!");
-                        name = email.split('@')[0];
+                    if (!name || !email || pass.length < 6) {
+                        return alert("Invalid registration data. Password must be 6+ chars.");
+                    }
+                    if (pass !== conf) {
+                        return alert("Passwords do not match. Please verify.");
                     }
 
-                    console.log(`[AuthService] Identity confirmed for: ${name}`);
-                    geApp.state.user = { name, email };
-                    localStorage.setItem('ge_v12_session', JSON.stringify(geApp.state.user));
-                    geApp.core.launch();
+                    console.log("[Engine] Auth success. Redirecting...");
+                    geEngine.state.user = { name, email };
+                    localStorage.setItem('ge_v14_session', JSON.stringify(geEngine.state.user));
+                    geEngine.core.boot();
                 },
 
                 logout() {
-                    if (confirm("Выйти из системы?")) {
+                    if (confirm("Are you sure you want to logout?")) {
                         localStorage.clear();
                         location.reload();
                     }
@@ -829,166 +653,167 @@
             },
 
             /**
-             * Подсистема звонков
+             * Calls Module: Audio and Video Logic
              */
             calls: {
-                start(type) {
-                    console.log(`[CallService] Initiating ${type} call to ${geApp.state.room}`);
-                    const overlay = document.getElementById('call-overlay');
-                    document.getElementById('call-name').innerText = geApp.state.room;
-                    document.getElementById('call-av').innerText = geApp.state.room[0].toUpperCase();
+                init(type) {
+                    const portal = document.getElementById('call-portal');
+                    const vidBtn = document.getElementById('call-ui-vid-btn');
                     
-                    const vidBtn = document.getElementById('call-vid-btn');
-                    vidBtn.style.background = (type === 'video') ? 'var(--ge-color-primary)' : 'rgba(255,255,255,0.1)';
+                    document.getElementById('call-ui-name').innerText = geEngine.state.room;
+                    document.getElementById('call-ui-av').innerText = geEngine.state.room[0].toUpperCase();
+                    
+                    // Style video button if mode is video
+                    vidBtn.style.background = (type === 'video') ? 'var(--ge-color-blue)' : 'rgba(255,255,255,0.1)';
 
-                    overlay.style.display = 'flex';
-                    this.runTimer();
+                    portal.style.display = 'flex';
+                    this.startTimer();
                 },
 
-                runTimer() {
-                    geApp.state.seconds = 0;
-                    clearInterval(geApp.state.timerInterval);
-                    geApp.state.timerInterval = setInterval(() => {
-                        geApp.state.seconds++;
-                        const m = Math.floor(geApp.state.seconds / 60).toString().padStart(2, '0');
-                        const s = (geApp.state.seconds % 60).toString().padStart(2, '0');
-                        document.getElementById('call-timer').innerText = `${m}:${s}`;
-                        document.getElementById('call-status').innerText = "ВЫЗОВ УСТАНОВЛЕН";
+                startTimer() {
+                    geEngine.state.callSeconds = 0;
+                    clearInterval(geEngine.state.callInterval);
+                    geEngine.state.callInterval = setInterval(() => {
+                        geEngine.state.callSeconds++;
+                        const m = Math.floor(geEngine.state.callSeconds / 60).toString().padStart(2, '0');
+                        const s = (geEngine.state.callSeconds % 60).toString().padStart(2, '0');
+                        document.getElementById('call-ui-timer').innerText = `${m}:${s}`;
+                        document.getElementById('call-ui-status').innerText = "CONNECTION SECURE";
                     }, 1000);
                 },
 
                 hangup() {
-                    console.log("[CallService] Call terminated by user");
-                    document.getElementById('call-overlay').style.display = 'none';
-                    clearInterval(geApp.state.timerInterval);
-                    document.getElementById('call-timer').innerText = "00:00";
-                    document.getElementById('call-status').innerText = "Connecting...";
+                    document.getElementById('call-portal').style.display = 'none';
+                    clearInterval(geEngine.state.callInterval);
+                    document.getElementById('call-ui-timer').innerText = "00:00";
+                    document.getElementById('call-ui-status').innerText = "CONNECTING";
                 }
             },
 
             /**
-             * Подсистема чата
+             * Chat Module: Messaging and Rooms
              */
             chat: {
                 async sync() {
                     try {
-                        const url = `/api/index?room=${geApp.state.room}&user_email=${geApp.state.user.email}`;
-                        const response = await fetch(url);
-                        const data = await response.json();
+                        const url = `/api/index?room=${geEngine.state.room}&user_email=${geEngine.state.user.email}`;
+                        const res = await fetch(url);
+                        const data = await res.json();
                         this.render(data);
                     } catch (e) {
-                        console.error("[ChatService] Sync failed. Connection pending...");
+                        console.warn("[Engine] Sync pending network connection...");
                     }
                 },
 
                 render(data) {
-                    // Рендер сообщений
-                    const box = document.getElementById('messages-box');
+                    // 1. Render Messages
+                    const mBox = document.getElementById('messages-display');
                     if (data.messages?.result) {
-                        box.innerHTML = data.messages.result.map(raw => {
+                        mBox.innerHTML = data.messages.result.map(raw => {
                             const m = JSON.parse(decodeURIComponent(raw));
-                            const isMe = m.email === geApp.state.user.email;
+                            const isMe = m.email === geEngine.state.user.email;
                             return `
                                 <div class="ge-bubble ${isMe ? 'me' : 'them'}">
-                                    <span class="ge-bubble-author">${isMe ? 'You' : m.username}</span>
+                                    <small style="display:block; font-size:10px; opacity:0.6; margin-bottom:5px;">
+                                        ${isMe ? 'YOU' : m.username.toUpperCase()}
+                                    </small>
                                     ${m.text}
                                 </div>
                             `;
                         }).join('');
                     }
 
-                    // Рендер списка комнат
-                    const scroller = document.getElementById('chat-scroller');
+                    // 2. Render Sidebar Rooms
+                    const sList = document.getElementById('sidebar-chat-list');
                     if (data.rooms?.result) {
-                        scroller.innerHTML = data.rooms.result.map(rid => `
-                            <div class="ge-chat-card ${rid === geApp.state.room ? 'active' : ''}" onclick="geApp.chat.open('${rid}')">
-                                <div class="ge-avatar-lg" style="width:50px; height:50px; font-size:18px; background:#444;">${rid[0].toUpperCase()}</div>
-                                <div class="ge-chat-meta">
-                                    <b>${rid}</b>
-                                    <span>Нажмите для общения</span>
+                        sList.innerHTML = data.rooms.result.map(r => `
+                            <div class="ge-chat-card ${r === geEngine.state.room ? 'active' : ''}" onclick="geEngine.chat.switchTo('${r}')">
+                                <div class="ge-user-avatar" style="width:48px; height:48px; font-size:18px; background:#555;">${r[0].toUpperCase()}</div>
+                                <div>
+                                    <b style="font-size:16px;">${r}</b><br>
+                                    <small style="color: var(--ge-text-muted);">Active Conversation</small>
                                 </div>
                             </div>
                         `).join('');
                     }
                 },
 
-                async send() {
-                    const input = document.getElementById('main-input');
+                switchTo(roomName) {
+                    console.log(`[Engine] Switching to room: ${roomName}`);
+                    geEngine.state.room = roomName;
+                    document.getElementById('active-chat-name').innerText = roomName;
+                    document.getElementById('active-chat-av').innerText = roomName[0].toUpperCase();
+                    this.sync();
+                },
+
+                async sendMessage() {
+                    const input = document.getElementById('composer-input');
                     const text = input.value.trim();
                     if (!text) return;
 
-                    console.log(`[ChatService] Sending message to ${geApp.state.room}`);
                     const payload = JSON.stringify({
-                        username: geApp.state.user.name,
-                        email: geApp.state.user.email,
+                        username: geEngine.state.user.name,
+                        email: geEngine.state.user.email,
                         text: text
                     });
 
                     input.value = '';
-                    await fetch(`/api/index?room=${geApp.state.room}&user_email=${geApp.state.user.email}`, {
+                    await fetch(`/api/index?room=${geEngine.state.room}&user_email=${geEngine.state.user.email}`, {
                         method: 'POST',
                         body: payload
                     });
                     this.sync();
                 },
 
-                open(rid) {
-                    geApp.state.room = rid;
-                    document.getElementById('active-title').innerText = rid;
-                    document.getElementById('active-av').innerText = rid[0].toUpperCase();
-                    this.sync();
-                },
-
-                add() {
-                    const name = prompt("Введите название новой группы:");
-                    if (name) this.open(name.trim());
+                createNew() {
+                    const name = prompt("Enter new Group or Contact name:");
+                    if (name) this.switchTo(name.trim());
                 }
             },
 
             /**
-             * Подсистема интерфейса
+             * UI Module: Visual effects
              */
             ui: {
                 toggleTheme() {
-                    const h = document.documentElement;
-                    const current = h.getAttribute('data-theme');
-                    const target = current === 'dark' ? 'light' : 'dark';
-                    h.setAttribute('data-theme', target);
-                    console.log(`[UIService] Theme changed to: ${target}`);
+                    const root = document.documentElement;
+                    const isDark = root.getAttribute('data-theme') === 'dark';
+                    root.setAttribute('data-theme', isDark ? 'light' : 'dark');
+                    console.log(`[Engine] Theme toggled to: ${isDark ? 'light' : 'dark'}`);
                 }
             },
 
             /**
-             * Ядро запуска
+             * Core Module: Initialization
              */
             core: {
-                launch() {
-                    console.log("[Core] Initializing Application Shell...");
-                    document.getElementById('auth-root').classList.add('ge-hide');
-                    document.getElementById('app-root').classList.add('ge-flex');
+                boot() {
+                    console.log("[Engine] Booting GeLink Application Shell...");
+                    document.getElementById('auth-portal').classList.add('u-hidden');
+                    document.getElementById('app-portal').classList.add('u-flex');
                     
-                    document.getElementById('my-name').innerText = geApp.state.user.name;
-                    document.getElementById('my-av').innerText = geApp.state.user.name[0].toUpperCase();
+                    document.getElementById('my-profile-name').innerText = geEngine.state.user.name;
+                    document.getElementById('my-profile-av').innerText = geEngine.state.user.name[0].toUpperCase();
 
-                    geApp.chat.sync();
-                    setInterval(() => geApp.chat.sync(), 4000);
+                    geEngine.chat.sync();
+                    setInterval(() => geEngine.chat.sync(), 4000);
                 }
             }
         };
 
-        // Точка входа
+        // DOM Entry Point
         window.onload = () => {
-            const saved = localStorage.getItem('ge_v12_session');
-            if (saved) {
-                geApp.state.user = JSON.parse(saved);
-                geApp.core.launch();
+            const session = localStorage.getItem('ge_v14_session');
+            if (session) {
+                geEngine.state.user = JSON.parse(session);
+                geEngine.core.boot();
             }
         };
 
-        // Обработка клавиши Enter
-        document.getElementById('main-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') geApp.chat.send();
-        });
+        // Keyboard Event Handling
+        document.getElementById('composer-input').onkeypress = (e) => {
+            if (e.key === 'Enter') geEngine.chat.sendMessage();
+        };
     </script>
 </body>
 </html>
