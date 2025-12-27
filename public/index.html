@@ -115,7 +115,7 @@
         }
         ::-webkit-scrollbar-thumb:hover { background: #8d949e; }
 
-        /* --- КНОПКА ПЕРЕКЛЮЧЕНИЯ ТЕМЫ (В САЙДБАРЕ) --- */
+        /* --- КНОПКА ПЕРЕКЛЮЧЕНИЯ ТЕМЫ --- */
         .ge-theme-toggler {
             width: 100%;
             display: flex;
@@ -131,7 +131,7 @@
             font-size: 13px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-bottom: 12px; /* Отступ до кнопки выхода */
+            margin-bottom: 12px;
         }
 
         .ge-theme-toggler:hover {
@@ -424,13 +424,15 @@
 
         .ge-msg-bubble {
             max-width: 65%;
-            padding: 18px 26px;
-            border-radius: 26px;
+            padding: 12px 18px;
+            border-radius: 20px;
             font-size: 16px;
-            line-height: 1.6;
+            line-height: 1.4;
             position: relative;
             box-shadow: var(--shadow-sm);
             animation: ge-msg-pop 0.4s var(--ease);
+            display: flex;
+            flex-direction: column;
         }
 
         @keyframes ge-msg-pop {
@@ -452,14 +454,28 @@
             border-bottom-left-radius: 4px;
         }
 
-        .ge-msg-meta {
+        .ge-msg-meta-top {
             display: block;
             font-size: 11px;
             font-weight: 800;
             text-transform: uppercase;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             opacity: 0.7;
         }
+
+        /* --- НОВАЯ СТРОКА СТАТУСА ПОД ТЕКСТОМ --- */
+        .ge-msg-status-line {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            margin-top: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            opacity: 0.8;
+        }
+        
+        .them .ge-msg-status-line { justify-content: flex-start; opacity: 0.5; }
 
         /* ПАНЕЛЬ ВВОДА */
         .ge-footer {
@@ -775,10 +791,22 @@
                     container.innerHTML = messages.map(raw => {
                         const m = JSON.parse(decodeURIComponent(raw));
                         const isMe = m.email === geEngine.state.session.email;
+                        
+                        // Логика иконок статуса
+                        let statusIcon = '🕒'; // По умолчанию часы (не загрузило/отправка)
+                        if (m.status === 'read') statusIcon = '✓✓';
+                        else if (m.status === 'sent') statusIcon = '✓';
+                        
+                        const timeStr = m.time || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
                         return `
                             <div class="ge-msg-bubble ${isMe ? 'me' : 'them'}">
-                                <span class="ge-msg-meta">${isMe ? 'Вы' : m.username}</span>
-                                ${m.text}
+                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
+                                <div class="ge-msg-text">${m.text}</div>
+                                <div class="ge-msg-status-line">
+                                    <span>${timeStr}</span>
+                                    ${isMe ? `<span>${statusIcon}</span>` : ''}
+                                </div>
                             </div>
                         `;
                     }).join('');
@@ -813,9 +841,22 @@
                     const input = document.getElementById('ge-main-input');
                     const text = input.value.trim();
                     if (!text) return;
-                    const payload = JSON.stringify({ username: geEngine.state.session.name, email: geEngine.state.session.email, text: text });
+                    
+                    // Формируем объект сообщения с метаданными
+                    const now = new Date();
+                    const payload = JSON.stringify({ 
+                        username: geEngine.state.session.name, 
+                        email: geEngine.state.session.email, 
+                        text: text,
+                        time: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                        status: 'sent' // Устанавливаем статус "отправлено" (одна галочка)
+                    });
+                    
                     input.value = '';
-                    await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { method: 'POST', body: payload });
+                    await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { 
+                        method: 'POST', 
+                        body: payload 
+                    });
                     geEngine.chat.refresh();
                 },
                 open(id) {
