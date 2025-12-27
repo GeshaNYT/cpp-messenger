@@ -115,39 +115,28 @@
         }
         ::-webkit-scrollbar-thumb:hover { background: #8d949e; }
 
-        /* --- ВИДЖЕТ ПЕРЕКЛЮЧЕНИЯ ТЕМЫ --- */
+        /* --- КНОПКА ПЕРЕКЛЮЧЕНИЯ ТЕМЫ (В САЙДБАРЕ) --- */
         .ge-theme-toggler {
-            position: fixed;
-            top: 25px;
-            right: 25px;
-            z-index: 100000;
+            width: 100%;
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 12px;
-            padding: 14px 28px;
+            padding: 14px;
             background: var(--bg-panel);
             border: 2px solid var(--ge-primary);
-            border-radius: var(--radius-full);
-            box-shadow: var(--shadow-lg);
+            border-radius: var(--radius-md);
             color: var(--ge-primary);
             font-weight: 800;
             font-size: 13px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            animation: ge-bounce-in 0.8s var(--ease);
-        }
-
-        @keyframes ge-bounce-in {
-            0% { transform: scale(0); opacity: 0; }
-            70% { transform: scale(1.1); }
-            100% { transform: scale(1); opacity: 1; }
+            margin-bottom: 12px; /* Отступ до кнопки выхода */
         }
 
         .ge-theme-toggler:hover {
-            transform: translateY(-4px);
-            background: var(--ge-primary);
-            color: white;
-            box-shadow: var(--shadow-accent);
+            background: var(--ge-primary-soft);
+            transform: translateY(-2px);
         }
 
         /* --- МОДУЛЬ АВТОРИЗАЦИИ --- */
@@ -515,6 +504,8 @@
         .ge-sidebar-footer {
             padding: 30px;
             border-top: 1px solid var(--border-base);
+            display: flex;
+            flex-direction: column;
         }
 
         .ge-logout-btn {
@@ -586,8 +577,6 @@
             <button class="btn-hangup" onclick="geEngine.calls.hangup()">✕</button>
         </div>
     </div>
-
-    <button class="ge-theme-toggler" onclick="geEngine.ui.toggleTheme()">🌓 Переключить вид</button>
 
     <section id="ge-auth-layer" class="ge-auth-overlay">
         <div class="ge-auth-container">
@@ -666,6 +655,7 @@
                 </div>
 
             <footer class="ge-sidebar-footer">
+                <button class="ge-theme-toggler" onclick="geEngine.ui.toggleTheme()">🌓 Переключить вид</button>
                 <button class="ge-logout-btn" onclick="geEngine.auth.exit()">ЗАВЕРШИТЬ СЕАНС</button>
             </footer>
         </aside>
