@@ -2,35 +2,34 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Messenger Pro Max</title>
+    <title>Messenger Pro Ultra</title>
     <style>
-        /* ПЕРЕМЕННЫЕ ЦВЕТОВ (Светлая и Темная темы) */
+        /* ПЕРЕМЕННЫЕ ДЛЯ ТЕМ */
         :root {
-            --bg-color: #f0f2f5;
-            --card-bg: #ffffff;
-            --text-color: #1c1e21;
-            --border-color: #dddfe2;
+            --bg: #f0f2f5;
+            --card: #ffffff;
+            --text: #1c1e21;
+            --border: #dddfe2;
             --msg-in: #f1f0f0;
             --msg-out: #dcf8c6;
-            --primary-blue: #1877f2;
-            --sidebar-bg: #ffffff;
+            --primary: #1877f2;
+            --sidebar-w: 300px;
         }
 
         [data-theme="dark"] {
-            --bg-color: #18191a;
-            --card-bg: #242526;
-            --text-color: #e4e6eb;
-            --border-color: #3a3b3c;
+            --bg: #18191a;
+            --card: #242526;
+            --text: #e4e6eb;
+            --border: #3a3b3c;
             --msg-in: #3a3b3c;
             --msg-out: #056162;
-            --primary-blue: #2d88ff;
-            --sidebar-bg: #242526;
+            --primary: #2d88ff;
         }
 
         body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background-color: var(--bg-color); 
-            color: var(--text-color); 
+            font-family: 'Segoe UI', Tahoma, sans-serif; 
+            background-color: var(--bg); 
+            color: var(--text); 
             height: 100vh; 
             margin: 0; 
             display: flex; 
@@ -41,55 +40,55 @@
 
         /* КОНТЕЙНЕР ПРИЛОЖЕНИЯ */
         .app-container {
-            display: none; /* Скрыто до авторизации */
+            display: none;
             width: 95%;
-            max-width: 1000px;
+            max-width: 1100px;
             height: 85vh;
-            background: var(--card-bg);
-            border-radius: 12px;
-            box-shadow: 0 12px 28px rgba(0,0,0,0.2);
+            background: var(--card);
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
             overflow: hidden;
             display: flex;
         }
 
         /* БОКОВАЯ ПАНЕЛЬ */
         .sidebar {
-            width: 300px;
-            border-right: 1px solid var(--border-color);
+            width: var(--sidebar-w);
+            border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
-            background: var(--sidebar-bg);
+            background: var(--card);
         }
 
         .sidebar-header {
             padding: 20px;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .rooms-list {
-            flex: 1;
-            overflow-y: auto;
-        }
+        .rooms-list { flex: 1; overflow-y: auto; }
 
         .room-item {
             padding: 15px 20px;
             cursor: pointer;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border);
             transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .room-item:hover { background: var(--msg-in); }
-        .room-item.active { background: var(--primary-blue); color: white; }
+        .room-item.active { background: var(--primary); color: white; }
 
         /* ОКНО ЧАТА */
         .chat-area {
             flex: 1;
             display: flex;
             flex-direction: column;
-            background: var(--bg-color);
+            background: var(--bg);
         }
 
         #chat-messages {
@@ -97,7 +96,7 @@
             overflow-y: auto;
             padding: 20px;
             display: flex;
-            flex-direction: column-reverse; /* Новые внизу */
+            flex-direction: column-reverse;
         }
 
         .message {
@@ -106,17 +105,17 @@
             border-radius: 12px;
             max-width: 70%;
             word-wrap: break-word;
-            position: relative;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
 
         .message.incoming { align-self: flex-start; background: var(--msg-in); }
         .message.outgoing { align-self: flex-end; background: var(--msg-out); color: #000; }
 
-        .message-info { font-size: 11px; font-weight: bold; margin-bottom: 4px; display: block; }
+        .message-author { font-size: 11px; font-weight: bold; margin-bottom: 4px; display: block; }
 
-        /* ФОРМЫ ВХОДА И РЕГИСТРАЦИИ */
+        /* ЭКРАНЫ АВТОРИЗАЦИИ */
         .auth-card {
-            background: var(--card-bg);
+            background: var(--card);
             padding: 40px;
             border-radius: 12px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
@@ -128,17 +127,17 @@
             width: 100%;
             padding: 12px;
             margin: 10px 0;
-            border: 1px solid var(--border-color);
+            border: 1px solid var(--border);
             border-radius: 8px;
+            background: var(--card);
+            color: var(--text);
             box-sizing: border-box;
-            background: var(--card-bg);
-            color: var(--text-color);
         }
 
         button {
             width: 100%;
             padding: 12px;
-            background: var(--primary-blue);
+            background: var(--primary);
             color: white;
             border: none;
             border-radius: 8px;
@@ -147,17 +146,17 @@
             margin-top: 10px;
         }
 
-        .link-btn { color: var(--primary-blue); cursor: pointer; margin-top: 15px; display: inline-block; }
+        .link-btn { color: var(--primary); cursor: pointer; margin-top: 15px; display: inline-block; font-size: 14px; }
 
-        /* ПЕРЕКЛЮЧАТЕЛЬ ТЕМ */
+        /* КНОПКА ТЕМЫ */
         .theme-btn {
             position: fixed;
             top: 20px;
             right: 20px;
             cursor: pointer;
             font-size: 24px;
-            z-index: 9999;
-            background: var(--card-bg);
+            z-index: 1000;
+            background: var(--card);
             padding: 10px;
             border-radius: 50%;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
@@ -166,26 +165,30 @@
         .theme-menu {
             display: none;
             position: absolute;
-            top: 50px;
+            top: 55px;
             right: 0;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
+            background: var(--card);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 10px;
+            padding: 5px;
             width: 150px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
+
+        .theme-menu div { padding: 10px; cursor: pointer; border-radius: 5px; }
+        .theme-menu div:hover { background: var(--msg-in); }
     </style>
 </head>
 <body>
 
     <div class="theme-btn" onclick="toggleThemeMenu()">🎨
         <div id="theme-menu" class="theme-menu">
-            <div onclick="setTheme('light')" style="padding: 10px; cursor: pointer;">☀️ Светлая</div>
-            <div onclick="setTheme('dark')" style="padding: 10px; cursor: pointer;">🌙 Темная</div>
+            <div onclick="setTheme('light')">☀️ Светлая</div>
+            <div onclick="setTheme('dark')">🌙 Темная</div>
         </div>
     </div>
 
-    <div id="reg-screen" class="auth-card" style="display: none;">
+    <div id="reg-screen" class="auth-card">
         <h2>Регистрация</h2>
         <input type="text" id="reg-user" placeholder="Ваше имя">
         <input type="email" id="reg-email" placeholder="Электронная почта">
@@ -199,33 +202,34 @@
         <h2>Вход</h2>
         <input type="email" id="login-email" placeholder="Почта">
         <input type="password" id="login-pass" placeholder="Пароль">
-        <button onclick="handleLogin()">Войти в мессенджер</button>
-        <div class="link-btn" onclick="showReg()">Нет аккаунта? Зарегистрироваться</div>
+        <button onclick="handleLogin()">Войти</button>
+        <div class="link-btn" onclick="showReg()">Нет аккаунта? Регистрация</div>
     </div>
 
     <div id="app-screen" class="app-container" style="display: none;">
         <div class="sidebar">
             <div class="sidebar-header">
-                <b>Мои Чаты</b>
-                <button onclick="createNewGroup()" style="width: auto; padding: 5px 10px; font-size: 12px;">+ Группа</button>
+                <b>Группы</b>
+                <button onclick="createGroup()" style="width:auto; padding: 5px 12px; font-size: 12px;">+ Новая</button>
             </div>
-            <div id="rooms-list" class="rooms-list">
-                </div>
-            <div style="padding: 20px; border-top: 1px solid var(--border-color);">
-                <button onclick="logout()" style="background: #ff4d4d;">Выйти из системы</button>
+            <div id="rooms-list" class="rooms-list"></div>
+            <div style="padding: 15px; border-top: 1px solid var(--border)">
+                <button onclick="logout()" style="background: #ff4d4d;">Выйти</button>
             </div>
         </div>
 
         <div class="chat-area">
-            <div class="sidebar-header" style="background: var(--card-bg);">
+            <div class="sidebar-header">
                 <span id="active-room-title">Общий чат</span>
-                <span id="current-username" style="font-size: 12px; opacity: 0.6;"></span>
-            </div>
-            <div id="chat-messages">
+                <div>
+                    <button id="add-member-btn" onclick="inviteUser()" style="width:auto; padding: 5px 10px; font-size: 12px; background: #28a745;">+ Добавить друга</button>
+                    <span id="my-name-tag" style="margin-left: 10px; font-size: 12px; opacity: 0.6;"></span>
                 </div>
-            <div style="padding: 20px; background: var(--card-bg); display: flex; gap: 10px; border-top: 1px solid var(--border-color);">
-                <input type="text" id="msg-input" placeholder="Введите сообщение..." style="margin: 0;">
-                <button onclick="send()" style="width: 60px; margin: 0;">></button>
+            </div>
+            <div id="chat-messages"></div>
+            <div style="padding: 20px; background: var(--card); display: flex; gap: 10px; border-top: 1px solid var(--border);">
+                <input type="text" id="msg-input" placeholder="Напишите сообщение..." style="margin:0">
+                <button onclick="send()" style="width: 60px; margin:0;">></button>
             </div>
         </div>
     </div>
@@ -234,155 +238,118 @@
         let currentUser = "";
         let currentRoom = "general";
 
-        // 1. ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ
-        window.onload = function() {
-            // Тема
-            const savedTheme = localStorage.getItem('user_theme') || 'light';
-            setTheme(savedTheme);
+        // ЗАГРУЗКА
+        window.onload = () => {
+            const theme = localStorage.getItem('chat_theme') || 'light';
+            setTheme(theme);
 
-            // Сессия
-            const sessionUser = localStorage.getItem('chat_session_user');
-            if (sessionUser) {
-                startApp(sessionUser);
-            } else {
-                showReg();
-            }
+            const user = localStorage.getItem('chat_session_user');
+            if (user) startApp(user);
         };
 
-        // 2. УПРАВЛЕНИЕ ТЕМАМИ
+        // ТЕМЫ
         function toggleThemeMenu() {
             const m = document.getElementById('theme-menu');
             m.style.display = (m.style.display === 'block') ? 'none' : 'block';
         }
-
-        function setTheme(theme) {
-            document.documentElement.setAttribute('data-theme', theme);
-            localStorage.setItem('user_theme', theme);
+        function setTheme(t) {
+            document.documentElement.setAttribute('data-theme', t);
+            localStorage.setItem('chat_theme', t);
+            document.getElementById('theme-menu').style.display = 'none';
         }
 
-        // 3. ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ
-        function showReg() { 
-            document.getElementById('reg-screen').style.display = 'block';
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('app-screen').style.display = 'none';
-        }
+        // ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ
+        function showLogin() { document.getElementById('reg-screen').style.display='none'; document.getElementById('login-screen').style.display='block'; }
+        function showReg() { document.getElementById('reg-screen').style.display='block'; document.getElementById('login-screen').style.display='none'; }
 
-        function showLogin() { 
-            document.getElementById('reg-screen').style.display = 'none';
-            document.getElementById('login-screen').style.display = 'block';
-            document.getElementById('app-screen').style.display = 'none';
-        }
-
-        // 4. ЛОГИКА АККАУНТОВ
+        // АВТОРИЗАЦИЯ
         function handleRegister() {
-            const u = document.getElementById('reg-user').value;
-            const e = document.getElementById('reg-email').value;
-            const p = document.getElementById('reg-pass').value;
-            const cp = document.getElementById('reg-confirm').value;
-
-            if(!u || !e || !p) return alert("Заполните всё!");
+            const u = document.getElementById('reg-user').value, e = document.getElementById('reg-email').value, p = document.getElementById('reg-pass').value, cp = document.getElementById('reg-confirm').value;
+            if(!u || !e || !p) return alert("Заполни всё!");
             if(p !== cp) return alert("Пароли не совпадают!");
-
-            localStorage.setItem('user_db_' + e, JSON.stringify({u, p}));
+            localStorage.setItem('acc_'+e, JSON.stringify({u, p}));
             localStorage.setItem('chat_session_user', u);
             startApp(u);
         }
 
         function handleLogin() {
-            const e = document.getElementById('login-email').value;
-            const p = document.getElementById('login-pass').value;
-            const saved = JSON.parse(localStorage.getItem('user_db_' + e) || "{}");
-
-            if(saved.p === p) {
-                localStorage.setItem('chat_session_user', saved.u);
-                startApp(saved.u);
-            } else {
-                alert("Неверная почта или пароль!");
-            }
+            const e = document.getElementById('login-email').value, p = document.getElementById('login-pass').value;
+            const acc = JSON.parse(localStorage.getItem('acc_'+e) || '{}');
+            if(acc.p === p) {
+                localStorage.setItem('chat_session_user', acc.u);
+                startApp(acc.u);
+            } else alert("Неверно!");
         }
 
-        function logout() {
-            localStorage.removeItem('chat_session_user');
-            location.reload();
-        }
+        function logout() { localStorage.removeItem('chat_session_user'); location.reload(); }
 
-        // 5. РАБОТА ПРИЛОЖЕНИЯ
+        // ПРИЛОЖЕНИЕ
         function startApp(user) {
             currentUser = user;
-            document.getElementById('reg-screen').style.display = 'none';
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('app-screen').style.display = 'flex';
-            document.getElementById('current-username').innerText = "Вы: " + user;
-
-            updateAll();
-            setInterval(updateAll, 3000);
+            document.getElementById('reg-screen').style.display='none';
+            document.getElementById('login-screen').style.display='none';
+            document.getElementById('app-screen').style.display='flex';
+            document.getElementById('my-name-tag').innerText = user;
+            update();
+            setInterval(update, 3000);
         }
 
-        function createNewGroup() {
-            const name = prompt("Название группы:");
-            if(name) switchRoom(name.trim());
+        function createGroup() {
+            const name = prompt("Название приватной группы:");
+            if (name) switchRoom(name.trim());
+        }
+
+        async function inviteUser() {
+            const target = prompt("Имя друга, которого нужно добавить:");
+            if (!target) return;
+            const payload = JSON.stringify({ username: "System", text: `${currentUser} пригласил вас в чат` });
+            await fetch(`/api/index?room=${currentRoom}&user=${target}`, { method: 'POST', body: payload });
+            alert("Пользователь добавлен!");
         }
 
         function switchRoom(name) {
             currentRoom = name;
             document.getElementById('active-room-title').innerText = "# " + name;
-            updateAll();
+            document.getElementById('add-member-btn').style.visibility = (name === 'general' ? 'hidden' : 'visible');
+            update();
         }
 
-        async function updateAll() {
+        async function update() {
             try {
-                // Загружаем данные из твоего API (которое на Vercel + Redis)
-                const response = await fetch(`/api/index?room=${currentRoom}`);
-                const data = await response.json();
+                const res = await fetch(`/api/index?room=${currentRoom}&user=${currentUser}`);
+                const data = await res.json();
 
-                // Список комнат
-                if(data.rooms && data.rooms.result) {
-                    const rList = document.getElementById('rooms-list');
-                    rList.innerHTML = data.rooms.result.map(r => `
-                        <div class="room-item ${r === currentRoom ? 'active' : ''}" onclick="switchRoom('${r}')">
-                            # ${r}
-                        </div>
+                if (data.rooms && data.rooms.result) {
+                    document.getElementById('rooms-list').innerHTML = data.rooms.result.map(r => `
+                        <div class="room-item ${r === currentRoom ? 'active' : ''}" onclick="switchRoom('${r}')"># ${r}</div>
                     `).join('');
                 }
 
-                // Сообщения
-                if(data.messages && data.messages.result) {
-                    const mBox = document.getElementById('chat-messages');
-                    mBox.innerHTML = data.messages.result.map(item => {
+                if (data.messages && data.messages.result) {
+                    document.getElementById('chat-messages').innerHTML = data.messages.result.map(item => {
                         try {
-                            const msgObj = JSON.parse(decodeURIComponent(item));
-                            const isMine = msgObj.username === currentUser;
+                            const m = JSON.parse(decodeURIComponent(item));
+                            const isMine = m.username === currentUser;
                             return `
                                 <div class="message ${isMine ? 'outgoing' : 'incoming'}">
-                                    <span class="message-info">${isMine ? 'Вы' : msgObj.username}</span>
-                                    ${msgObj.text}
-                                </div>
-                            `;
-                        } catch(e) {
-                            return `<div class="message incoming">${decodeURIComponent(item)}</div>`;
-                        }
+                                    <span class="message-author">${isMine ? 'Вы' : m.username}</span>
+                                    ${m.text}
+                                </div>`;
+                        } catch(e) { return `<div class="message incoming">${decodeURIComponent(item)}</div>`; }
                     }).join('');
                 }
-            } catch(e) { console.error("Ошибка обновления"); }
+            } catch(e) {}
         }
 
         async function send() {
-            const input = document.getElementById('msg-input');
-            if(!input.value.trim()) return;
-
-            const payload = JSON.stringify({
-                username: currentUser,
-                text: input.value.trim()
-            });
-
-            await fetch(`/api/index?room=${currentRoom}`, {
-                method: 'POST',
-                body: payload
-            });
-
-            input.value = '';
-            updateAll();
+            const i = document.getElementById('msg-input');
+            if(!i.value) return;
+            const payload = JSON.stringify({ username: currentUser, text: i.value });
+            await fetch(`/api/index?room=${currentRoom}&user=${currentUser}`, { method: 'POST', body: payload });
+            i.value = ''; update();
         }
+
+        window.onclick = (e) => { if (!e.target.matches('.theme-btn')) document.getElementById('theme-menu').style.display='none'; }
     </script>
 </body>
 </html>
