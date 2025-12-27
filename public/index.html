@@ -8,21 +8,21 @@
         .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; }
         h2 { text-align: center; color: #1c1e21; }
         #chat-screen { display: none; width: 450px; }
-        #login-screen { display: none; }
+        #login-screen, #auth-screen { display: none; } /* Скрыты до проверки входа */
         #chat { height: 400px; border: 1px solid #e4e6eb; background: #fff; overflow-y: auto; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; flex-direction: column-reverse; }
         input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #dddfe2; border-radius: 6px; box-sizing: border-box; }
         button { width: 100%; padding: 12px; background: #1877f2; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
         .link-text { text-align: center; margin-top: 15px; font-size: 14px; color: #1877f2; cursor: pointer; }
         .msg-item { margin-bottom: 8px; padding: 8px; border-radius: 5px; background: #f1f0f0; }
         .msg-user { color: #1877f2; font-weight: bold; }
-        .error { color: red; font-size: 13px; text-align: center; display: none; margin-bottom: 10px; }
+        .header-chat { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .logout-btn { width: auto; padding: 5px 10px; background: #ff4d4d; font-size: 12px; }
     </style>
 </head>
 <body>
 
     <div id="auth-screen" class="card">
         <h2>Регистрация</h2>
-        <div id="reg-error" class="error"></div>
         <input type="text" id="reg-user" placeholder="Имя пользователя">
         <input type="email" id="reg-email" placeholder="Почта">
         <input type="password" id="reg-pass" placeholder="Пароль">
@@ -33,7 +33,6 @@
 
     <div id="login-screen" class="card">
         <h2>Вход</h2>
-        <div id="login-error" class="error">Ошибка входа!</div>
         <input type="email" id="login-email" placeholder="Почта">
         <input type="password" id="login-pass" placeholder="Пароль">
         <button onclick="handleLogin()">Войти</button>
@@ -41,7 +40,10 @@
     </div>
 
     <div id="chat-screen" class="card">
-        <h3 id="user-display"></h3>
+        <div class="header-chat">
+            <h3 id="user-display" style="margin:0;"></h3>
+            <button class="logout-btn" onclick="logout()">Выйти</button>
+        </div>
         <div id="chat"></div>
         <div style="display:flex; gap:10px;">
             <input type="text" id="m" placeholder="Сообщение...">
@@ -51,6 +53,16 @@
 
     <script>
         let currentUser = "";
+
+        // ПРОВЕРКА ВХОДА ПРИ ЗАГРУЗКЕ
+        window.onload = function() {
+            const savedUser = localStorage.getItem('chat_session_user');
+            if (savedUser) {
+                startChat(savedUser);
+            } else {
+                document.getElementById('auth-screen').style.display = 'block';
+            }
+        };
 
         function toggleAuth(toLogin) {
             document.getElementById('auth-screen').style.display = toLogin ? 'none' : 'block';
@@ -62,16 +74,29 @@
             const e = document.getElementById('reg-email').value;
             const p = document.getElementById('reg-pass').value;
             const cp = document.getElementById('reg-confirm').value;
+            if (!u || !e || !p) { alert("Заполните все поля"); return; }
             if (p !== cp) { alert("Пароли не совпадают!"); return; }
-            localStorage.setItem(e, JSON.stringify({ u, p }));
+            
+            localStorage.setItem('user_' + e, JSON.stringify({ u, p }));
+            localStorage.setItem('chat_session_user', u); // Запоминаем сессию
             startChat(u);
         }
 
         function handleLogin() {
             const e = document.getElementById('login-email').value;
             const p = document.getElementById('login-pass').value;
-            const acc = JSON.parse(localStorage.getItem(e) || "{}");
-            if (acc.p === p) startChat(acc.u); else alert("Неверно!");
+            const acc = JSON.parse(localStorage.getItem('user_' + e) || "{}");
+            if (acc.p === p) {
+                localStorage.setItem('chat_session_user', acc.u); // Запоминаем сессию
+                startChat(acc.u);
+            } else {
+                alert("Неверные данные!");
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('chat_session_user');
+            location.reload(); // Перезагружаем, чтобы вернуться на экран входа
         }
 
         function startChat(user) {
@@ -80,20 +105,23 @@
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('chat-screen').style.display = 'block';
             document.getElementById('user-display').innerText = "Вы: " + user;
-            load(); setInterval(load, 3000);
+            load();
+            setInterval(load, 3000);
         }
 
         async function load() {
-            const res = await fetch('/api/index');
-            const data = await res.json();
-            if (data.result) {
-                document.getElementById('chat').innerHTML = data.result.map(item => {
-                    try {
-                        const m = JSON.parse(decodeURIComponent(item));
-                        return `<div class="msg-item"><span class="msg-user">${m.username}:</span> ${m.text}</div>`;
-                    } catch(e) { return `<div class="msg-item">${decodeURIComponent(item)}</div>`; }
-                }).join('');
-            }
+            try {
+                const res = await fetch('/api/index');
+                const data = await res.json();
+                if (data.result) {
+                    document.getElementById('chat').innerHTML = data.result.map(item => {
+                        try {
+                            const m = JSON.parse(decodeURIComponent(item));
+                            return `<div class="msg-item"><span class="msg-user">${m.username}:</span> ${m.text}</div>`;
+                        } catch(e) { return `<div class="msg-item">${decodeURIComponent(item)}</div>`; }
+                    }).join('');
+                }
+            } catch(e) { console.error("Ошибка загрузки"); }
         }
 
         async function send() {
@@ -101,7 +129,8 @@
             if (!i.value) return;
             const msgData = JSON.stringify({ username: currentUser, text: i.value });
             await fetch('/api/index', { method: 'POST', body: msgData });
-            i.value = ''; load();
+            i.value = '';
+            load();
         }
     </script>
 </body>
