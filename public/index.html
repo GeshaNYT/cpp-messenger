@@ -463,7 +463,7 @@
             opacity: 0.7;
         }
 
-        /* --- НОВАЯ СТРОКА СТАТУСА ПОД ТЕКСТОМ --- */
+        /* --- СТРОКА СТАТУСА ПОД ТЕКСТОМ --- */
         .ge-msg-status-line {
             display: flex;
             align-items: center;
@@ -775,15 +775,30 @@
                     }
 
                     if (!rooms) return;
-                    scroller.innerHTML = rooms.map(rid => `
-                        <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}')">
-                            <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:#444;">${rid[0].toUpperCase()}</div>
-                            <div class="ge-item-content">
-                                <b>${rid}</b>
-                                <span>Активный зашифрованный канал</span>
+                    scroller.innerHTML = rooms.map(rid => {
+                        // ЛОГИКА ОПРЕДЕЛЕНИЯ КРАСИВОГО ИМЕНИ
+                        let displayName = rid;
+                        if (rid.startsWith('private-')) {
+                            const parts = rid.replace('private-', '').split('-');
+                            // Пытаемся найти почту собеседника (не нашу)
+                            const myEmailSafe = geEngine.state.session.email.replace(/[@.]/g, '');
+                            const otherPart = parts.find(p => p !== myEmailSafe);
+                            if (otherPart) {
+                                // Просто берем начало строки до домена или просто часть
+                                displayName = otherPart.split('gmailcom')[0] || otherPart;
+                            }
+                        }
+
+                        return `
+                            <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}', '${displayName}')">
+                                <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:#444;">${displayName[0].toUpperCase()}</div>
+                                <div class="ge-item-content">
+                                    <b>${displayName}</b>
+                                    <span>Активный зашифрованный канал</span>
+                                </div>
                             </div>
-                        </div>
-                    `).join('');
+                        `;
+                    }).join('');
                 },
                 renderMessages(messages) {
                     const container = document.getElementById('ge-msg-container');
@@ -792,8 +807,7 @@
                         const m = JSON.parse(decodeURIComponent(raw));
                         const isMe = m.email === geEngine.state.session.email;
                         
-                        // Логика иконок статуса
-                        let statusIcon = '🕒'; // По умолчанию часы (не загрузило/отправка)
+                        let statusIcon = '🕒'; 
                         if (m.status === 'read') statusIcon = '✓✓';
                         else if (m.status === 'sent') statusIcon = '✓';
                         
@@ -816,9 +830,9 @@
             calls: {
                 initiate(type) {
                     const overlay = document.getElementById('ge-call-ui');
-                    const target = geEngine.state.activeRoom;
-                    document.getElementById('ge-call-name').innerText = target;
-                    document.getElementById('ge-call-av').innerText = target[0].toUpperCase();
+                    const targetName = document.getElementById('ge-active-name').innerText;
+                    document.getElementById('ge-call-name').innerText = targetName;
+                    document.getElementById('ge-call-av').innerText = targetName[0].toUpperCase();
                     document.getElementById('ge-call-status').innerText = type === 'video' ? 'ВИДЕОЗВОНОК...' : 'ГОЛОСОВОЙ ВЫЗОВ...';
                     overlay.style.display = 'flex';
                 },
@@ -842,14 +856,13 @@
                     const text = input.value.trim();
                     if (!text) return;
                     
-                    // Формируем объект сообщения с метаданными
                     const now = new Date();
                     const payload = JSON.stringify({ 
                         username: geEngine.state.session.name, 
                         email: geEngine.state.session.email, 
                         text: text,
                         time: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                        status: 'sent' // Устанавливаем статус "отправлено" (одна галочка)
+                        status: 'sent' 
                     });
                     
                     input.value = '';
@@ -859,10 +872,10 @@
                     });
                     geEngine.chat.refresh();
                 },
-                open(id) {
+                open(id, prettyName) {
                     geEngine.state.activeRoom = id;
-                    document.getElementById('ge-active-name').innerText = id;
-                    document.getElementById('ge-active-av').innerText = id[0].toUpperCase();
+                    document.getElementById('ge-active-name').innerText = prettyName || id;
+                    document.getElementById('ge-active-av').innerText = (prettyName || id)[0].toUpperCase();
                     geEngine.chat.refresh();
                 },
                 async addFriend() {
@@ -874,7 +887,7 @@
                 },
                 createGroup() {
                     const name = prompt("Имя группы:");
-                    if (name) geEngine.chat.open(name.trim());
+                    if (name) geEngine.chat.open(name.trim(), name.trim());
                 }
             },
 
