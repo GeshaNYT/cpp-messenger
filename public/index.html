@@ -3,632 +3,677 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeLink Messenger Ultra | Secure Communication Platform v7.0</title>
+    <title>GeLink Enterprise Messenger | Version 9.0 Ultimate</title>
     
     <style>
-        /* --- КОРНЕВЫЕ ТОКЕНЫ И ПЕРЕМЕННЫЕ --- */
+        /* --- КОРНЕВЫЕ ПЕРЕМЕННЫЕ (DESIGN TOKENS) --- */
         :root {
-            --ge-brand-primary: #0084ff;
-            --ge-brand-dark: #0063c2;
-            --ge-brand-light: #e7f3ff;
-            --ge-brand-gradient: linear-gradient(135deg, #0084ff 0%, #00c6ff 100%);
+            /* Основная палитра */
+            --ge-primary: #0084ff;
+            --ge-primary-dark: #006dd4;
+            --ge-primary-light: #339cff;
+            --ge-primary-soft: rgba(0, 132, 255, 0.1);
+            --ge-accent-gradient: linear-gradient(135deg, #0084ff 0%, #00c6ff 100%);
             
-            --ge-status-online: #42b72a;
-            --ge-status-away: #f7b928;
-            --ge-status-error: #fa3e3e;
+            /* Статусы */
+            --ge-success: #42b72a;
+            --ge-error: #fa3e3e;
+            --ge-warning: #f7b928;
+            --ge-online: #31a24c;
             
-            /* Светлая палитра (Default) */
-            --ge-bg-app: #f0f2f5;
-            --ge-bg-side: #ffffff;
-            --ge-bg-chat: #f0f2f5;
-            --ge-bg-header: #ffffff;
-            --ge-bg-card: #ffffff;
-            --ge-bg-input: #f0f2f5;
-            --ge-bg-bubble-me: #0084ff;
-            --ge-bg-bubble-them: #e4e6eb;
+            /* Светлая тема */
+            --bg-body: #f0f2f5;
+            --bg-panel: #ffffff;
+            --bg-header: #ffffff;
+            --bg-input: #f0f2f5;
+            --bg-bubble-me: #0084ff;
+            --bg-bubble-other: #e4e6eb;
             
-            --ge-text-main: #1c1e21;
-            --ge-text-muted: #65676b;
-            --ge-text-on-brand: #ffffff;
-            --ge-text-link: #1877f2;
+            --text-primary: #1c1e21;
+            --text-secondary: #65676b;
+            --text-tertiary: #8a8d91;
+            --text-white: #ffffff;
             
-            --ge-border-main: #dddfe2;
-            --ge-border-soft: rgba(0,0,0,0.05);
+            --border-base: #dddfe2;
+            --border-soft: rgba(0, 0, 0, 0.05);
             
-            /* Эффекты и тени */
-            --ge-shadow-sm: 0 2px 4px rgba(0,0,0,0.08);
-            --ge-shadow-md: 0 12px 28px rgba(0,0,0,0.1);
-            --ge-shadow-lg: 0 24px 50px rgba(0,0,0,0.15);
-            --ge-shadow-brand: 0 8px 20px rgba(0, 132, 255, 0.3);
+            /* Тени */
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --shadow-lg: 0 12px 28px rgba(0,0,0,0.12);
+            --shadow-xl: 0 20px 40px rgba(0,0,0,0.15);
+            --shadow-accent: 0 8px 20px rgba(0, 132, 255, 0.25);
             
-            /* Геометрия */
-            --ge-radius-full: 500px;
-            --ge-radius-lg: 24px;
-            --ge-radius-md: 16px;
-            --ge-radius-sm: 10px;
+            /* Размеры */
+            --sidebar-width: 440px;
+            --header-height: 85px;
+            --radius-xs: 6px;
+            --radius-sm: 10px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
+            --radius-xl: 32px;
+            --radius-full: 1000px;
             
             /* Тайминги */
-            --ge-ease: cubic-bezier(0.4, 0, 0.2, 1);
-            --ge-duration: 0.3s;
+            --t-fast: 0.2s;
+            --t-normal: 0.3s;
+            --t-slow: 0.5s;
+            --ease: cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* --- ТЕМНЫЙ РЕЖИМ (DARK MODE) --- */
+        /* --- ТЕМНАЯ ТЕМА --- */
         [data-theme="dark"] {
-            --ge-bg-app: #18191a;
-            --ge-bg-side: #242526;
-            --ge-bg-chat: #18191a;
-            --ge-bg-header: #242526;
-            --ge-bg-card: #242526;
-            --ge-bg-input: #3a3b3c;
-            --ge-bg-bubble-them: #3a3b3c;
+            --bg-body: #18191a;
+            --bg-panel: #242526;
+            --bg-header: #242526;
+            --bg-input: #3a3b3c;
+            --bg-bubble-other: #3a3b3c;
             
-            --ge-text-main: #e4e6eb;
-            --ge-text-muted: #b0b3b8;
-            --ge-border-main: #3e4042;
-            --ge-shadow-md: 0 12px 28px rgba(0,0,0,0.5);
+            --text-primary: #e4e6eb;
+            --text-secondary: #b0b3b8;
+            --text-tertiary: #8a8d91;
+            
+            --border-base: #3e4042;
+            --shadow-lg: 0 12px 28px rgba(0,0,0,0.5);
         }
 
-        /* --- БАЗОВЫЕ СТИЛИ (RESET) --- */
+        /* --- БАЗОВЫЕ НАСТРОЙКИ --- */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
             outline: none;
-            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
         }
 
         html, body {
             height: 100%;
             width: 100%;
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background-color: var(--ge-bg-app);
-            color: var(--ge-text-main);
+            background-color: var(--bg-body);
+            color: var(--text-primary);
             overflow: hidden;
-            transition: background var(--ge-duration) var(--ge-ease);
+            transition: background var(--t-normal) var(--ease);
         }
 
-        button {
-            cursor: pointer;
+        button, input, textarea {
+            font-family: inherit;
             border: none;
             background: none;
-            font: inherit;
-            transition: all var(--ge-duration) var(--ge-ease);
+            transition: var(--transition);
         }
 
-        input {
-            border: none;
-            font: inherit;
-        }
+        button { cursor: pointer; }
 
         /* --- КАСТОМНЫЙ СКРОЛЛБАР --- */
-        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { 
             background: #bcc0c4; 
             border-radius: 10px; 
             border: 2px solid transparent; 
-            background-clip: padding-box;
+            background-clip: padding-box; 
         }
         ::-webkit-scrollbar-thumb:hover { background: #8d949e; }
 
-        /* --- КНОПКА ТЕМЫ (FIXED POSITION) --- */
-        .ge-widget-theme {
+        /* --- ВИДЖЕТ ПЕРЕКЛЮЧЕНИЯ ТЕМЫ --- */
+        .ge-theme-toggler {
             position: fixed;
-            top: 30px;
-            right: 30px;
-            z-index: 99999;
+            top: 25px;
+            right: 25px;
+            z-index: 100000;
             display: flex;
             align-items: center;
             gap: 12px;
             padding: 14px 28px;
-            background: var(--ge-bg-card);
-            border: 2px solid var(--ge-brand-primary);
-            border-radius: var(--ge-radius-full);
-            box-shadow: var(--ge-shadow-lg);
-            color: var(--ge-brand-primary);
+            background: var(--bg-panel);
+            border: 2px solid var(--ge-primary);
+            border-radius: var(--radius-full);
+            box-shadow: var(--shadow-lg);
+            color: var(--ge-primary);
             font-weight: 800;
-            font-size: 14px;
+            font-size: 13px;
             text-transform: uppercase;
             letter-spacing: 1px;
-        }
-        .ge-widget-theme:hover {
-            transform: translateY(-4px) scale(1.03);
-            background: var(--ge-brand-primary);
-            color: white;
-            box-shadow: var(--ge-shadow-brand);
+            animation: ge-bounce-in 0.8s var(--ease);
         }
 
-        /* --- МОДУЛЬ АВТОРИЗАЦИИ (LOGIN / REGISTER) --- */
-        .ge-auth-layer {
+        @keyframes ge-bounce-in {
+            0% { transform: scale(0); opacity: 0; }
+            70% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .ge-theme-toggler:hover {
+            transform: translateY(-4px);
+            background: var(--ge-primary);
+            color: white;
+            box-shadow: var(--shadow-accent);
+        }
+
+        /* --- МОДУЛЬ АВТОРИЗАЦИИ (РЕГИСТРАЦИЯ И ВХОД) --- */
+        .ge-auth-overlay {
             position: fixed;
             inset: 0;
             z-index: 90000;
-            background: var(--ge-bg-app);
+            background: var(--bg-body);
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: opacity 0.5s ease, visibility 0.5s;
+            padding: 20px;
             background-image: 
-                radial-gradient(at 0% 0%, var(--ge-brand-light) 0, transparent 45%),
-                radial-gradient(at 100% 100%, var(--ge-brand-light) 0, transparent 45%);
+                radial-gradient(at 0% 0%, var(--ge-primary-soft) 0, transparent 40%),
+                radial-gradient(at 100% 100%, var(--ge-primary-soft) 0, transparent 40%);
         }
 
-        .ge-auth-card {
-            background: var(--ge-bg-card);
+        .ge-auth-container {
+            background: var(--bg-panel);
             width: 100%;
-            max-width: 540px;
-            padding: 70px 60px;
-            border-radius: var(--ge-radius-lg);
-            box-shadow: var(--ge-shadow-lg);
-            border: 1px solid var(--ge-border-main);
+            max-width: 520px;
+            padding: 60px 50px;
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--border-base);
             text-align: center;
-            animation: ge-entry-anim 0.8s var(--ge-ease);
+            animation: ge-slide-up 0.7s var(--ease);
         }
 
-        @keyframes ge-entry-anim {
-            from { opacity: 0; transform: translateY(60px); }
+        @keyframes ge-slide-up {
+            from { opacity: 0; transform: translateY(40px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .ge-auth-brand {
+        .ge-brand-logo {
             font-size: 84px;
             font-weight: 900;
-            color: var(--ge-brand-primary);
+            color: var(--ge-primary);
             letter-spacing: -5px;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
 
-        .ge-auth-desc {
-            color: var(--ge-text-muted);
+        .ge-auth-tagline {
             font-size: 18px;
+            color: var(--text-secondary);
             margin-bottom: 45px;
+            font-weight: 500;
         }
 
-        .ge-auth-nav {
+        .ge-auth-tabs {
             display: flex;
-            gap: 30px;
+            gap: 25px;
             justify-content: center;
             margin-bottom: 40px;
-            border-bottom: 2px solid var(--ge-border-soft);
-        }
-
-        .ge-nav-tab {
-            padding-bottom: 12px;
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--ge-text-muted);
             position: relative;
         }
 
-        .ge-nav-tab.active {
-            color: var(--ge-brand-primary);
+        .ge-auth-tab {
+            padding: 10px 0;
+            font-size: 19px;
+            font-weight: 700;
+            color: var(--text-tertiary);
+            border-bottom: 3px solid transparent;
         }
 
-        .ge-nav-tab.active::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: var(--ge-brand-primary);
+        .ge-auth-tab.active {
+            color: var(--ge-primary);
+            border-bottom-color: var(--ge-primary);
         }
 
-        .ge-form-box {
+        .ge-form-group {
             display: flex;
             flex-direction: column;
-            gap: 24px;
+            gap: 22px;
             text-align: left;
         }
 
-        .ge-input-wrapper {
+        .ge-field {
             display: flex;
             flex-direction: column;
             gap: 10px;
         }
 
-        .ge-input-label {
+        .ge-label {
             font-size: 12px;
             font-weight: 800;
-            color: var(--ge-text-muted);
+            color: var(--text-secondary);
             text-transform: uppercase;
+            letter-spacing: 0.5px;
             padding-left: 5px;
         }
 
-        .ge-input-field {
+        .ge-input-core {
             width: 100%;
-            padding: 20px 25px;
-            background: var(--ge-bg-input);
+            padding: 18px 24px;
+            background: var(--bg-input);
             border: 2px solid transparent;
-            border-radius: var(--ge-radius-md);
-            color: var(--ge-text-main);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
             font-size: 16px;
             font-weight: 500;
+            box-shadow: var(--shadow-sm);
         }
 
-        .ge-input-field:focus {
-            background: var(--ge-bg-card);
-            border-color: var(--ge-brand-primary);
-            box-shadow: 0 0 0 5px var(--ge-brand-light);
+        .ge-input-core:focus {
+            background: var(--bg-panel);
+            border-color: var(--ge-primary);
+            box-shadow: 0 0 0 5px var(--ge-primary-soft);
         }
 
-        .ge-btn-primary {
+        .ge-btn-submit {
             width: 100%;
             padding: 22px;
-            background: var(--ge-brand-primary);
+            background: var(--ge-primary);
             color: white;
-            border-radius: var(--ge-radius-md);
+            border-radius: var(--radius-md);
             font-size: 18px;
             font-weight: 800;
-            box-shadow: var(--ge-shadow-brand);
+            box-shadow: var(--shadow-accent);
             margin-top: 15px;
         }
 
-        .ge-btn-primary:hover {
-            background: var(--ge-brand-dark);
+        .ge-btn-submit:hover {
+            background: var(--ge-primary-dark);
             transform: translateY(-2px);
         }
 
-        /* --- ГЛАВНЫЙ ИНТЕРФЕЙС МЕССЕНДЖЕРА --- */
-        .ge-app-shell {
-            display: none; /* Скрыто до входа */
+        /* --- ГЛАВНАЯ СТРУКТУРА МЕССЕНДЖЕРА --- */
+        .ge-messenger-shell {
+            display: none; /* Переключается скриптом */
             width: 100vw;
             height: 100vh;
             flex-direction: row;
         }
 
-        /* Левая панель (Sidebar) */
-        .ge-app-sidebar {
-            width: 460px;
-            background: var(--ge-bg-side);
-            border-right: 1px solid var(--ge-border-main);
+        /* САЙДБАР */
+        .ge-sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border-base);
             display: flex;
             flex-direction: column;
             z-index: 100;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.02);
         }
 
-        .ge-side-head {
+        .ge-sidebar-header {
             padding: 45px 35px;
-            border-bottom: 1px solid var(--ge-border-main);
+            border-bottom: 1px solid var(--border-base);
         }
 
-        .ge-my-profile {
+        .ge-user-profile {
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 22px;
             margin-bottom: 35px;
         }
 
-        .ge-big-av {
-            width: 70px;
-            height: 70px;
-            border-radius: 25px;
-            background: var(--ge-brand-gradient);
+        .ge-user-av {
+            width: 75px;
+            height: 75px;
+            border-radius: 28px;
+            background: var(--ge-accent-gradient);
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 30px;
+            font-size: 32px;
             font-weight: 900;
-            box-shadow: var(--ge-shadow-sm);
+            box-shadow: var(--shadow-md);
+            position: relative;
         }
 
-        .ge-side-nav {
+        .ge-user-av::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            right: -4px;
+            width: 18px;
+            height: 18px;
+            background: var(--ge-online);
+            border: 4px solid var(--bg-panel);
+            border-radius: 50%;
+        }
+
+        .ge-sidebar-nav {
             display: flex;
-            background: var(--ge-bg-app);
+            background: var(--bg-body);
             padding: 6px;
-            border-radius: 16px;
-            margin-bottom: 30px;
+            border-radius: var(--radius-md);
+            margin-bottom: 25px;
         }
 
-        .ge-nav-item {
+        .ge-nav-tab {
             flex: 1;
-            padding: 15px;
+            padding: 14px;
             text-align: center;
             font-weight: 800;
             font-size: 13px;
-            color: var(--ge-text-muted);
+            color: var(--text-secondary);
             border-radius: 12px;
         }
 
-        .ge-nav-item.active {
-            background: var(--ge-bg-side);
-            color: var(--ge-brand-primary);
-            box-shadow: var(--ge-shadow-sm);
+        .ge-nav-tab.active {
+            background: var(--bg-panel);
+            color: var(--ge-primary);
+            box-shadow: var(--shadow-sm);
         }
 
         /* Список чатов */
-        .ge-chat-scroller {
+        .ge-chat-list {
             flex: 1;
             overflow-y: auto;
         }
 
-        .ge-item-chat {
-            padding: 22px 35px;
+        .ge-chat-item {
+            padding: 24px 35px;
             display: flex;
             align-items: center;
             gap: 20px;
-            border-bottom: 1px solid var(--ge-border-soft);
-            transition: background 0.2s;
+            border-bottom: 1px solid var(--border-soft);
+            cursor: pointer;
+            transition: var(--t-fast);
         }
 
-        .ge-item-chat:hover { background: var(--ge-bg-app); }
-        .ge-item-chat.active { background: var(--ge-brand-light); border-left: 6px solid var(--ge-brand-primary); }
+        .ge-chat-item:hover { background: var(--bg-body); }
+        .ge-chat-item.active { background: var(--ge-primary-soft); border-left: 6px solid var(--ge-primary); }
 
-        .ge-item-chat.active b { color: var(--ge-brand-primary); }
+        .ge-item-content b { display: block; font-size: 17px; margin-bottom: 6px; color: var(--text-primary); }
+        .ge-item-content span { font-size: 13px; color: var(--text-secondary); }
 
-        .ge-item-meta b { display: block; font-size: 17px; margin-bottom: 5px; }
-        .ge-item-meta span { font-size: 13px; color: var(--ge-text-muted); }
-
-        /* Область переписки */
-        .ge-app-main {
+        /* ОСНОВНАЯ ОБЛАСТЬ ЧАТА */
+        .ge-chat-view {
             flex: 1;
             display: flex;
             flex-direction: column;
-            background: var(--ge-bg-chat);
+            background: var(--bg-body);
+            position: relative;
         }
 
-        .ge-main-header {
-            height: 100px;
-            background: var(--ge-bg-header);
-            border-bottom: 1px solid var(--ge-border-main);
+        .ge-view-header {
+            height: var(--header-height);
+            background: var(--bg-header);
+            border-bottom: 1px solid var(--border-base);
             padding: 0 45px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            z-index: 10;
         }
 
-        .ge-msg-container {
+        .ge-messages-area {
             flex: 1;
-            padding: 45px;
+            padding: 40px 50px;
             overflow-y: auto;
             display: flex;
             flex-direction: column-reverse;
             gap: 20px;
+            background-image: radial-gradient(var(--border-base) 1px, transparent 1px);
+            background-size: 30px 30px;
         }
 
-        /* Баблы сообщений */
-        .ge-bubble {
+        /* Сообщения */
+        .ge-msg-bubble {
             max-width: 65%;
             padding: 18px 26px;
             border-radius: 26px;
             font-size: 16px;
             line-height: 1.6;
             position: relative;
-            box-shadow: var(--ge-shadow-sm);
-            animation: bubble-in 0.3s var(--ge-ease);
+            box-shadow: var(--shadow-sm);
+            animation: ge-msg-pop 0.4s var(--ease);
         }
 
-        @keyframes bubble-in {
-            from { transform: scale(0.9); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
+        @keyframes ge-msg-pop {
+            from { opacity: 0; transform: scale(0.9) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
         }
 
-        .ge-bubble.me {
+        .ge-msg-bubble.me {
             align-self: flex-end;
-            background: var(--ge-bg-bubble-me);
+            background: var(--ge-primary);
             color: white;
-            border-bottom-right-radius: 5px;
+            border-bottom-right-radius: 4px;
         }
 
-        .ge-bubble.them {
+        .ge-msg-bubble.them {
             align-self: flex-start;
-            background: var(--ge-bg-bubble-them);
-            color: var(--ge-text-main);
-            border-bottom-left-radius: 5px;
+            background: var(--bg-panel);
+            color: var(--text-primary);
+            border-bottom-left-radius: 4px;
         }
 
-        .ge-bubble .sender {
+        .ge-msg-meta {
             display: block;
             font-size: 11px;
-            font-weight: 900;
+            font-weight: 800;
             text-transform: uppercase;
             margin-bottom: 6px;
-            opacity: 0.8;
+            opacity: 0.7;
         }
 
-        /* Панель ввода */
-        .ge-main-footer {
-            padding: 35px 45px;
-            background: var(--ge-bg-header);
-            border-top: 1px solid var(--ge-border-main);
+        /* ПАНЕЛЬ ВВОДА */
+        .ge-footer {
+            padding: 35px 50px;
+            background: var(--bg-header);
+            border-top: 1px solid var(--border-base);
             display: flex;
             align-items: center;
             gap: 25px;
         }
 
-        .ge-msg-input {
+        .ge-composer-input {
             flex: 1;
             padding: 20px 35px;
-            background: var(--ge-bg-input);
-            border-radius: var(--ge-radius-full);
+            background: var(--bg-input);
+            border-radius: var(--radius-full);
             font-size: 16px;
-            color: var(--ge-text-main);
+            color: var(--text-primary);
             border: 2px solid transparent;
         }
 
-        .ge-msg-input:focus {
-            background: var(--ge-bg-header);
-            border-color: var(--ge-brand-primary);
+        .ge-composer-input:focus {
+            background: var(--bg-header);
+            border-color: var(--ge-primary);
         }
 
-        .ge-btn-send {
+        .ge-send-btn {
             width: 65px;
             height: 65px;
             border-radius: 50%;
-            background: var(--ge-brand-primary);
+            background: var(--ge-primary);
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 28px;
-            box-shadow: var(--ge-shadow-brand);
+            font-size: 26px;
+            box-shadow: var(--shadow-accent);
         }
 
-        .ge-btn-send:hover {
-            transform: scale(1.1) rotate(5deg);
-        }
+        .ge-send-btn:hover { transform: scale(1.1) rotate(5deg); }
 
-        .ge-side-footer {
+        .ge-sidebar-footer {
             padding: 30px;
-            border-top: 1px solid var(--ge-border-main);
+            border-top: 1px solid var(--border-base);
         }
 
-        /* --- СИСТЕМНЫЕ КЛАССЫ --- */
+        .ge-logout-btn {
+            width: 100%;
+            padding: 16px;
+            color: var(--ge-error);
+            font-weight: 800;
+            font-size: 14px;
+            text-align: center;
+            border-radius: var(--radius-md);
+            border: 2px solid var(--ge-error);
+        }
+
+        .ge-logout-btn:hover {
+            background: var(--ge-error);
+            color: white;
+        }
+
+        /* СИСТЕМНЫЕ КЛАССЫ */
         .ge-hidden { display: none !important; }
         .ge-flex { display: flex !important; }
+        .ge-error-text { color: var(--ge-error); font-size: 12px; margin-top: 5px; font-weight: 600; }
 
     </style>
 </head>
 <body>
 
-    <button class="ge-widget-theme" onclick="geCore.ui.toggleTheme()">🌓 ИЗМЕНИТЬ ВИД</button>
+    <button class="ge-theme-toggler" onclick="geEngine.ui.toggleTheme()">🌓 Переключить вид</button>
 
-    <div id="ge-auth-root" class="ge-auth-layer">
-        <div class="ge-auth-card">
-            <div class="ge-auth-brand">GeLink</div>
-            <p class="ge-auth-desc">Secure Private Messenger v7.0</p>
+    <section id="ge-auth-layer" class="ge-auth-overlay">
+        <div class="ge-auth-container">
+            <div class="ge-brand-logo">GeLink</div>
+            <p class="ge-auth-tagline">Профессиональный мессенджер v9.0</p>
             
-            <div class="ge-auth-nav">
-                <button id="tab-login" class="ge-nav-tab active" onclick="geCore.auth.switchTab('login')">Вход</button>
-                <button id="tab-reg" class="ge-nav-tab" onclick="geCore.auth.switchTab('reg')">Регистрация</button>
+            <div class="ge-auth-tabs">
+                <button id="tab-login" class="ge-auth-tab active" onclick="geEngine.auth.switch('login')">Вход</button>
+                <button id="tab-reg" class="ge-auth-tab" onclick="geEngine.auth.switch('reg')">Регистрация</button>
             </div>
 
-            <div id="ge-form-login" class="ge-form-box">
-                <div class="ge-input-wrapper">
-                    <label class="ge-input-label">Электронная почта</label>
-                    <input type="email" id="log-email" class="ge-input-field" placeholder="user@gelink.com">
+            <div id="ge-form-login" class="ge-form-group">
+                <div class="ge-field">
+                    <label class="ge-label">Электронная почта</label>
+                    <input type="email" id="in-email" class="ge-input-core" placeholder="example@gelink.com">
                 </div>
-                <div class="ge-input-wrapper">
-                    <label class="ge-input-label">Ваш пароль</label>
-                    <input type="password" id="log-pass" class="ge-input-field" placeholder="••••••••">
+                <div class="ge-field">
+                    <label class="ge-label">Пароль доступа</label>
+                    <input type="password" id="in-pass" class="ge-input-core" placeholder="••••••••">
                 </div>
-                <button class="ge-btn-primary" onclick="geCore.auth.perform('login')">ВОЙТИ В АККАУНТ</button>
+                <button class="ge-btn-submit" onclick="geEngine.auth.handle('login')">ВОЙТИ В АККАУНТ</button>
             </div>
 
-            <div id="ge-form-reg" class="ge-form-box ge-hidden">
-                <div class="ge-input-wrapper">
-                    <label class="ge-input-label">Как вас зовут?</label>
-                    <input type="text" id="reg-name" class="ge-input-field" placeholder="Иван Иванов">
+            <div id="ge-form-reg" class="ge-form-group ge-hidden">
+                <div class="ge-field">
+                    <label class="ge-label">Ваше полное имя</label>
+                    <input type="text" id="up-name" class="ge-input-core" placeholder="Александр Петров">
                 </div>
-                <div class="ge-input-wrapper">
-                    <label class="ge-input-label">Электронная почта</label>
-                    <input type="email" id="reg-email" class="ge-input-field" placeholder="name@domain.ru">
+                <div class="ge-field">
+                    <label class="ge-label">Email для связи</label>
+                    <input type="email" id="up-email" class="ge-input-core" placeholder="name@domain.ru">
                 </div>
-                <div class="ge-input-wrapper">
-                    <label class="ge-input-label">Создайте пароль</label>
-                    <input type="password" id="reg-pass" class="ge-input-field" placeholder="Минимум 8 символов">
+                <div class="ge-field">
+                    <label class="ge-label">Придумайте пароль</label>
+                    <input type="password" id="up-pass" class="ge-input-core" placeholder="Мин. 8 символов">
                 </div>
-                <button class="ge-btn-primary" onclick="geCore.auth.perform('reg')">СОЗДАТЬ АККАУНТ</button>
+                <div class="ge-field">
+                    <label class="ge-label">Подтвердите пароль</label>
+                    <input type="password" id="up-confirm" class="ge-input-core" placeholder="Повторите ввод">
+                    <span id="up-error" class="ge-error-text ge-hidden">Пароли не совпадают!</span>
+                </div>
+                <button class="ge-btn-submit" onclick="geEngine.auth.handle('reg')">ЗАРЕГИСТРИРОВАТЬСЯ</button>
             </div>
 
-            <p style="margin-top: 35px; font-size: 13px; color: var(--ge-text-muted); font-weight: 500;">
-                Ваши данные защищены сквозным шифрованием.
-            </p>
+            <div style="margin-top: 40px; font-size: 13px; color: var(--text-tertiary); line-height: 1.5;">
+                При входе вы подтверждаете согласие с <br> <b>Политикой Конфиденциальности GeLink</b>.
+            </div>
         </div>
-    </div>
+    </section>
 
-    <div id="ge-app-root" class="ge-app-shell">
+    <main id="ge-main-app" class="ge-messenger-shell">
         
-        <aside class="ge-app-sidebar">
-            <div class="ge-side-head">
-                <div class="ge-my-profile">
-                    <div class="ge-big-av" id="ge-user-av">?</div>
+        <aside class="ge-sidebar">
+            <header class="ge-sidebar-header">
+                <div class="ge-user-profile">
+                    <div class="ge-user-av" id="ge-my-av">?</div>
                     <div>
-                        <b id="ge-user-name" style="font-size: 22px;">...</b>
-                        <div style="font-size: 13px; color: var(--ge-status-online); font-weight: 800;">● В СЕТИ</div>
+                        <b id="ge-my-name" style="font-size: 22px;">Пользователь</b>
+                        <div style="font-size: 13px; color: var(--ge-online); font-weight: 800;">● ОНЛАЙН</div>
                     </div>
                 </div>
 
-                <div class="ge-side-nav">
-                    <button id="nav-chats" class="ge-nav-item active" onclick="geCore.ui.switchTab('chats')">ЧАТЫ</button>
-                    <button id="nav-people" class="ge-nav-item" onclick="geCore.ui.switchTab('people')">ЛЮДИ</button>
+                <div class="ge-sidebar-nav">
+                    <button id="nav-chats" class="ge-nav-tab active" onclick="geEngine.ui.setTab('chats')">ЧАТЫ</button>
+                    <button id="nav-people" class="ge-nav-tab" onclick="geEngine.ui.setTab('people')">КОНТАКТЫ</button>
                 </div>
 
                 <div style="display: flex; gap: 12px;">
-                    <button class="ge-btn-primary" style="padding: 14px; font-size: 12px; margin:0;" onclick="geCore.messenger.addFriend()">+ ДОБАВИТЬ</button>
-                    <button class="ge-btn-primary" style="padding: 14px; font-size: 12px; margin:0; background: var(--ge-bg-app); color: var(--ge-text-main); box-shadow: none;" onclick="geCore.messenger.newGroup()">+ ГРУППА</button>
+                    <button class="ge-btn-submit" style="padding: 14px; font-size: 12px; margin: 0;" onclick="geEngine.chat.addFriend()">+ ДОБАВИТЬ</button>
+                    <button class="ge-btn-submit" style="padding: 14px; font-size: 12px; margin: 0; background: var(--bg-body); color: var(--text-primary); box-shadow: none;" onclick="geEngine.chat.createGroup()">+ ГРУППА</button>
                 </div>
-            </div>
-
-            <div id="ge-list-chats" class="ge-chat-scroller">
-                </div>
-            <div id="ge-list-people" class="ge-chat-scroller ge-hidden">
-                </div>
-
-            <div class="ge-side-footer">
-                <button class="ge-btn-primary" style="background: var(--ge-status-error); padding: 15px; font-size: 14px;" onclick="geCore.auth.logout()">ВЫЙТИ ИЗ СИСТЕМЫ</button>
-            </div>
-        </aside>
-
-        <main class="ge-app-main">
-            <header class="ge-main-header">
-                <div style="display: flex; align-items: center; gap: 22px;">
-                    <div class="ge-big-av" id="ge-active-av" style="width: 55px; height: 55px; background: #444; font-size: 20px;">#</div>
-                    <div>
-                        <b id="ge-active-title" style="font-size: 24px;">Выберите диалог</b>
-                        <div id="ge-active-status" style="font-size: 13px; opacity: 0.6;">Система GeLink готова к работе</div>
-                    </div>
-                </div>
-                <div id="ge-chat-tools">
-                    </div>
             </header>
 
-            <div id="ge-msg-stage" class="ge-msg-container">
+            <div id="ge-chat-list-scroller" class="ge-chat-list">
                 </div>
 
-            <footer class="ge-main-footer">
-                <input type="text" id="ge-composer-input" class="ge-msg-input" placeholder="Введите ваше сообщение...">
-                <button class="ge-btn-send" onclick="geCore.messenger.send()">➤</button>
+            <footer class="ge-sidebar-footer">
+                <button class="ge-logout-btn" onclick="geEngine.auth.exit()">ЗАВЕРШИТЬ СЕАНС</button>
             </footer>
-        </main>
-    </div>
+        </aside>
+
+        <section class="ge-chat-view">
+            <header class="ge-view-header">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div class="ge-user-av" id="ge-active-av" style="width: 55px; height: 55px; background: #555;">#</div>
+                    <div>
+                        <b id="ge-active-name" style="font-size: 24px;">Выберите диалог</b>
+                        <div id="ge-active-status" style="font-size: 13px; opacity: 0.6;">Система GeLink готова к обмену данными</div>
+                    </div>
+                </div>
+            </header>
+
+            <div id="ge-msg-container" class="ge-messages-area">
+                </div>
+
+            <footer class="ge-footer">
+                <input type="text" id="ge-main-input" class="ge-composer-input" placeholder="Напишите ваше сообщение здесь...">
+                <button class="ge-send-btn" onclick="geEngine.chat.broadcast()">➤</button>
+            </footer>
+        </section>
+    </main>
 
     <script>
         /**
-         * Глобальный объект системы GeLink
+         * Монолитный объект ядра системы
          */
-        const geCore = {
+        const geEngine = {
             state: {
-                user: { name: "", email: "" },
-                activeChat: "general",
-                currentTab: "chats",
-                isReady: false
+                session: null,
+                activeRoom: "general",
+                activeTab: "chats"
             },
 
             /**
-             * Подсистема аутентификации
+             * СЕРВИС АВТОРИЗАЦИИ
              */
             auth: {
-                switchTab(mode) {
+                switch(mode) {
                     document.getElementById('tab-login').classList.toggle('active', mode === 'login');
                     document.getElementById('tab-reg').classList.toggle('active', mode === 'reg');
                     document.getElementById('ge-form-login').classList.toggle('ge-hidden', mode !== 'login');
                     document.getElementById('ge-form-reg').classList.toggle('ge-hidden', mode !== 'reg');
                 },
 
-                perform(type) {
-                    let name, email, pass;
-                    
+                handle(type) {
+                    let n, e, p, pc;
+
                     if (type === 'reg') {
-                        name = document.getElementById('reg-name').value.trim();
-                        email = document.getElementById('reg-email').value.trim();
-                        pass = document.getElementById('reg-pass').value.trim();
-                        if (!name || !email || pass.length < 6) return alert("Ошибка: Проверьте данные регистрации!");
+                        n = document.getElementById('up-name').value.trim();
+                        e = document.getElementById('up-email').value.trim();
+                        p = document.getElementById('up-pass').value.trim();
+                        pc = document.getElementById('up-confirm').value.trim();
+
+                        if (!n || !e || !p) return alert("Заполните все данные!");
+                        if (p !== pc) {
+                            document.getElementById('up-error').classList.remove('ge-hidden');
+                            return;
+                        }
                     } else {
-                        email = document.getElementById('log-email').value.trim();
-                        pass = document.getElementById('log-pass').value.trim();
-                        if (!email || !pass) return alert("Ошибка: Введите логин и пароль!");
-                        name = email.split('@')[0];
+                        e = document.getElementById('in-email').value.trim();
+                        p = document.getElementById('in-pass').value.trim();
+                        if (!e || !p) return alert("Введите логин и пароль!");
+                        n = e.split('@')[0];
                     }
 
-                    geCore.state.user = { name, email };
-                    localStorage.setItem('gelink_v7_session', JSON.stringify(geCore.state.user));
-                    geCore.init();
+                    geEngine.state.session = { name: n, email: e };
+                    localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
+                    geEngine.init();
                 },
 
-                logout() {
-                    if (confirm("Выйти из аккаунта?")) {
+                exit() {
+                    if (confirm("Вы действительно хотите выйти?")) {
                         localStorage.clear();
                         location.reload();
                     }
@@ -636,7 +681,7 @@
             },
 
             /**
-             * Подсистема интерфейса
+             * СЕРВИС ИНТЕРФЕЙСА
              */
             ui: {
                 toggleTheme() {
@@ -645,151 +690,129 @@
                     html.setAttribute('data-theme', isDark ? 'light' : 'dark');
                 },
 
-                switchTab(tab) {
-                    geCore.state.currentTab = tab;
+                setTab(tab) {
+                    geEngine.state.activeTab = tab;
                     document.getElementById('nav-chats').classList.toggle('active', tab === 'chats');
                     document.getElementById('nav-people').classList.toggle('active', tab === 'people');
-                    document.getElementById('ge-list-chats').classList.toggle('ge-hidden', tab !== 'chats');
-                    document.getElementById('ge-list-people').classList.toggle('ge-hidden', tab !== 'people');
+                    geEngine.chat.refresh();
                 },
 
                 renderMessages(messages) {
-                    const stage = document.getElementById('ge-msg-stage');
+                    const container = document.getElementById('ge-msg-container');
                     if (!messages) return;
                     
-                    stage.innerHTML = messages.map(raw => {
+                    container.innerHTML = messages.map(raw => {
                         const m = JSON.parse(decodeURIComponent(raw));
-                        const isMe = m.email === geCore.state.user.email;
+                        const isMe = m.email === geEngine.state.session.email;
                         return `
-                            <div class="ge-bubble ${isMe ? 'me' : 'them'}">
-                                <span class="sender">${isMe ? 'Вы' : m.username}</span>
+                            <div class="ge-msg-bubble ${isMe ? 'me' : 'them'}">
+                                <span class="ge-msg-meta">${isMe ? 'Вы' : m.username}</span>
                                 ${m.text}
                             </div>
                         `;
                     }).join('');
                 },
 
-                renderLists(data) {
-                    // Рендер чатов
-                    const cList = document.getElementById('ge-list-chats');
-                    if (data.rooms?.result) {
-                        cList.innerHTML = data.rooms.result.map(rid => `
-                            <div class="ge-item-chat ${rid === geCore.state.activeChat ? 'active' : ''}" onclick="geCore.messenger.open('${rid}')">
-                                <div class="ge-big-av" style="width:48px; height:48px; font-size:18px; background:#444;">${rid[0].toUpperCase()}</div>
-                                <div class="ge-item-meta">
-                                    <b>${rid}</b>
-                                    <span>Канал связи активен</span>
-                                </div>
-                            </div>
-                        `).join('');
-                    }
+                renderChatList(rooms) {
+                    const scroller = document.getElementById('ge-chat-list-scroller');
+                    if (!rooms) return;
 
-                    // Рендер людей
-                    const pList = document.getElementById('ge-list-people');
-                    if (data.contacts?.result) {
-                        pList.innerHTML = data.contacts.result.map(email => `
-                            <div class="ge-item-chat" onclick="geCore.messenger.openPrivate('${email}')">
-                                <div class="ge-big-av" style="width:48px; height:48px; font-size:18px;">${email[0].toUpperCase()}</div>
-                                <div class="ge-item-meta">
-                                    <b>${email}</b>
-                                    <span>Пользователь GeLink</span>
-                                </div>
+                    scroller.innerHTML = rooms.map(rid => `
+                        <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}')">
+                            <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:#444;">${rid[0].toUpperCase()}</div>
+                            <div class="ge-item-content">
+                                <b>${rid}</b>
+                                <span>Активный зашифрованный канал</span>
                             </div>
-                        `).join('');
-                    }
+                        </div>
+                    `).join('');
                 }
             },
 
             /**
-             * Подсистема мессенджера
+             * СЕРВИС СООБЩЕНИЙ
              */
-            messenger: {
-                async sync() {
+            chat: {
+                async refresh() {
                     try {
-                        const url = `/api/index?room=${geCore.state.activeChat}&user_email=${geCore.state.user.email}`;
+                        const url = `/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`;
                         const res = await fetch(url);
                         const data = await res.json();
                         
-                        geCore.ui.renderLists(data);
-                        geCore.ui.renderMessages(data.messages?.result);
-                    } catch (e) { console.warn("GeLink Sync Error: Backend unreachable"); }
+                        geEngine.ui.renderChatList(data.rooms?.result);
+                        geEngine.ui.renderMessages(data.messages?.result);
+                    } catch (e) { console.warn("GeLink Engine: Waiting for connection..."); }
                 },
 
-                async send() {
-                    const input = document.getElementById('ge-composer-input');
+                async broadcast() {
+                    const input = document.getElementById('ge-main-input');
                     const text = input.value.trim();
                     if (!text) return;
 
                     const payload = JSON.stringify({
-                        username: geCore.state.user.name,
-                        email: geCore.state.user.email,
+                        username: geEngine.state.session.name,
+                        email: geEngine.state.session.email,
                         text: text
                     });
 
                     input.value = '';
-                    await fetch(`/api/index?room=${geCore.state.activeChat}&user_email=${geCore.state.user.email}`, {
+                    await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, {
                         method: 'POST',
                         body: payload
                     });
-                    geCore.messenger.sync();
+                    geEngine.chat.refresh();
                 },
 
-                open(id, label) {
-                    geCore.state.activeChat = id;
-                    document.getElementById('ge-active-title').innerText = label || id;
-                    document.getElementById('ge-active-av').innerText = (label || id)[0].toUpperCase();
-                    geCore.messenger.sync();
-                },
-
-                openPrivate(targetEmail) {
-                    const pair = [geCore.state.user.email, targetEmail].sort();
-                    const rid = `private-${pair[0].replace(/[@.]/g, '')}-${pair[1].replace(/[@.]/g, '')}`;
-                    geCore.messenger.open(rid, targetEmail);
-                    geCore.ui.switchTab('chats');
+                open(id) {
+                    geEngine.state.activeRoom = id;
+                    document.getElementById('ge-active-name').innerText = id;
+                    document.getElementById('ge-active-av').innerText = id[0].toUpperCase();
+                    geEngine.chat.refresh();
                 },
 
                 async addFriend() {
-                    const email = prompt("Email нового контакта:");
-                    if (email) {
-                        await fetch(`/api/index?action=addContact&user_email=${geCore.state.user.email}&target_email=${email}`);
-                        geCore.messenger.sync();
+                    const mail = prompt("Введите Email контакта:");
+                    if (mail) {
+                        await fetch(`/api/index?action=addContact&user_email=${geEngine.state.session.email}&target_email=${mail}`);
+                        geEngine.chat.refresh();
                     }
                 },
 
-                newGroup() {
-                    const name = prompt("Название группы:");
-                    if (name) geCore.messenger.open(name.trim());
+                createGroup() {
+                    const name = prompt("Назовите новую группу:");
+                    if (name) geEngine.chat.open(name.trim());
                 }
             },
 
             /**
-             * Инициализация приложения
+             * ИНИЦИАЛИЗАЦИЯ
              */
             init() {
-                document.getElementById('ge-auth-root').classList.add('ge-hidden');
-                document.getElementById('ge-app-root').classList.add('ge-flex');
+                document.getElementById('ge-auth-layer').classList.add('ge-hidden');
+                document.getElementById('ge-main-app').classList.add('ge-flex');
                 
-                document.getElementById('ge-user-name').innerText = geCore.state.user.name;
-                document.getElementById('ge-user-av').innerText = geCore.state.user.name[0].toUpperCase();
+                document.getElementById('ge-my-name').innerText = geEngine.state.session.name;
+                document.getElementById('ge-my-av').innerText = geEngine.state.session.name[0].toUpperCase();
 
-                geCore.messenger.sync();
-                setInterval(() => geCore.messenger.sync(), 4000);
+                geEngine.chat.refresh();
+                setInterval(() => geEngine.chat.refresh(), 4000);
             }
         };
 
-        // Точка входа
+        // Точка входа в систему
         window.onload = () => {
-            const session = localStorage.getItem('gelink_v7_session');
-            if (session) {
-                geCore.state.user = JSON.parse(session);
-                geCore.init();
+            const saved = localStorage.getItem('ge_v9_token');
+            if (saved) {
+                geEngine.state.session = JSON.parse(saved);
+                geEngine.init();
             }
         };
 
-        // Слушатель Enter
-        document.getElementById('ge-composer-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') geCore.messenger.send();
+        // Слушатель клавиатуры
+        document.getElementById('ge-main-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') geEngine.chat.broadcast();
         });
+
     </script>
 </body>
 </html>
