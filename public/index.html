@@ -4,22 +4,60 @@
     <meta charset="UTF-8">
     <title>Cloud Messenger</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; }
-        h2 { text-align: center; color: #1c1e21; }
+        /* Переменные для легкой смены тем */
+        :root {
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-color: #1c1e21;
+            --input-border: #dddfe2;
+            --msg-bg: #f1f0f0;
+            --primary-blue: #1877f2;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #18191a;
+            --card-bg: #242526;
+            --text-color: #e4e6eb;
+            --input-border: #3a3b3c;
+            --msg-bg: #3a3b3c;
+            --primary-blue: #2d88ff;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; transition: 0.3s; }
+        .card { background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; position: relative; }
+        
+        /* Кнопка тем */
+        .theme-toggle { position: absolute; top: 15px; right: 15px; cursor: pointer; font-size: 20px; z-index: 100; }
+        .theme-menu { 
+            display: none; position: absolute; top: 40px; right: 10px; 
+            background: var(--card-bg); border: 1px solid var(--input-border);
+            border-radius: 8px; padding: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .theme-menu div { padding: 8px 15px; cursor: pointer; border-radius: 4px; }
+        .theme-menu div:hover { background: var(--msg-bg); }
+
+        h2 { text-align: center; }
         #chat-screen { display: none; width: 450px; }
-        #login-screen, #auth-screen { display: none; } /* Скрыты до проверки входа */
-        #chat { height: 400px; border: 1px solid #e4e6eb; background: #fff; overflow-y: auto; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; flex-direction: column-reverse; }
-        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #dddfe2; border-radius: 6px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #1877f2; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .link-text { text-align: center; margin-top: 15px; font-size: 14px; color: #1877f2; cursor: pointer; }
-        .msg-item { margin-bottom: 8px; padding: 8px; border-radius: 5px; background: #f1f0f0; }
-        .msg-user { color: #1877f2; font-weight: bold; }
+        #login-screen, #auth-screen { display: none; }
+        
+        #chat { height: 400px; border: 1px solid var(--input-border); background: var(--card-bg); overflow-y: auto; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; flex-direction: column-reverse; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid var(--input-border); border-radius: 6px; box-sizing: border-box; background: var(--card-bg); color: var(--text-color); }
+        button { width: 100%; padding: 12px; background: var(--primary-blue); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        
+        .msg-item { margin-bottom: 8px; padding: 10px; border-radius: 8px; background: var(--msg-bg); }
+        .msg-user { color: var(--primary-blue); font-weight: bold; margin-right: 5px; }
         .header-chat { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .logout-btn { width: auto; padding: 5px 10px; background: #ff4d4d; font-size: 12px; }
     </style>
 </head>
 <body>
+
+    <div class="theme-toggle" onclick="toggleThemeMenu()">🎨
+        <div id="theme-menu" class="theme-menu">
+            <div onclick="setTheme('light')">☀️ Светлая</div>
+            <div onclick="setTheme('dark')">🌙 Темная</div>
+        </div>
+    </div>
 
     <div id="auth-screen" class="card">
         <h2>Регистрация</h2>
@@ -28,7 +66,7 @@
         <input type="password" id="reg-pass" placeholder="Пароль">
         <input type="password" id="reg-confirm" placeholder="Повторите пароль">
         <button onclick="handleRegister()">Создать аккаунт</button>
-        <div class="link-text" onclick="toggleAuth(true)">Уже есть аккаунт? Войти</div>
+        <div style="text-align:center; margin-top:15px; cursor:pointer; color:var(--primary-blue)" onclick="toggleAuth(true)">Уже есть аккаунт? Войти</div>
     </div>
 
     <div id="login-screen" class="card">
@@ -36,102 +74,4 @@
         <input type="email" id="login-email" placeholder="Почта">
         <input type="password" id="login-pass" placeholder="Пароль">
         <button onclick="handleLogin()">Войти</button>
-        <div class="link-text" onclick="toggleAuth(false)">Нет аккаунта? Регистрация</div>
-    </div>
-
-    <div id="chat-screen" class="card">
-        <div class="header-chat">
-            <h3 id="user-display" style="margin:0;"></h3>
-            <button class="logout-btn" onclick="logout()">Выйти</button>
-        </div>
-        <div id="chat"></div>
-        <div style="display:flex; gap:10px;">
-            <input type="text" id="m" placeholder="Сообщение...">
-            <button onclick="send()" style="width: 50px;">></button>
-        </div>
-    </div>
-
-    <script>
-        let currentUser = "";
-
-        // ПРОВЕРКА ВХОДА ПРИ ЗАГРУЗКЕ
-        window.onload = function() {
-            const savedUser = localStorage.getItem('chat_session_user');
-            if (savedUser) {
-                startChat(savedUser);
-            } else {
-                document.getElementById('auth-screen').style.display = 'block';
-            }
-        };
-
-        function toggleAuth(toLogin) {
-            document.getElementById('auth-screen').style.display = toLogin ? 'none' : 'block';
-            document.getElementById('login-screen').style.display = toLogin ? 'block' : 'none';
-        }
-
-        function handleRegister() {
-            const u = document.getElementById('reg-user').value;
-            const e = document.getElementById('reg-email').value;
-            const p = document.getElementById('reg-pass').value;
-            const cp = document.getElementById('reg-confirm').value;
-            if (!u || !e || !p) { alert("Заполните все поля"); return; }
-            if (p !== cp) { alert("Пароли не совпадают!"); return; }
-            
-            localStorage.setItem('user_' + e, JSON.stringify({ u, p }));
-            localStorage.setItem('chat_session_user', u); // Запоминаем сессию
-            startChat(u);
-        }
-
-        function handleLogin() {
-            const e = document.getElementById('login-email').value;
-            const p = document.getElementById('login-pass').value;
-            const acc = JSON.parse(localStorage.getItem('user_' + e) || "{}");
-            if (acc.p === p) {
-                localStorage.setItem('chat_session_user', acc.u); // Запоминаем сессию
-                startChat(acc.u);
-            } else {
-                alert("Неверные данные!");
-            }
-        }
-
-        function logout() {
-            localStorage.removeItem('chat_session_user');
-            location.reload(); // Перезагружаем, чтобы вернуться на экран входа
-        }
-
-        function startChat(user) {
-            currentUser = user;
-            document.getElementById('auth-screen').style.display = 'none';
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('chat-screen').style.display = 'block';
-            document.getElementById('user-display').innerText = "Вы: " + user;
-            load();
-            setInterval(load, 3000);
-        }
-
-        async function load() {
-            try {
-                const res = await fetch('/api/index');
-                const data = await res.json();
-                if (data.result) {
-                    document.getElementById('chat').innerHTML = data.result.map(item => {
-                        try {
-                            const m = JSON.parse(decodeURIComponent(item));
-                            return `<div class="msg-item"><span class="msg-user">${m.username}:</span> ${m.text}</div>`;
-                        } catch(e) { return `<div class="msg-item">${decodeURIComponent(item)}</div>`; }
-                    }).join('');
-                }
-            } catch(e) { console.error("Ошибка загрузки"); }
-        }
-
-        async function send() {
-            const i = document.getElementById('m');
-            if (!i.value) return;
-            const msgData = JSON.stringify({ username: currentUser, text: i.value });
-            await fetch('/api/index', { method: 'POST', body: msgData });
-            i.value = '';
-            load();
-        }
-    </script>
-</body>
-</html>
+        <div style="text-align:center; margin-top:15px; cursor:pointer; color:var(--primary-blue)" onclick="toggleAuth(false)">Регистрация</div>
