@@ -665,7 +665,7 @@
                     <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0;" onclick="geEngine.chat.addFriend()">+ ДОБАВИТЬ</button>
                     <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0; background: var(--bg-body); color: var(--text-primary); box-shadow: none;" onclick="geEngine.chat.createGroup()">+ ГРУППА</button>
                 </div>
-            </header>
+            </header>я
 
             <div id="ge-chat-list-scroller" class="ge-chat-list">
                 </div>
@@ -876,37 +876,33 @@
                     geEngine.chat.refresh();
                 },
                 async addFriend() {
-                    const mail = prompt("Введите Email пользователя для проверки и добавления:");
-                    if (!mail || !mail.includes('@')) return;
+                    const mail = prompt("Введите Email контакта:");
+                    if (!mail) return;
 
                     try {
-                        // 1. Сначала отправляем запрос на проверку и добавление
-                        const response = await fetch(`/api/index?action=addContact&user_email=${geEngine.state.session.email}&target_email=${encodeURIComponent(mail)}`);
-                        const result = await response.json();
+                        // Отправляем запрос на сервер
+                        const res = await fetch(`/api/index?action=addContact&user_email=${geEngine.state.session.email}&target_email=${mail}`);
+                        const data = await res.json();
 
-                        // 2. Проверяем статус ответа от сервера
-                        // Предполагается, что сервер вернет { status: "error" }, если пользователь не найден
-                        if (result.status === "error" || result.exists === false) {
-                            alert("Ошибка: Пользователь с таким Email не зарегистрирован в системе GeLink.");
-                            return;
+                        if (data.status === 'success') {
+                            alert("Пользователь найден и добавлен в контакты!");
+                            
+                            // Генерируем ID приватной комнаты (как в твоей логике)
+                            const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                            const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
+                            const ids = [myMailSafe, otherMailSafe].sort();
+                            const roomId = `private-${ids[0]}-${ids[1]}`;
+                            
+                            // Открываем чат
+                            geEngine.chat.open(roomId, mail.split('@')[0]);
+                        } else {
+                            alert("Ошибка: Пользователь с таким Email не найден в базе GeLink.");
                         }
-
-                        // 3. Если пользователь существует, формируем ID комнаты
-                        const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                        const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
-                        const ids = [myMailSafe, otherMailSafe].sort();
-                        const roomId = `private-${ids[0]}-${ids[1]}`;
-
-                        alert("Пользователь найден! Чат создан.");
-                        
-                        // 4. Обновляем список и открываем чат
-                        await geEngine.chat.refresh();
-                        geEngine.chat.open(roomId, mail.split('@')[0]);
-
                     } catch (e) {
-                        console.error("Ошибка при проверке аккаунта:", e);
-                        alert("Не удалось связаться с сервером для проверки аккаунта.");
+                        alert("Произошла ошибка при проверке пользователя.");
+                        console.error(e);
                     }
+                    geEngine.chat.refresh();
                 },
                 createGroup() {
                     const name = prompt("Имя группы:");
