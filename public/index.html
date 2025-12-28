@@ -765,7 +765,9 @@
                 session: null,
                 activeRoom: "general",
                 activeTab: "chats",
-                blocked: {}, // Список заблокированных комнат {roomId: true}
+                blocked: {}, // {roomId: true}
+                deletedRooms: {}, // {roomId: true} - локальный список удаленных чатов
+                clearedRooms: {}, // {roomId: true} - локальный список очищенных чатов
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
@@ -840,7 +842,11 @@
                     }
 
                     if (!rooms) return;
-                    scroller.innerHTML = rooms.map(rid => {
+                    
+                    // Фильтруем список от удаленных локально комнат
+                    const visibleRooms = rooms.filter(rid => !geEngine.state.deletedRooms[rid]);
+
+                    scroller.innerHTML = visibleRooms.map(rid => {
                         let displayName = rid;
                         if (rid.startsWith('private-')) {
                             const parts = rid.replace('private-', '').split('-');
@@ -874,7 +880,13 @@
                 },
                 renderMessages(messages) {
                     const container = document.getElementById('ge-msg-container');
-                    if (!messages) { container.innerHTML = ""; return; }
+                    
+                    // Если чат помечен как очищенный, не выводим сообщения
+                    if (geEngine.state.clearedRooms[geEngine.state.activeRoom] || !messages) {
+                        container.innerHTML = "";
+                        return;
+                    }
+
                     container.innerHTML = messages.map(raw => {
                         const m = JSON.parse(decodeURIComponent(raw));
                         const isMe = m.email === geEngine.state.session.email;
@@ -921,17 +933,20 @@
                         const data = await res.json();
                         geEngine.ui.renderChatList(data.rooms?.result);
                         if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(data.messages?.result);
-                    } catch (e) { console.warn("Sync..."); }
+                    } catch (e) { console.warn("Waiting API..."); }
                 },
                 async broadcast() {
                     if (geEngine.state.blocked[geEngine.state.activeRoom]) {
-                        alert("Чат заблокирован. Разблокируйте, чтобы писать.");
+                        alert("Чат заблокирован.");
                         return;
                     }
                     const input = document.getElementById('ge-main-input');
                     const text = input.value.trim();
                     if (!text) return;
                     
+                    // Если пишем в "очищенный" чат, снимаем метку очистки
+                    delete geEngine.state.clearedRooms[geEngine.state.activeRoom];
+
                     const now = new Date();
                     const payload = JSON.stringify({ 
                         username: geEngine.state.session.name, 
@@ -955,39 +970,41 @@
                     geEngine.chat.refresh();
                 },
                 async addFriend() {
-                    const mail = prompt("Введите Email контакта:");
+                    const mail = prompt("Email нового контакта:");
                     if (!mail) return;
-
                     try {
                         const res = await fetch(`/api/index?action=addContact&user_email=${geEngine.state.session.email}&target_email=${mail}`);
                         const data = await res.json();
-
                         if (data.status === 'success') {
-                            alert("Пользователь найден!");
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
                             const ids = [myMailSafe, otherMailSafe].sort();
                             const roomId = `private-${ids[0]}-${ids[1]}`;
+                            // Убираем из списка удаленных, если был там
+                            delete geEngine.state.deletedRooms[roomId];
                             geEngine.chat.open(roomId, mail.split('@')[0]);
                         } else {
                             alert("Пользователь не найден.");
                         }
-                    } catch (e) { alert("Ошибка API."); }
+                    } catch (e) { alert("Ошибка подключения."); }
                     geEngine.chat.refresh();
                 },
                 createGroup() {
-                    const name = prompt("Имя группы:");
-                    if (name) geEngine.chat.open(name.trim(), name.trim());
+                    const name = prompt("Название группы:");
+                    if (name) {
+                        const rid = name.trim();
+                        delete geEngine.state.deletedRooms[rid];
+                        geEngine.chat.open(rid, rid);
+                    }
                 },
-                // --- ФУНКЦИИ УПРАВЛЕНИЯ ---
+                // --- ЛОГИКА МЕНЮ (УДАЛЕНИЕ И ОЧИСТКА) ---
                 async clearChat(event, rid) {
                     event.stopPropagation();
-                    if (confirm("Очистить всю историю сообщений?")) {
+                    if (confirm("Очистить все сообщения в этом чате?")) {
+                        // Помечаем локально как очищенный
+                        geEngine.state.clearedRooms[rid] = true;
+                        // Отправляем запрос на сервер
                         await fetch(`/api/index?action=clearChat&room=${rid}&user_email=${geEngine.state.session.email}`);
-                        // Если API не удаляет физически, очистим локальный UI для вида
-                        if(geEngine.state.activeRoom === rid) {
-                            document.getElementById('ge-msg-container').innerHTML = "";
-                        }
                         geEngine.chat.refresh();
                     }
                 },
@@ -995,8 +1012,7 @@
                     event.stopPropagation();
                     const isBlocked = geEngine.state.blocked[rid];
                     const action = isBlocked ? 'unblockChat' : 'blockChat';
-                    
-                    if (confirm(`${isBlocked ? 'Разблокировать' : 'Заблокировать'} этот чат?`)) {
+                    if (confirm(`${isBlocked ? 'Разблокировать' : 'Заблокировать'} чат?`)) {
                         await fetch(`/api/index?action=${action}&room=${rid}&user_email=${geEngine.state.session.email}`);
                         geEngine.state.blocked[rid] = !isBlocked;
                         geEngine.chat.refresh();
@@ -1004,8 +1020,12 @@
                 },
                 async removeChat(event, rid) {
                     event.stopPropagation();
-                    if (confirm("Удалить этот чат из списка контактов?")) {
+                    if (confirm("Вы действительно хотите удалить чат из списка?")) {
+                        // Помечаем локально как удаленный (скрываем из списка)
+                        geEngine.state.deletedRooms[rid] = true;
+                        // Запрос на сервер
                         await fetch(`/api/index?action=removeChat&room=${rid}&user_email=${geEngine.state.session.email}`);
+                        
                         if (geEngine.state.activeRoom === rid) {
                             geEngine.state.activeRoom = "general";
                         }
