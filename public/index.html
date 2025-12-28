@@ -351,7 +351,9 @@
             overflow-y: auto;
         }
 
+        /* --- СТИЛИ ДЛЯ МЕНЮ КОНТАКТА --- */
         .ge-chat-item {
+            position: relative;
             padding: 24px 35px;
             display: flex;
             align-items: center;
@@ -366,6 +368,59 @@
 
         .ge-item-content b { display: block; font-size: 17px; margin-bottom: 6px; color: var(--text-primary); }
         .ge-item-content span { font-size: 13px; color: var(--text-secondary); }
+
+        .ge-item-dots {
+            position: absolute;
+            top: 24px;
+            right: 20px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-size: 20px;
+            color: var(--text-tertiary);
+            z-index: 5;
+            transition: 0.2s;
+        }
+
+        .ge-item-dots:hover {
+            background: var(--border-soft);
+            color: var(--ge-primary);
+        }
+
+        .ge-chat-menu {
+            position: absolute;
+            top: 55px;
+            right: 20px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-base);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-lg);
+            width: 180px;
+            display: none;
+            flex-direction: column;
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .ge-chat-menu.active { display: flex; }
+
+        .ge-menu-btn {
+            width: 100%;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-soft);
+        }
+
+        .ge-menu-btn:last-child { border-bottom: none; }
+        .ge-menu-btn:hover { background: var(--ge-primary-soft); color: var(--ge-primary); }
+        .ge-menu-btn.danger { color: var(--ge-error); }
+        .ge-menu-btn.danger:hover { background: rgba(250, 62, 62, 0.1); }
 
         /* ОСНОВНАЯ ОБЛАСТЬ ЧАТА */
         .ge-chat-view {
@@ -665,7 +720,7 @@
                     <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0;" onclick="geEngine.chat.addFriend()">+ ДОБАВИТЬ</button>
                     <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0; background: var(--bg-body); color: var(--text-primary); box-shadow: none;" onclick="geEngine.chat.createGroup()">+ ГРУППА</button>
                 </div>
-            </header>я
+            </header>
 
             <div id="ge-chat-list-scroller" class="ge-chat-list">
                 </div>
@@ -757,6 +812,15 @@
                     });
                     geEngine.chat.refresh();
                 },
+                toggleMenu(event, rid) {
+                    event.stopPropagation();
+                    const menu = document.getElementById('menu-' + rid);
+                    const isActive = menu.classList.contains('active');
+                    // Закрываем все другие открытые меню
+                    document.querySelectorAll('.ge-chat-menu').forEach(m => m.classList.remove('active'));
+                    // Тогглим текущее
+                    if (!isActive) menu.classList.add('active');
+                },
                 renderChatList(rooms) {
                     const scroller = document.getElementById('ge-chat-list-scroller');
                     const tab = geEngine.state.activeTab;
@@ -791,7 +855,13 @@
                                 <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:#444;">${displayName[0].toUpperCase()}</div>
                                 <div class="ge-item-content">
                                     <b>${displayName}</b>
-                                    <span>Активный зашифрованный канал</span>
+                                    <span>Активный канал</span>
+                                </div>
+                                <div class="ge-item-dots" onclick="geEngine.ui.toggleMenu(event, '${rid}')">⋮</div>
+                                <div class="ge-chat-menu" id="menu-${rid}">
+                                    <button class="ge-menu-btn" onclick="geEngine.chat.clearChat(event, '${rid}')">Очистить чат</button>
+                                    <button class="ge-menu-btn" onclick="geEngine.chat.blockChat(event, '${rid}')">Заблокировать</button>
+                                    <button class="ge-menu-btn danger" onclick="geEngine.chat.removeChat(event, '${rid}')">Удалить чат</button>
                                 </div>
                             </div>
                         `;
@@ -880,33 +950,52 @@
                     if (!mail) return;
 
                     try {
-                        // Отправляем запрос на сервер
                         const res = await fetch(`/api/index?action=addContact&user_email=${geEngine.state.session.email}&target_email=${mail}`);
                         const data = await res.json();
 
                         if (data.status === 'success') {
                             alert("Пользователь найден и добавлен в контакты!");
-                            
-                            // Генерируем ID приватной комнаты (как в твоей логике)
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
                             const ids = [myMailSafe, otherMailSafe].sort();
                             const roomId = `private-${ids[0]}-${ids[1]}`;
-                            
-                            // Открываем чат
                             geEngine.chat.open(roomId, mail.split('@')[0]);
                         } else {
-                            alert("Ошибка: Пользователь с таким Email не найден в базе GeLink.");
+                            alert("Ошибка: Пользователь с таким Email не найден.");
                         }
                     } catch (e) {
                         alert("Произошла ошибка при проверке пользователя.");
-                        console.error(e);
                     }
                     geEngine.chat.refresh();
                 },
                 createGroup() {
                     const name = prompt("Имя группы:");
                     if (name) geEngine.chat.open(name.trim(), name.trim());
+                },
+                // --- ФУНКЦИИ МЕНЮ ---
+                async clearChat(event, rid) {
+                    event.stopPropagation();
+                    if (confirm("Вы уверены, что хотите очистить переписку?")) {
+                        await fetch(`/api/index?action=clearChat&room=${rid}&user_email=${geEngine.state.session.email}`);
+                        geEngine.chat.refresh();
+                    }
+                },
+                async blockChat(event, rid) {
+                    event.stopPropagation();
+                    if (confirm("Вы уверены, что хотите заблокировать этот чат?")) {
+                        await fetch(`/api/index?action=blockChat&room=${rid}&user_email=${geEngine.state.session.email}`);
+                        alert("Чат заблокирован.");
+                    }
+                },
+                async removeChat(event, rid) {
+                    event.stopPropagation();
+                    if (confirm("Вы уверены, что хотите удалить этот чат из списка?")) {
+                        await fetch(`/api/index?action=removeChat&room=${rid}&user_email=${geEngine.state.session.email}`);
+                        if (geEngine.state.activeRoom === rid) {
+                            geEngine.state.activeRoom = "general";
+                        }
+                        geEngine.chat.refresh();
+                    }
                 }
             },
 
@@ -915,6 +1004,12 @@
                 document.getElementById('ge-main-app').classList.add('ge-flex');
                 document.getElementById('ge-my-name').innerText = geEngine.state.session.name;
                 document.getElementById('ge-my-av').innerText = geEngine.state.session.name[0].toUpperCase();
+                
+                // Закрытие всех меню при клике по документу
+                document.addEventListener('click', () => {
+                    document.querySelectorAll('.ge-chat-menu').forEach(m => m.classList.remove('active'));
+                });
+
                 geEngine.chat.refresh();
                 setInterval(() => geEngine.chat.refresh(), 4000);
             }
