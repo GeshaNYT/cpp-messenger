@@ -352,6 +352,7 @@
         }
 
         .ge-chat-item {
+            position: relative;
             padding: 24px 35px;
             display: flex;
             align-items: center;
@@ -366,6 +367,58 @@
 
         .ge-item-content b { display: block; font-size: 17px; margin-bottom: 6px; color: var(--text-primary); }
         .ge-item-content span { font-size: 13px; color: var(--text-secondary); }
+
+        /* --- СТИЛИ ДЛЯ МЕНЮ ТРЕХ ТОЧЕК --- */
+        .ge-item-dots {
+            position: absolute;
+            right: 25px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            color: var(--text-tertiary);
+            font-size: 20px;
+            transition: 0.2s;
+            z-index: 5;
+        }
+
+        .ge-item-dots:hover {
+            background: var(--border-soft);
+            color: var(--ge-primary);
+        }
+
+        .ge-context-menu {
+            position: absolute;
+            right: 20px;
+            top: 55px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-base);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-lg);
+            display: none;
+            flex-direction: column;
+            z-index: 1000;
+            min-width: 150px;
+            overflow: hidden;
+        }
+
+        .ge-context-menu.active { display: flex; }
+
+        .ge-menu-btn {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--ge-error);
+            background: none;
+            transition: 0.2s;
+        }
+
+        .ge-menu-btn:hover { background: rgba(250, 62, 62, 0.05); }
 
         /* ОСНОВНАЯ ОБЛАСТЬ ЧАТА */
         .ge-chat-view {
@@ -665,7 +718,7 @@
                     <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0;" onclick="geEngine.chat.addFriend()">+ ДОБАВИТЬ</button>
                     <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0; background: var(--bg-body); color: var(--text-primary); box-shadow: none;" onclick="geEngine.chat.createGroup()">+ ГРУППА</button>
                 </div>
-            </header>я
+            </header>
 
             <div id="ge-chat-list-scroller" class="ge-chat-list">
                 </div>
@@ -708,6 +761,7 @@
                 session: null,
                 activeRoom: "general",
                 activeTab: "chats",
+                deletedContacts: [], // Список скрытых контактов
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
@@ -757,6 +811,14 @@
                     });
                     geEngine.chat.refresh();
                 },
+                // Функция открытия/закрытия меню трех точек
+                toggleContextMenu(event, rid) {
+                    event.stopPropagation();
+                    const menu = document.getElementById('menu-' + rid);
+                    const isOpen = menu.classList.contains('active');
+                    document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
+                    if (!isOpen) menu.classList.add('active');
+                },
                 renderChatList(rooms) {
                     const scroller = document.getElementById('ge-chat-list-scroller');
                     const tab = geEngine.state.activeTab;
@@ -775,7 +837,11 @@
                     }
 
                     if (!rooms) return;
-                    scroller.innerHTML = rooms.map(rid => {
+                    
+                    // Фильтруем удаленные контакты
+                    const visibleRooms = rooms.filter(rid => !geEngine.state.deletedContacts.includes(rid));
+
+                    scroller.innerHTML = visibleRooms.map(rid => {
                         let displayName = rid;
                         if (rid.startsWith('private-')) {
                             const parts = rid.replace('private-', '').split('-');
@@ -792,6 +858,10 @@
                                 <div class="ge-item-content">
                                     <b>${displayName}</b>
                                     <span>Активный зашифрованный канал</span>
+                                </div>
+                                <div class="ge-item-dots" onclick="geEngine.ui.toggleContextMenu(event, '${rid}')">⋮</div>
+                                <div class="ge-context-menu" id="menu-${rid}">
+                                    <button class="ge-menu-btn" onclick="geEngine.chat.removeContact(event, '${rid}')">Удалить контакт</button>
                                 </div>
                             </div>
                         `;
@@ -880,29 +950,38 @@
                     if (!mail) return;
 
                     try {
-                        // Отправляем запрос на сервер
                         const res = await fetch(`/api/index?action=addContact&user_email=${geEngine.state.session.email}&target_email=${mail}`);
                         const data = await res.json();
 
                         if (data.status === 'success') {
                             alert("Пользователь найден и добавлен в контакты!");
-                            
-                            // Генерируем ID приватной комнаты (как в твоей логике)
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
                             const ids = [myMailSafe, otherMailSafe].sort();
                             const roomId = `private-${ids[0]}-${ids[1]}`;
                             
-                            // Открываем чат
+                            // Возвращаем контакт, если он был удален ранее
+                            geEngine.state.deletedContacts = geEngine.state.deletedContacts.filter(r => r !== roomId);
                             geEngine.chat.open(roomId, mail.split('@')[0]);
                         } else {
-                            alert("Ошибка: Пользователь с таким Email не найден в базе GeLink.");
+                            alert("Ошибка: Пользователь с таким Email не найден.");
                         }
                     } catch (e) {
-                        alert("Произошла ошибка при проверке пользователя.");
-                        console.error(e);
+                        alert("Произошла ошибка.");
                     }
                     geEngine.chat.refresh();
+                },
+                // Функция удаления контакта
+                removeContact(event, rid) {
+                    event.stopPropagation();
+                    if (confirm("Удалить этот контакт из списка?")) {
+                        geEngine.state.deletedContacts.push(rid);
+                        if (geEngine.state.activeRoom === rid) {
+                            geEngine.state.activeRoom = "general";
+                            document.getElementById('ge-active-name').innerText = "Выберите диалог";
+                        }
+                        geEngine.chat.refresh();
+                    }
                 },
                 createGroup() {
                     const name = prompt("Имя группы:");
@@ -915,6 +994,12 @@
                 document.getElementById('ge-main-app').classList.add('ge-flex');
                 document.getElementById('ge-my-name').innerText = geEngine.state.session.name;
                 document.getElementById('ge-my-av').innerText = geEngine.state.session.name[0].toUpperCase();
+
+                // Закрывать меню при клике по экрану
+                document.addEventListener('click', () => {
+                    document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
+                });
+
                 geEngine.chat.refresh();
                 setInterval(() => geEngine.chat.refresh(), 4000);
             }
