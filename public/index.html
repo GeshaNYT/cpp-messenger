@@ -835,21 +835,15 @@
 
                     if (!rooms) return;
 
-                    // Логика фильтрации и распределения чатов
+                    // Фильтрация: general только в "ГРУППАХ" (people), private-* только в "ЧАТАХ"
                     const filtered = rooms.filter(rid => {
                         if (geEngine.state.deletedRooms.includes(rid)) return false;
-
-                        if (tab === 'chats') {
-                            // Вкладка чатов показывает только личные сообщения
-                            return rid.startsWith('private-');
-                        } else if (tab === 'people') {
-                            // Вкладка групп показывает general и пользовательские группы
-                            return rid === 'general' || !rid.startsWith('private-');
-                        }
+                        if (tab === 'chats') return rid.startsWith('private-');
+                        if (tab === 'people') return rid === 'general' || !rid.startsWith('private-');
                         return true;
                     });
 
-                    scroller.innerHTML = filtered.map(rid => {
+                    let html = filtered.map(rid => {
                         let displayName = rid;
                         let isGroup = rid === 'general' || !rid.startsWith('private-');
 
@@ -878,6 +872,18 @@
                             </div>
                         `;
                     }).join('');
+
+                    // Кнопка вступления в General (показывается только во вкладке ГРУППЫ и если покинута)
+                    if (tab === 'people' && geEngine.state.deletedRooms.includes('general')) {
+                        html += `
+                            <div class="ge-chat-item" style="border: 2px dashed var(--ge-primary); margin: 20px; border-radius: var(--radius-md); background: var(--ge-primary-soft); text-align: center; justify-content: center; display: flex; flex-direction: column;" onclick="geEngine.chat.joinGeneral()">
+                                <b style="color: var(--ge-primary); font-size: 16px;">+ Вступить в группу мессенджера</b>
+                                <span style="font-size: 12px; color: var(--text-secondary);">Вернуться в канал General</span>
+                            </div>
+                        `;
+                    }
+
+                    scroller.innerHTML = html;
                 },
                 renderMessages(messages) {
                     const container = document.getElementById('ge-msg-container');
@@ -928,7 +934,7 @@
                         const data = await res.json();
                         geEngine.ui.renderChatList(data.rooms?.result);
                         if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(data.messages?.result);
-                    } catch (e) { console.warn("Waiting for server..."); }
+                    } catch (e) { console.warn("Sync..."); }
                 },
                 async broadcast() {
                     const input = document.getElementById('ge-main-input');
@@ -967,10 +973,16 @@
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                         
                         if(geEngine.state.activeRoom === rid) {
-                            geEngine.state.activeRoom = "general";
+                            geEngine.state.activeRoom = "";
                         }
                         geEngine.chat.refresh();
                     }
+                },
+                joinGeneral() {
+                    geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== 'general');
+                    localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                    geEngine.chat.open('general', 'general');
+                    geEngine.chat.refresh();
                 },
                 async addFriend() {
                     const mail = prompt("Введите Email контакта:");
@@ -981,11 +993,9 @@
                         const data = await res.json();
 
                         if (data.status === 'success') {
-                            alert("Пользователь найден и добавлен!");
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
-                            const ids = [myMailSafe, otherMailSafe].sort();
-                            const roomId = `private-${ids[0]}-${ids[1]}`;
+                            const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
                             
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
