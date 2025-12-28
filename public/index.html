@@ -368,10 +368,10 @@
         .ge-item-content b { display: block; font-size: 17px; margin-bottom: 6px; color: var(--text-primary); }
         .ge-item-content span { font-size: 13px; color: var(--text-secondary); }
 
-        /* --- СТИЛИ ДЛЯ МЕНЮ ТРЕХ ТОЧЕК --- */
+        /* Меню трёх точек */
         .ge-item-dots {
             position: absolute;
-            right: 25px;
+            right: 20px;
             top: 50%;
             transform: translateY(-50%);
             width: 32px;
@@ -383,18 +383,15 @@
             color: var(--text-tertiary);
             font-size: 20px;
             transition: 0.2s;
-            z-index: 5;
+            z-index: 10;
         }
 
-        .ge-item-dots:hover {
-            background: var(--border-soft);
-            color: var(--ge-primary);
-        }
+        .ge-item-dots:hover { background: var(--border-soft); color: var(--ge-primary); }
 
         .ge-context-menu {
             position: absolute;
-            right: 20px;
-            top: 55px;
+            right: 25px;
+            top: 70%;
             background: var(--bg-panel);
             border: 1px solid var(--border-base);
             border-radius: var(--radius-sm);
@@ -402,7 +399,7 @@
             display: none;
             flex-direction: column;
             z-index: 1000;
-            min-width: 150px;
+            min-width: 160px;
             overflow: hidden;
         }
 
@@ -412,13 +409,13 @@
             padding: 12px 16px;
             text-align: left;
             font-size: 13px;
-            font-weight: 600;
+            font-weight: 700;
             color: var(--ge-error);
             background: none;
             transition: 0.2s;
         }
 
-        .ge-menu-btn:hover { background: rgba(250, 62, 62, 0.05); }
+        .ge-menu-btn:hover { background: rgba(250, 62, 62, 0.1); }
 
         /* ОСНОВНАЯ ОБЛАСТЬ ЧАТА */
         .ge-chat-view {
@@ -761,7 +758,7 @@
                 session: null,
                 activeRoom: "general",
                 activeTab: "chats",
-                deletedContacts: [], // Список скрытых контактов
+                deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"), // Загружаем список из памяти
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
@@ -811,13 +808,12 @@
                     });
                     geEngine.chat.refresh();
                 },
-                // Функция открытия/закрытия меню трех точек
-                toggleContextMenu(event, rid) {
-                    event.stopPropagation();
+                toggleMenu(e, rid) {
+                    e.stopPropagation();
                     const menu = document.getElementById('menu-' + rid);
-                    const isOpen = menu.classList.contains('active');
+                    const isActive = menu.classList.contains('active');
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
-                    if (!isOpen) menu.classList.add('active');
+                    if(!isActive) menu.classList.add('active');
                 },
                 renderChatList(rooms) {
                     const scroller = document.getElementById('ge-chat-list-scroller');
@@ -837,11 +833,11 @@
                     }
 
                     if (!rooms) return;
-                    
-                    // Фильтруем удаленные контакты
-                    const visibleRooms = rooms.filter(rid => !geEngine.state.deletedContacts.includes(rid));
 
-                    scroller.innerHTML = visibleRooms.map(rid => {
+                    // ФИЛЬТР: Не отображаем те, что в списке удаленных
+                    const filtered = rooms.filter(rid => !geEngine.state.deletedRooms.includes(rid));
+
+                    scroller.innerHTML = filtered.map(rid => {
                         let displayName = rid;
                         if (rid.startsWith('private-')) {
                             const parts = rid.replace('private-', '').split('-');
@@ -859,9 +855,9 @@
                                     <b>${displayName}</b>
                                     <span>Активный зашифрованный канал</span>
                                 </div>
-                                <div class="ge-item-dots" onclick="geEngine.ui.toggleContextMenu(event, '${rid}')">⋮</div>
-                                <div class="ge-context-menu" id="menu-${rid}">
-                                    <button class="ge-menu-btn" onclick="geEngine.chat.removeContact(event, '${rid}')">Удалить контакт</button>
+                                <div class="ge-item-dots" onclick="geEngine.ui.toggleMenu(event, '${rid}')">⋮</div>
+                                <div id="menu-${rid}" class="ge-context-menu">
+                                    <button class="ge-menu-btn" onclick="geEngine.chat.removeRoom(event, '${rid}')">Удалить контакт</button>
                                 </div>
                             </div>
                         `;
@@ -945,6 +941,19 @@
                     document.getElementById('ge-active-av').innerText = (prettyName || id)[0].toUpperCase();
                     geEngine.chat.refresh();
                 },
+                removeRoom(e, rid) {
+                    e.stopPropagation();
+                    if(confirm("Удалить контакт из списка?")) {
+                        // Добавляем в массив и СОХРАНЯЕМ В LOCALSTORAGE
+                        geEngine.state.deletedRooms.push(rid);
+                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                        
+                        if(geEngine.state.activeRoom === rid) {
+                            geEngine.state.activeRoom = "general";
+                        }
+                        geEngine.chat.refresh();
+                    }
+                },
                 async addFriend() {
                     const mail = prompt("Введите Email контакта:");
                     if (!mail) return;
@@ -954,34 +963,24 @@
                         const data = await res.json();
 
                         if (data.status === 'success') {
-                            alert("Пользователь найден и добавлен в контакты!");
+                            alert("Пользователь найден и добавлен!");
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
                             const ids = [myMailSafe, otherMailSafe].sort();
                             const roomId = `private-${ids[0]}-${ids[1]}`;
                             
-                            // Возвращаем контакт, если он был удален ранее
-                            geEngine.state.deletedContacts = geEngine.state.deletedContacts.filter(r => r !== roomId);
+                            // Если мы его раньше удаляли — восстанавливаем
+                            geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
+                            localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                            
                             geEngine.chat.open(roomId, mail.split('@')[0]);
                         } else {
-                            alert("Ошибка: Пользователь с таким Email не найден.");
+                            alert("Ошибка: Пользователь не найден.");
                         }
                     } catch (e) {
-                        alert("Произошла ошибка.");
+                        alert("Ошибка сети.");
                     }
                     geEngine.chat.refresh();
-                },
-                // Функция удаления контакта
-                removeContact(event, rid) {
-                    event.stopPropagation();
-                    if (confirm("Удалить этот контакт из списка?")) {
-                        geEngine.state.deletedContacts.push(rid);
-                        if (geEngine.state.activeRoom === rid) {
-                            geEngine.state.activeRoom = "general";
-                            document.getElementById('ge-active-name').innerText = "Выберите диалог";
-                        }
-                        geEngine.chat.refresh();
-                    }
                 },
                 createGroup() {
                     const name = prompt("Имя группы:");
@@ -995,7 +994,7 @@
                 document.getElementById('ge-my-name').innerText = geEngine.state.session.name;
                 document.getElementById('ge-my-av').innerText = geEngine.state.session.name[0].toUpperCase();
 
-                // Закрывать меню при клике по экрану
+                // Закрывать контекстные меню при клике в любое место
                 document.addEventListener('click', () => {
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
                 });
