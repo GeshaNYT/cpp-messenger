@@ -707,7 +707,7 @@
 
                 <div class="ge-sidebar-nav">
                     <button id="nav-chats" class="ge-nav-tab active" onclick="geEngine.ui.setTab('chats')">ЧАТЫ</button>
-                    <button id="nav-people" class="ge-nav-tab" onclick="geEngine.ui.setTab('people')">КОНТАКТЫ</button>
+                    <button id="nav-people" class="ge-nav-tab" onclick="geEngine.ui.setTab('people')">ГРУППЫ</button>
                     <button id="nav-calls" class="ge-nav-tab" onclick="geEngine.ui.setTab('calls')">ЗВОНКИ</button>
                 </div>
 
@@ -758,7 +758,7 @@
                 session: null,
                 activeRoom: "general",
                 activeTab: "chats",
-                deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"), // Загружаем список из памяти
+                deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
@@ -804,7 +804,8 @@
                 setTab(tab) {
                     geEngine.state.activeTab = tab;
                     ['chats', 'people', 'calls'].forEach(t => {
-                        document.getElementById('nav-' + t).classList.toggle('active', tab === t);
+                        const el = document.getElementById('nav-' + t);
+                        if(el) el.classList.toggle('active', tab === t);
                     });
                     geEngine.chat.refresh();
                 },
@@ -834,11 +835,24 @@
 
                     if (!rooms) return;
 
-                    // ФИЛЬТР: Не отображаем те, что в списке удаленных
-                    const filtered = rooms.filter(rid => !geEngine.state.deletedRooms.includes(rid));
+                    // Логика фильтрации и распределения чатов
+                    const filtered = rooms.filter(rid => {
+                        if (geEngine.state.deletedRooms.includes(rid)) return false;
+
+                        if (tab === 'chats') {
+                            // Вкладка чатов показывает только личные сообщения
+                            return rid.startsWith('private-');
+                        } else if (tab === 'people') {
+                            // Вкладка групп показывает general и пользовательские группы
+                            return rid === 'general' || !rid.startsWith('private-');
+                        }
+                        return true;
+                    });
 
                     scroller.innerHTML = filtered.map(rid => {
                         let displayName = rid;
+                        let isGroup = rid === 'general' || !rid.startsWith('private-');
+
                         if (rid.startsWith('private-')) {
                             const parts = rid.replace('private-', '').split('-');
                             const myEmailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
@@ -853,11 +867,13 @@
                                 <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:#444;">${displayName[0].toUpperCase()}</div>
                                 <div class="ge-item-content">
                                     <b>${displayName}</b>
-                                    <span>Активный зашифрованный канал</span>
+                                    <span>${isGroup ? 'Групповой канал' : 'Активный зашифрованный канал'}</span>
                                 </div>
                                 <div class="ge-item-dots" onclick="geEngine.ui.toggleMenu(event, '${rid}')">⋮</div>
                                 <div id="menu-${rid}" class="ge-context-menu">
-                                    <button class="ge-menu-btn" onclick="geEngine.chat.removeRoom(event, '${rid}')">Удалить контакт</button>
+                                    <button class="ge-menu-btn" onclick="geEngine.chat.removeRoom(event, '${rid}')">
+                                        ${isGroup ? 'Покинуть группу' : 'Удалить контакт'}
+                                    </button>
                                 </div>
                             </div>
                         `;
@@ -943,8 +959,10 @@
                 },
                 removeRoom(e, rid) {
                     e.stopPropagation();
-                    if(confirm("Удалить контакт из списка?")) {
-                        // Добавляем в массив и СОХРАНЯЕМ В LOCALSTORAGE
+                    const isGroup = rid === 'general' || !rid.startsWith('private-');
+                    const confirmMsg = isGroup ? "Вы уверены, что хотите покинуть группу?" : "Удалить контакт из списка?";
+                    
+                    if(confirm(confirmMsg)) {
                         geEngine.state.deletedRooms.push(rid);
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                         
@@ -969,7 +987,6 @@
                             const ids = [myMailSafe, otherMailSafe].sort();
                             const roomId = `private-${ids[0]}-${ids[1]}`;
                             
-                            // Если мы его раньше удаляли — восстанавливаем
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                             
@@ -994,7 +1011,6 @@
                 document.getElementById('ge-my-name').innerText = geEngine.state.session.name;
                 document.getElementById('ge-my-av').innerText = geEngine.state.session.name[0].toUpperCase();
 
-                // Закрывать контекстные меню при клике в любое место
                 document.addEventListener('click', () => {
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
                 });
