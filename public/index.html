@@ -759,8 +759,8 @@
                 activeRoom: "general",
                 activeTab: "chats",
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
-                // БАГ ИСПРАВЛЕН ТУТ: Сохраняем локальные группы в localStorage
-                localGroups: JSON.parse(localStorage.getItem('ge_local_groups') || '["general"]'),
+                // Список всех зарегистрированных пользователей для имитации БД
+                usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
@@ -778,23 +778,48 @@
                     let n, e, p, pc;
                     if (type === 'reg') {
                         n = document.getElementById('up-name').value.trim();
-                        e = document.getElementById('up-email').value.trim();
+                        e = document.getElementById('up-email').value.trim().toLowerCase();
                         p = document.getElementById('up-pass').value.trim();
                         pc = document.getElementById('up-confirm').value.trim();
+
                         if (!n || !e || !p) return alert("Заполните данные!");
                         if (p !== pc) { document.getElementById('up-error').classList.remove('ge-hidden'); return; }
+
+                        // БАГ ИСПРАВЛЕН ТУТ: Проверка существования пользователя
+                        const userExists = geEngine.state.usersDB.find(u => u.email === e);
+                        if (userExists) {
+                            return alert("Пользователь с таким Email уже существует! Используйте вход.");
+                        }
+
+                        // Сохранение нового пользователя в "БД"
+                        const newUser = { name: n, email: e, password: p };
+                        geEngine.state.usersDB.push(newUser);
+                        localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
+                        
+                        geEngine.state.session = { name: n, email: e };
                     } else {
-                        e = document.getElementById('in-email').value.trim();
+                        e = document.getElementById('in-email').value.trim().toLowerCase();
                         p = document.getElementById('in-pass').value.trim();
-                        if (!e || !p) return alert("Введите логин!");
-                        n = e.split('@')[0];
+                        if (!e || !p) return alert("Введите логин и пароль!");
+
+                        // Поиск пользователя в БД и проверка пароля
+                        const user = geEngine.state.usersDB.find(u => u.email === e && u.password === p);
+                        if (!user) {
+                            return alert("Неверный email или пароль!");
+                        }
+                        
+                        geEngine.state.session = { name: user.name, email: user.email };
+                        n = user.name;
                     }
-                    geEngine.state.session = { name: n, email: e };
+                    
                     localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
                     geEngine.init();
                 },
                 exit() {
-                    if (confirm("Выйти?")) { localStorage.clear(); location.reload(); }
+                    if (confirm("Выйти?")) { 
+                        localStorage.removeItem('ge_v9_token'); 
+                        location.reload(); 
+                    }
                 }
             },
 
@@ -818,7 +843,7 @@
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
                     if(!isActive) menu.classList.add('active');
                 },
-                renderChatList(serverRooms) {
+                renderChatList(rooms) {
                     const scroller = document.getElementById('ge-chat-list-scroller');
                     const tab = geEngine.state.activeTab;
 
@@ -835,19 +860,18 @@
                         return;
                     }
 
-                    // Комбинируем серверные комнаты и те, что создал пользователь локально
-                    let allRooms = Array.from(new Set([...(serverRooms || []), ...geEngine.state.localGroups]));
+                    if (!rooms) return;
 
-                    const filtered = allRooms.filter(rid => {
+                    const filtered = rooms.filter(rid => {
                         if (geEngine.state.deletedRooms.includes(rid)) return false;
                         if (tab === 'chats') return rid.startsWith('private-');
-                        if (tab === 'people') return !rid.startsWith('private-');
+                        if (tab === 'people') return rid === 'general' || !rid.startsWith('private-');
                         return true;
                     });
 
                     let html = filtered.map(rid => {
                         let displayName = rid;
-                        let isGroup = !rid.startsWith('private-');
+                        let isGroup = rid === 'general' || !rid.startsWith('private-');
 
                         if (rid.startsWith('private-')) {
                             const parts = rid.replace('private-', '').split('-');
@@ -906,7 +930,6 @@
                                 <div class="ge-msg-status-line">
                                     <span>${timeStr}</span>
                                     ${isMe ? `<span>${statusIcon}</span>` : ''}
-                                }
                                 </div>
                             </div>
                         `;
@@ -967,13 +990,16 @@
                 },
                 removeRoom(e, rid) {
                     e.stopPropagation();
-                    const isGroup = !rid.startsWith('private-');
+                    const isGroup = rid === 'general' || !rid.startsWith('private-');
                     const confirmMsg = isGroup ? "Вы уверены, что хотите покинуть группу?" : "Удалить контакт из списка?";
                     
                     if(confirm(confirmMsg)) {
                         geEngine.state.deletedRooms.push(rid);
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                        if(geEngine.state.activeRoom === rid) geEngine.state.activeRoom = "";
+                        
+                        if(geEngine.state.activeRoom === rid) {
+                            geEngine.state.activeRoom = "";
+                        }
                         geEngine.chat.refresh();
                     }
                 },
@@ -981,36 +1007,36 @@
                     geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== 'general');
                     localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                     geEngine.chat.open('general', 'general');
+                    geEngine.chat.refresh();
                 },
                 async addFriend() {
                     const mail = prompt("Введите Email контакта:");
                     if (!mail) return;
+
                     try {
                         const res = await fetch(`/api/index?action=addContact&user_email=${geEngine.state.session.email}&target_email=${mail}`);
                         const data = await res.json();
+
                         if (data.status === 'success') {
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
                             const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
+                            
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                            
                             geEngine.chat.open(roomId, mail.split('@')[0]);
-                        } else { alert("Ошибка: Пользователь не найден."); }
-                    } catch (e) { alert("Ошибка сети."); }
+                        } else {
+                            alert("Ошибка: Пользователь не найден.");
+                        }
+                    } catch (e) {
+                        alert("Ошибка сети.");
+                    }
                     geEngine.chat.refresh();
                 },
                 createGroup() {
                     const name = prompt("Имя группы:");
-                    if (name) {
-                        const roomName = name.trim();
-                        // ИСПРАВЛЕНИЕ: Добавляем в локальный список и сохраняем
-                        if (!geEngine.state.localGroups.includes(roomName)) {
-                            geEngine.state.localGroups.push(roomName);
-                            localStorage.setItem('ge_local_groups', JSON.stringify(geEngine.state.localGroups));
-                        }
-                        geEngine.ui.setTab('people'); // Переключаемся на вкладку групп
-                        geEngine.chat.open(roomName, roomName);
-                    }
+                    if (name) geEngine.chat.open(name.trim(), name.trim());
                 }
             },
 
