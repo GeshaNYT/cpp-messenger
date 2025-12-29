@@ -907,14 +907,22 @@
                     const container = document.getElementById('ge-msg-container');
                     if (!geEngine.state.activeRoom) return;
 
-                    const rawMsgs = (messages || []).map(m => JSON.parse(decodeURIComponent(m)));
+                    // Исправленная логика обработки данных
+                    const validMessages = (messages || []).filter(m => m !== "" && m !== null);
+                    const rawMsgs = validMessages.map(m => {
+                        try {
+                            return JSON.parse(decodeURIComponent(m));
+                        } catch(e) { return null; }
+                    }).filter(m => m !== null);
+
                     // Ищем последнюю метку очистки
                     const lastPurgeIndex = rawMsgs.map(m => m.text).lastIndexOf("__PURGE__");
+                    
                     // Показываем только те, что после очистки и не являются метками инициализации
                     const visible = rawMsgs.slice(lastPurgeIndex + 1).filter(m => m.text !== "__INIT__");
 
                     if (visible.length === 0) {
-                        container.innerHTML = `<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">История очищена.</div>`;
+                        container.innerHTML = `<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Сообщений пока нет.</div>`;
                         return;
                     }
 
@@ -934,6 +942,7 @@
 
             chat: {
                 async refresh() {
+                    if (!geEngine.state.session) return;
                     try {
                         const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`;
                         const res = await fetch(url);
@@ -1010,7 +1019,6 @@
                         localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
                     }
                     
-                    // Магия: отправляем невидимый сигнал, чтобы чат возник у друга
                     const oldRoom = geEngine.state.activeRoom;
                     geEngine.state.activeRoom = roomId;
                     await this.broadcast("__INIT__");
