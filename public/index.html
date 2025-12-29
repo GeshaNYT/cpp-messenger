@@ -894,13 +894,8 @@
                                 <div class="ge-item-dots" onclick="geEngine.ui.toggleMenu(event, '${rid}')">⋮</div>
                                 <div id="menu-${rid}" class="ge-context-menu">
                                     <button class="ge-menu-btn danger" onclick="geEngine.chat.removeRoom(event, '${rid}')">
-                                        ${isGroup ? 'Покинуть и очистить' : 'Удалить у обоих'}
+                                        ${isGroup ? 'Удалить группу' : 'Удалить диалог'}
                                     </button>
-                                    ${isCreator && isGroup && rid !== 'general' ? `
-                                        <button class="ge-menu-btn danger" onclick="geEngine.chat.deleteRoomPermanently(event, '${rid}')">
-                                            Удалить группу
-                                        </button>
-                                    ` : ''}
                                 </div>
                             </div>
                         `;
@@ -930,7 +925,6 @@
                         return;
                     }
 
-                    // Фильтруем системные сообщения об удалении, чтобы они не отображались в чате
                     const visibleMessages = messages.filter(raw => {
                          const m = JSON.parse(decodeURIComponent(raw));
                          return m.text !== "__SYSTEM_ROOM_DELETED__";
@@ -986,48 +980,46 @@
                         const res = await fetch(url);
                         const data = await res.json();
                         
-                        // Логика обнаружения новых комнат
-                        if(data.rooms?.result) {
-                            let updated = false;
-                            for (const rid of data.rooms.result) {
-                                // Если мы нашли сообщение об удалении в комнате - удаляем её локально
-                                if (rid.startsWith('private-') || !rid.startsWith('private-')) {
-                                     const checkUrl = `/api/index?room=${rid}&user_email=${geEngine.state.session.email}`;
-                                     const checkRes = await fetch(checkUrl);
-                                     const checkData = await checkRes.json();
-                                     const messages = checkData.messages?.result || [];
-                                     
-                                     const isDeleted = messages.some(raw => JSON.parse(decodeURIComponent(raw)).text === "__SYSTEM_ROOM_DELETED__");
-                                     
-                                     if (isDeleted && !geEngine.state.deletedRooms.includes(rid)) {
-                                         geEngine.state.deletedRooms.push(rid);
-                                         geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== rid);
-                                         updated = true;
-                                         if(geEngine.state.activeRoom === rid) {
-                                             geEngine.state.activeRoom = "";
-                                         }
-                                         continue;
-                                     }
-                                }
+                        let updated = false;
 
-                                if(rid.startsWith('private-') && !geEngine.state.localRooms.includes(rid) && !geEngine.state.deletedRooms.includes(rid)) {
+                        // 1. Проверяем новые комнаты
+                        if(data.rooms?.result) {
+                            for (const rid of data.rooms.result) {
+                                if (!geEngine.state.localRooms.includes(rid) && !geEngine.state.deletedRooms.includes(rid)) {
                                     geEngine.state.localRooms.push(rid);
                                     updated = true;
                                 }
                             }
-                            if(updated) {
-                                localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                                localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                            }
+                        }
+
+                        // 2. Проверяем ТОЛЬКО ТЕКУЩУЮ активную комнату на сигнал удаления
+                        if (geEngine.state.activeRoom) {
+                             const messages = data.messages?.result || [];
+                             const isDeleted = messages.some(raw => JSON.parse(decodeURIComponent(raw)).text === "__SYSTEM_ROOM_DELETED__");
+                             
+                             if (isDeleted) {
+                                 const ridToDelete = geEngine.state.activeRoom;
+                                 geEngine.state.deletedRooms.push(ridToDelete);
+                                 geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== ridToDelete);
+                                 geEngine.state.activeRoom = "";
+                                 updated = true;
+                             }
+                        }
+
+                        if(updated) {
+                            localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                            localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                         }
 
                         geEngine.ui.renderChatList(data.rooms?.result);
                         
-                        if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
-                            if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(data.messages?.result);
+                        if (geEngine.state.activeRoom) {
+                            geEngine.ui.renderMessages(data.messages?.result);
                         } else {
-                             document.getElementById('ge-msg-container').innerHTML = "";
+                            document.getElementById('ge-msg-container').innerHTML = "";
+                            document.getElementById('ge-active-name').innerText = "Выберите диалог";
                         }
+
                     } catch (e) { console.warn("Sync..."); }
                 },
                 async broadcast() {
@@ -1059,11 +1051,7 @@
                 },
                 async removeRoom(e, rid) {
                     e.stopPropagation();
-                    const isGroup = rid === 'general' || !rid.startsWith('private-');
-                    const confirmMsg = isGroup ? "Покинуть группу и удалить историю у всех?" : "Удалить контакт и очистить чат у обоих пользователей?";
-                    
-                    if(confirm(confirmMsg)) {
-                        // Отправляем сигнал удаления в чат (его увидит refresh второго пользователя)
+                    if(confirm("Вы уверены? Контакт и история будут удалены у обоих пользователей.")) {
                         const killSignal = JSON.stringify({ 
                             username: "System", 
                             email: "system@gelink.com", 
@@ -1072,6 +1060,7 @@
                             status: 'read' 
                         });
 
+                        // Отправляем сигнал ТОЛЬКО в эту конкретную комнату
                         await fetch(`/api/index?room=${rid}&user_email=${geEngine.state.session.email}`, { 
                             method: 'POST', 
                             body: killSignal 
@@ -1085,16 +1074,9 @@
                         
                         if(geEngine.state.activeRoom === rid) {
                             geEngine.state.activeRoom = "";
-                            document.getElementById('ge-active-name').innerText = "Выберите диалог";
-                            document.getElementById('ge-active-av').innerText = "#";
-                            document.getElementById('ge-msg-container').innerHTML = "";
                         }
                         geEngine.chat.refresh();
                     }
-                },
-                deleteRoomPermanently(e, rid) {
-                    // Используем ту же логику для полного удаления
-                    this.removeRoom(e, rid);
                 },
                 joinGeneral() {
                     geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== 'general');
@@ -1151,14 +1133,10 @@
                         if (!geEngine.state.localRooms.includes(roomName)) {
                             geEngine.state.localRooms.push(roomName);
                             geEngine.state.createdRooms.push(roomName);
-                            
                             localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                            localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
                         }
-                        
                         geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomName);
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-
                         geEngine.chat.open(roomName, roomName);
                         geEngine.chat.refresh();
                     }
@@ -1166,10 +1144,6 @@
             },
 
             init() {
-                if (geEngine.state.deletedRooms.includes("general")) {
-                    geEngine.state.activeRoom = "";
-                }
-
                 document.getElementById('ge-auth-layer').classList.add('ge-hidden');
                 document.getElementById('ge-main-app').classList.add('ge-flex');
                 document.getElementById('ge-my-name').innerText = geEngine.state.session.name;
