@@ -759,7 +759,6 @@
                 activeRoom: "general",
                 activeTab: "chats",
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
-                // Список всех зарегистрированных пользователей для имитации БД
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
@@ -785,13 +784,11 @@
                         if (!n || !e || !p) return alert("Заполните данные!");
                         if (p !== pc) { document.getElementById('up-error').classList.remove('ge-hidden'); return; }
 
-                        // БАГ ИСПРАВЛЕН ТУТ: Проверка существования пользователя
                         const userExists = geEngine.state.usersDB.find(u => u.email === e);
                         if (userExists) {
                             return alert("Пользователь с таким Email уже существует! Используйте вход.");
                         }
 
-                        // Сохранение нового пользователя в "БД"
                         const newUser = { name: n, email: e, password: p };
                         geEngine.state.usersDB.push(newUser);
                         localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
@@ -802,7 +799,6 @@
                         p = document.getElementById('in-pass').value.trim();
                         if (!e || !p) return alert("Введите логин и пароль!");
 
-                        // Поиск пользователя в БД и проверка пароля
                         const user = geEngine.state.usersDB.find(u => u.email === e && u.password === p);
                         if (!user) {
                             return alert("Неверный email или пароль!");
@@ -913,6 +909,13 @@
                 renderMessages(messages) {
                     const container = document.getElementById('ge-msg-container');
                     if (!messages) return;
+                    
+                    // Если активная комната не задана (пользователь вышел), не пытаемся отрисовывать сообщения
+                    if (!geEngine.state.activeRoom || geEngine.state.activeRoom === "") {
+                        container.innerHTML = "";
+                        return;
+                    }
+
                     container.innerHTML = messages.map(raw => {
                         const m = JSON.parse(decodeURIComponent(raw));
                         const isMe = m.email === geEngine.state.session.email;
@@ -930,6 +933,7 @@
                                 <div class="ge-msg-status-line">
                                     <span>${timeStr}</span>
                                     ${isMe ? `<span>${statusIcon}</span>` : ''}
+                                }
                                 </div>
                             </div>
                         `;
@@ -953,6 +957,18 @@
 
             chat: {
                 async refresh() {
+                    // ЕСЛИ КОМНАТА ПУСТАЯ ИЛИ УДАЛЕНА - НЕ ОБНОВЛЯЕМ
+                    if (!geEngine.state.activeRoom || geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
+                        const scroller = document.getElementById('ge-chat-list-scroller');
+                        // Но список чатов все равно нужно отрендерить
+                        try {
+                           const res = await fetch(`/api/index?room=general&user_email=${geEngine.state.session.email}`);
+                           const data = await res.json();
+                           geEngine.ui.renderChatList(data.rooms?.result);
+                        } catch(e){}
+                        return;
+                    }
+
                     try {
                         const url = `/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`;
                         const res = await fetch(url);
@@ -964,7 +980,7 @@
                 async broadcast() {
                     const input = document.getElementById('ge-main-input');
                     const text = input.value.trim();
-                    if (!text) return;
+                    if (!text || !geEngine.state.activeRoom) return;
                     
                     const now = new Date();
                     const payload = JSON.stringify({ 
@@ -999,6 +1015,9 @@
                         
                         if(geEngine.state.activeRoom === rid) {
                             geEngine.state.activeRoom = "";
+                            document.getElementById('ge-active-name').innerText = "Выберите диалог";
+                            document.getElementById('ge-active-av').innerText = "#";
+                            document.getElementById('ge-msg-container').innerHTML = "";
                         }
                         geEngine.chat.refresh();
                     }
@@ -1041,6 +1060,11 @@
             },
 
             init() {
+                // ИСПРАВЛЕНИЕ: Если "general" удален, сбрасываем стартовую комнату
+                if (geEngine.state.deletedRooms.includes("general")) {
+                    geEngine.state.activeRoom = "";
+                }
+
                 document.getElementById('ge-auth-layer').classList.add('ge-hidden');
                 document.getElementById('ge-main-app').classList.add('ge-flex');
                 document.getElementById('ge-my-name').innerText = geEngine.state.session.name;
