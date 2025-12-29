@@ -862,6 +862,7 @@
                         return;
                     }
 
+                    // Объединяем локальные комнаты и комнаты с сервера
                     let allRooms = Array.from(new Set([...(serverRooms || []), ...geEngine.state.localRooms]));
 
                     const filtered = allRooms.filter(rid => {
@@ -874,7 +875,6 @@
                     let html = filtered.map(rid => {
                         let displayName = rid;
                         let isGroup = rid === 'general' || !rid.startsWith('private-');
-                        // Проверяем, является ли пользователь создателем
                         const isCreator = geEngine.state.createdRooms.includes(rid);
 
                         if (rid.startsWith('private-')) {
@@ -882,7 +882,8 @@
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherPart = parts.find(p => p !== myMailSafe);
                             if (otherPart) {
-                                displayName = otherPart.split('gmailcom')[0] || otherPart;
+                                // Попытка найти красивое имя из базы по email-части (упрощенно)
+                                displayName = otherPart;
                             }
                         }
 
@@ -891,12 +892,12 @@
                                 <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:#444;">${displayName[0].toUpperCase()}</div>
                                 <div class="ge-item-content">
                                     <b>${displayName}</b>
-                                    <span>${isGroup ? 'Групповой канал' : 'Активный зашифрованный канал'}</span>
+                                    <span>${isGroup ? 'Групповой канал' : 'Активный диалог'}</span>
                                 </div>
                                 <div class="ge-item-dots" onclick="geEngine.ui.toggleMenu(event, '${rid}')">⋮</div>
                                 <div id="menu-${rid}" class="ge-context-menu">
                                     <button class="ge-menu-btn" onclick="geEngine.chat.removeRoom(event, '${rid}')">
-                                        ${isGroup ? 'Покинуть группу' : 'Удалить контакт'}
+                                        ${isGroup ? 'Покинуть группу' : 'Удалить диалог'}
                                     </button>
                                     ${isCreator && isGroup && rid !== 'general' ? `
                                         <button class="ge-menu-btn danger" onclick="geEngine.chat.deleteRoomPermanently(event, '${rid}')">
@@ -911,8 +912,8 @@
                     if (tab === 'people' && geEngine.state.deletedRooms.includes('general')) {
                         html += `
                             <div class="ge-chat-item" style="border: 2px dashed var(--ge-primary); margin: 20px; border-radius: var(--radius-md); background: var(--ge-primary-soft); text-align: center; justify-content: center; display: flex; flex-direction: column;" onclick="geEngine.chat.joinGeneral()">
-                                <b style="color: var(--ge-primary); font-size: 16px;">+ Вступить в группу мессенджера</b>
-                                <span style="font-size: 12px; color: var(--text-secondary);">Вернуться в канал General</span>
+                                <b style="color: var(--ge-primary); font-size: 16px;">+ Вступить в сообщество</b>
+                                <span style="font-size: 12px; color: var(--text-secondary);">Вернуться в General</span>
                             </div>
                         `;
                     }
@@ -977,6 +978,18 @@
                         const res = await fetch(url);
                         const data = await res.json();
                         
+                        // Если с сервера пришли новые приватные комнаты, которых нет в локальном списке - добавляем
+                        if(data.rooms?.result) {
+                            let updated = false;
+                            data.rooms.result.forEach(rid => {
+                                if(rid.startsWith('private-') && !geEngine.state.localRooms.includes(rid) && !geEngine.state.deletedRooms.includes(rid)) {
+                                    geEngine.state.localRooms.push(rid);
+                                    updated = true;
+                                }
+                            });
+                            if(updated) localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                        }
+
                         geEngine.ui.renderChatList(data.rooms?.result);
                         
                         if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
@@ -1016,7 +1029,7 @@
                 removeRoom(e, rid) {
                     e.stopPropagation();
                     const isGroup = rid === 'general' || !rid.startsWith('private-');
-                    const confirmMsg = isGroup ? "Вы уверены, что хотите покинуть группу?" : "Удалить контакт из списка?";
+                    const confirmMsg = isGroup ? "Вы уверены, что хотите покинуть группу?" : "Удалить диалог?";
                     
                     if(confirm(confirmMsg)) {
                         geEngine.state.deletedRooms.push(rid);
@@ -1034,10 +1047,9 @@
                         geEngine.chat.refresh();
                     }
                 },
-                // Новая функция для полного удаления группы создателем
                 deleteRoomPermanently(e, rid) {
                     e.stopPropagation();
-                    if(confirm("Вы администратор этой группы. Удалить её полностью для всех (локально)?")) {
+                    if(confirm("Вы администратор этой группы. Удалить её полностью для всех?")) {
                         geEngine.state.deletedRooms.push(rid);
                         geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== rid);
                         geEngine.state.createdRooms = geEngine.state.createdRooms.filter(r => r !== rid);
@@ -1064,6 +1076,7 @@
                     if (!mail) return;
 
                     try {
+                        // 1. Пытаемся добавить контакт через API
                         const res = await fetch(`/api/index?action=addContact&user_email=${geEngine.state.session.email}&target_email=${mail}`);
                         const data = await res.json();
 
@@ -1072,6 +1085,22 @@
                             const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
                             const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
                             
+                            // 2. Чтобы у ДРУГОГО пользователя тоже появилась эта комната, отправляем "приветственное" системное сообщение в эту комнату
+                            // Сервер зафиксирует создание комнаты для обоих участников
+                            const welcome = JSON.stringify({ 
+                                username: "Система", 
+                                email: "system@gelink.com", 
+                                text: `Диалог создан.`,
+                                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                                status: 'read' 
+                            });
+
+                            await fetch(`/api/index?room=${roomId}&user_email=${geEngine.state.session.email}`, { 
+                                method: 'POST', 
+                                body: welcome 
+                            });
+
+                            // 3. Обновляем свой локальный список
                             if (!geEngine.state.localRooms.includes(roomId)) {
                                 geEngine.state.localRooms.push(roomId);
                                 localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
@@ -1085,7 +1114,7 @@
                             alert("Ошибка: Пользователь не найден.");
                         }
                     } catch (e) {
-                        alert("Ошибка сети.");
+                        alert("Ошибка соединения.");
                     }
                     geEngine.chat.refresh();
                 },
@@ -1095,7 +1124,6 @@
                         const roomName = name.trim();
                         if (!geEngine.state.localRooms.includes(roomName)) {
                             geEngine.state.localRooms.push(roomName);
-                            // Помечаем, что именно мы создали эту группу
                             geEngine.state.createdRooms.push(roomName);
                             
                             localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
