@@ -762,14 +762,14 @@
                 activeRoom: "general",
                 activeTab: "chats",
                 localRooms: JSON.parse(localStorage.getItem('ge_local_rooms') || "[]"),
+                // Список комнат, созданных этим пользователем
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
-                ],
-                activeCallInterval: null
+                ]
             },
 
             auth: {
@@ -811,6 +811,7 @@
                         }
                         
                         geEngine.state.session = { name: user.name, email: user.email };
+                        n = user.name;
                     }
                     
                     localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
@@ -873,6 +874,7 @@
                     let html = filtered.map(rid => {
                         let displayName = rid;
                         let isGroup = rid === 'general' || !rid.startsWith('private-');
+                        // Проверяем, является ли пользователь создателем
                         const isCreator = geEngine.state.createdRooms.includes(rid);
 
                         if (rid.startsWith('private-')) {
@@ -956,53 +958,15 @@
 
             calls: {
                 initiate(type) {
-                    const room = geEngine.state.activeRoom;
-                    if (!room || room === "general" || room === "") {
-                        return alert("Звонки доступны только в личных диалогах!");
-                    }
-
                     const overlay = document.getElementById('ge-call-ui');
                     const targetName = document.getElementById('ge-active-name').innerText;
-                    const statusText = document.getElementById('ge-call-status');
-
                     document.getElementById('ge-call-name').innerText = targetName;
                     document.getElementById('ge-call-av').innerText = targetName[0].toUpperCase();
-                    statusText.innerText = type === 'video' ? 'ВИДЕОЗВОНОК...' : 'ГОЛОСОВОЙ ВЫЗОВ...';
-                    
+                    document.getElementById('ge-call-status').innerText = type === 'video' ? 'ВИДЕОЗВОНОК...' : 'ГОЛОСОВОЙ ВЫЗОВ...';
                     overlay.style.display = 'flex';
-
-                    // Имитация процесса звонка
-                    let seconds = 0;
-                    if(geEngine.state.activeCallInterval) clearInterval(geEngine.state.activeCallInterval);
-
-                    geEngine.state.activeCallInterval = setInterval(() => {
-                        seconds++;
-                        if (seconds === 3) statusText.innerText = "ВЫЗОВ...";
-                        if (seconds === 6) statusText.innerText = "СОЕДИНЕНИЕ УСТАНОВЛЕНО";
-                        if (seconds > 6) {
-                            const time = seconds - 6;
-                            const m = Math.floor(time / 60).toString().padStart(2, '0');
-                            const s = (time % 60).toString().padStart(2, '0');
-                            statusText.innerText = `${m}:${s}`;
-                        }
-                    }, 1000);
                 },
                 hangup() {
-                    const overlay = document.getElementById('ge-call-ui');
-                    const targetName = document.getElementById('ge-call-name').innerText;
-                    
-                    if(geEngine.state.activeCallInterval) clearInterval(geEngine.state.activeCallInterval);
-                    
-                    // Добавляем в историю
-                    geEngine.state.historyCalls.unshift({
-                        name: targetName,
-                        type: "audio",
-                        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                        status: "Исходящий"
-                    });
-
-                    overlay.style.display = 'none';
-                    geEngine.ui.setTab(geEngine.state.activeTab); // Обновить список если мы на вкладке звонков
+                    document.getElementById('ge-call-ui').style.display = 'none';
                 }
             },
 
@@ -1070,6 +1034,7 @@
                         geEngine.chat.refresh();
                     }
                 },
+                // Новая функция для полного удаления группы создателем
                 deleteRoomPermanently(e, rid) {
                     e.stopPropagation();
                     if(confirm("Вы администратор этой группы. Удалить её полностью для всех (локально)?")) {
@@ -1130,6 +1095,7 @@
                         const roomName = name.trim();
                         if (!geEngine.state.localRooms.includes(roomName)) {
                             geEngine.state.localRooms.push(roomName);
+                            // Помечаем, что именно мы создали эту группу
                             geEngine.state.createdRooms.push(roomName);
                             
                             localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
@@ -1155,8 +1121,10 @@
                 document.getElementById('ge-my-name').innerText = geEngine.state.session.name;
                 document.getElementById('ge-my-av').innerText = geEngine.state.session.name[0].toUpperCase();
 
-                document.addEventListener('click', () => {
-                    document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
+                document.addEventListener('click', (e) => {
+                    if (!e.target.closest('.ge-item-dots') && !e.target.closest('.ge-context-menu')) {
+                        document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
+                    }
                 });
 
                 geEngine.chat.refresh();
