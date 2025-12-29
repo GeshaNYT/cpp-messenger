@@ -762,7 +762,6 @@
                 activeRoom: "general",
                 activeTab: "chats",
                 localRooms: JSON.parse(localStorage.getItem('ge_local_rooms') || "[]"),
-                createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 historyCalls: [
@@ -862,7 +861,8 @@
                     let allRooms = Array.from(new Set([...(serverRooms || []), ...geEngine.state.localRooms]));
 
                     const filtered = allRooms.filter(rid => {
-                        if (geEngine.state.deletedRooms.includes(rid)) return false;
+                        // Показываем комнату, если она не в черном списке или она активна в данный момент
+                        if (geEngine.state.deletedRooms.includes(rid) && rid !== geEngine.state.activeRoom) return false;
                         if (tab === 'chats') return rid.startsWith('private-');
                         if (tab === 'people') return rid === 'general' || !rid.startsWith('private-');
                         return true;
@@ -901,12 +901,14 @@
                     if (!geEngine.state.activeRoom) return;
 
                     const cleanMsgs = (messages || []).filter(raw => {
-                        const m = JSON.parse(decodeURIComponent(raw));
-                        return m.text !== "__ROOM_PURGE_SIGNAL__" && m.text !== "__ROOM_INIT_HIDDEN__";
+                        try {
+                            const m = JSON.parse(decodeURIComponent(raw));
+                            return m.text !== "__ROOM_PURGE_SIGNAL__" && m.text !== "__ROOM_INIT_HIDDEN__";
+                        } catch(e) { return false; }
                     });
 
                     if (cleanMsgs.length === 0) {
-                        container.innerHTML = `<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Чат пуст</div>`;
+                        container.innerHTML = `<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Переписка удалена или пуста</div>`;
                         return;
                     }
 
@@ -948,17 +950,20 @@
                             });
                         }
 
+                        // Проверка сигнала удаления
                         if (geEngine.state.activeRoom && data.messages?.result) {
-                            const messages = data.messages.result.map(raw => JSON.parse(decodeURIComponent(raw)));
+                            const messages = data.messages.result.map(raw => {
+                                try { return JSON.parse(decodeURIComponent(raw)); } catch(e) { return {}; }
+                            });
                             const hasPurge = messages.some(m => m.text === "__ROOM_PURGE_SIGNAL__");
+                            
                             if (hasPurge) {
                                 const rid = geEngine.state.activeRoom;
-                                geEngine.state.deletedRooms.push(rid);
-                                geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== rid);
-                                localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                                localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                                geEngine.state.activeRoom = "";
-                                geEngine.chat.refresh();
+                                if (!geEngine.state.deletedRooms.includes(rid)) {
+                                    geEngine.state.deletedRooms.push(rid);
+                                    localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                                    geEngine.state.activeRoom = "";
+                                }
                             }
                         }
 
@@ -984,13 +989,17 @@
                     geEngine.chat.refresh();
                 },
                 open(id, prettyName) {
+                    // При открытии удаляем из списка удаленных, чтобы можно было писать
+                    geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(r => r !== id);
+                    localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                    
                     geEngine.state.activeRoom = id;
                     document.getElementById('ge-active-name').innerText = prettyName || id;
                     geEngine.chat.refresh();
                 },
                 async removeRoom(e, rid) {
                     e.stopPropagation();
-                    if(confirm("Вы уверены? Переписка будет полностью очищена у обоих участников.")) {
+                    if(confirm("Удалить переписку у обоих участников?")) {
                         const purgeSignal = JSON.stringify({ 
                             username: "System", 
                             email: "system@gelink.com", 
@@ -998,10 +1007,10 @@
                         });
                         await fetch(`/api/index?room=${rid}&user_email=${geEngine.state.session.email}`, { method: 'POST', body: purgeSignal });
                         
-                        geEngine.state.deletedRooms.push(rid);
-                        geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== rid);
-                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                        if (!geEngine.state.deletedRooms.includes(rid)) {
+                            geEngine.state.deletedRooms.push(rid);
+                            localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                        }
                         
                         geEngine.state.activeRoom = "";
                         geEngine.chat.refresh();
@@ -1015,9 +1024,11 @@
                     const otherSafe = mail.replace(/[@.]/g, '').toLowerCase();
                     const roomId = `private-${[mySafe, otherSafe].sort().join('-')}`;
 
+                    // Принудительно разрешаем эту комнату
                     geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                     localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
 
+                    // Инициализация комнаты пустым сообщением
                     const initMsg = JSON.stringify({ 
                         username: "Система", 
                         email: "system@gelink.com", 
@@ -1031,7 +1042,6 @@
                     }
 
                     geEngine.chat.open(roomId, mail.split('@')[0]);
-                    geEngine.chat.refresh();
                 },
                 createGroup() {
                     const name = prompt("Имя группы:");
@@ -1056,7 +1066,7 @@
                 });
 
                 geEngine.chat.refresh();
-                setInterval(() => geEngine.chat.refresh(), 4000);
+                setInterval(() => geEngine.chat.refresh(), 3000);
             }
         };
 
