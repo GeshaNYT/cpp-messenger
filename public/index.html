@@ -933,9 +933,15 @@
                     }
 
                     container.innerHTML = messages.map(raw => {
-                        const m = JSON.parse(decodeURIComponent(raw));
-                        const isMe = m.email === geEngine.state.session.email;
+                        let m;
+                        try {
+                            // Исправлено: парсим сообщение, если оно строка
+                            m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw;
+                        } catch(e) { 
+                            m = { username: 'System', text: 'Ошибка данных', email: '' }; 
+                        }
                         
+                        const isMe = m.email === geEngine.state.session.email;
                         let statusIcon = '🕒'; 
                         if (m.status === 'read') statusIcon = '✓✓';
                         else if (m.status === 'sent') statusIcon = '✓';
