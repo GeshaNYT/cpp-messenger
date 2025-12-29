@@ -115,6 +115,21 @@
         }
         ::-webkit-scrollbar-thumb:hover { background: #8d949e; }
 
+        /* --- КОНТЕКСТНОЕ МЕНЮ СООБЩЕНИЙ --- */
+        .ge-msg-context-menu {
+            position: fixed;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-base);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-lg);
+            display: none;
+            flex-direction: column;
+            z-index: 10000;
+            min-width: 150px;
+            overflow: hidden;
+        }
+        .ge-msg-context-menu.active { display: flex; }
+
         /* --- КНОПКА ПЕРЕКЛЮЧЕНИЯ ТЕМЫ --- */
         .ge-theme-toggler {
             width: 100%;
@@ -138,21 +153,6 @@
             background: var(--ge-primary-soft);
             transform: translateY(-2px);
         }
-
-        /* --- КОНТЕКСТНОЕ МЕНЮ СООБЩЕНИЙ --- */
-        .ge-msg-menu {
-            position: fixed;
-            background: var(--bg-panel);
-            border: 1px solid var(--border-base);
-            border-radius: var(--radius-sm);
-            box-shadow: var(--shadow-lg);
-            display: none;
-            flex-direction: column;
-            z-index: 10000;
-            min-width: 160px;
-            overflow: hidden;
-        }
-        .ge-msg-menu.active { display: flex; }
 
         /* --- МОДУЛЬ АВТОРИЗАЦИИ --- */
         .ge-auth-overlay {
@@ -547,6 +547,13 @@
         
         .them .ge-msg-status-line { justify-content: flex-start; opacity: 0.5; }
 
+        .ge-edited-badge {
+            font-style: italic;
+            font-size: 10px;
+            margin-right: 4px;
+            opacity: 0.8;
+        }
+
         /* ПАНЕЛЬ ВВОДА */
         .ge-footer {
             padding: 35px 50px;
@@ -654,9 +661,9 @@
 </head>
 <body>
 
-    <div id="ge-msg-actions" class="ge-msg-menu">
+    <div id="ge-msg-options" class="ge-msg-context-menu">
         <button class="ge-menu-btn" onclick="geEngine.chat.startEdit()">✎ Изменить</button>
-        <button class="ge-menu-btn danger" onclick="geEngine.chat.deleteMsg()">🗑 Удалить у всех</button>
+        <button class="ge-menu-btn danger" onclick="geEngine.chat.deleteForEveryone()">🗑 Удалить</button>
     </div>
 
     <div id="ge-call-ui" class="ge-call-overlay">
@@ -791,9 +798,9 @@
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
                 ],
-                // Доп. состояние для работы с конкретными сообщениями
-                selectedMsg: null, 
-                isEditing: false
+                // Новые состояния для управления сообщениями
+                editingMsgId: null,
+                selectedMsgData: null
             },
 
             auth: {
@@ -810,8 +817,13 @@
                         e = document.getElementById('up-email').value.trim().toLowerCase();
                         p = document.getElementById('up-pass').value.trim();
                         pc = document.getElementById('up-confirm').value.trim();
+
                         if (!n || !e || !p) return alert("Заполните данные!");
                         if (p !== pc) { document.getElementById('up-error').classList.remove('ge-hidden'); return; }
+
+                        const userExists = geEngine.state.usersDB.find(u => u.email === e);
+                        if (userExists) return alert("Пользователь существует!");
+
                         const newUser = { name: n, email: e, password: p };
                         geEngine.state.usersDB.push(newUser);
                         localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
@@ -820,7 +832,7 @@
                         e = document.getElementById('in-email').value.trim().toLowerCase();
                         p = document.getElementById('in-pass').value.trim();
                         const user = geEngine.state.usersDB.find(u => u.email === e && u.password === p);
-                        if (!user) return alert("Неверный логин!");
+                        if (!user) return alert("Неверный вход!");
                         geEngine.state.session = { name: user.name, email: user.email };
                     }
                     localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
@@ -847,31 +859,51 @@
                 toggleMenu(e, rid) {
                     e.stopPropagation();
                     const menu = document.getElementById('menu-' + rid);
+                    const isActive = menu.classList.contains('active');
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
-                    menu.classList.add('active');
+                    if(!isActive) menu.classList.add('active');
                 },
                 renderChatList(serverRooms) {
                     const scroller = document.getElementById('ge-chat-list-scroller');
-                    if (geEngine.state.activeTab === 'calls') {
+                    const tab = geEngine.state.activeTab;
+
+                    if (tab === 'calls') {
                         scroller.innerHTML = geEngine.state.historyCalls.map(c => `
                             <div class="ge-chat-item">
                                 <div class="ge-user-av" style="width:50px; height:50px; background:#f5f5f5; color:#555;">${c.type === 'video' ? '📹' : '📞'}</div>
-                                <div class="ge-item-content"><b>${c.name}</b><span>${c.status} • ${c.time}</span></div>
+                                <div class="ge-item-content"><b>${c.name}</b><span style="color: ${c.status === 'Пропущенный' ? 'var(--ge-error)' : ''}">${c.status} • ${c.time}</span></div>
                             </div>
                         `).join('');
                         return;
                     }
+
                     let allRooms = Array.from(new Set([...(serverRooms || []), ...geEngine.state.localRooms]));
-                    const filtered = allRooms.filter(rid => !geEngine.state.deletedRooms.includes(rid));
+                    const filtered = allRooms.filter(rid => {
+                        if (geEngine.state.deletedRooms.includes(rid)) return false;
+                        if (tab === 'chats') return rid.startsWith('private-');
+                        if (tab === 'people') return rid === 'general' || !rid.startsWith('private-');
+                        return true;
+                    });
+
                     scroller.innerHTML = filtered.map(rid => {
+                        let displayName = rid;
                         let isGroup = rid === 'general' || !rid.startsWith('private-');
+                        const isCreator = geEngine.state.createdRooms.includes(rid);
+                        if (rid.startsWith('private-')) {
+                            const parts = rid.replace('private-', '').split('-');
+                            const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                            const otherPart = parts.find(p => p !== myMailSafe);
+                            if (otherPart) displayName = otherPart.split('gmailcom')[0] || otherPart;
+                        }
+
                         return `
-                            <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}')">
-                                <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:#444;">${rid[0].toUpperCase()}</div>
-                                <div class="ge-item-content"><b>${rid}</b><span>${isGroup ? 'Канал' : 'Диалог'}</span></div>
+                            <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}', '${displayName}')">
+                                <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:#444;">${displayName[0].toUpperCase()}</div>
+                                <div class="ge-item-content"><b>${displayName}</b><span>${isGroup ? 'Групповой канал' : 'Активный канал'}</span></div>
                                 <div class="ge-item-dots" onclick="geEngine.ui.toggleMenu(event, '${rid}')">⋮</div>
                                 <div id="menu-${rid}" class="ge-context-menu">
-                                    <button class="ge-menu-btn" onclick="geEngine.chat.removeRoom(event, '${rid}')">Покинуть</button>
+                                    <button class="ge-menu-btn" onclick="geEngine.chat.removeRoom(event, '${rid}')">${isGroup ? 'Покинуть' : 'Удалить'}</button>
+                                    ${isCreator && isGroup && rid !== 'general' ? `<button class="ge-menu-btn danger" onclick="geEngine.chat.deleteRoomPermanently(event, '${rid}')">Удалить группу</button>` : ''}
                                 </div>
                             </div>
                         `;
@@ -879,28 +911,37 @@
                 },
                 renderMessages(messages) {
                     const container = document.getElementById('ge-msg-container');
-                    if (!messages || messages.length === 0) { container.innerHTML = ""; return; }
+                    if (!geEngine.state.activeRoom || geEngine.state.activeRoom === "") { container.innerHTML = ""; return; }
+                    
+                    // Группировка по ID для отображения только последних версий (редактирования)
+                    const msgMap = new Map();
+                    if(messages) {
+                        messages.forEach(raw => {
+                            const m = JSON.parse(decodeURIComponent(raw));
+                            if(m.id) msgMap.set(m.id, m);
+                        });
+                    }
 
-                    // ЛОГИКА ОБРАБОТКИ СОСТОЯНИЙ (Edit/Delete)
-                    const processedMap = new Map();
-                    messages.forEach(raw => {
-                        const m = JSON.parse(decodeURIComponent(raw));
-                        // Перезаписываем сообщение с тем же ID (более новые версии заменяют старые)
-                        if (m.id) processedMap.set(m.id, m);
-                    });
+                    const finalMessages = Array.from(msgMap.values()).filter(m => !m.isDeleted);
 
-                    const finalMsgs = Array.from(processedMap.values()).filter(m => !m.isDeleted);
+                    if (finalMessages.length === 0) {
+                        container.innerHTML = `<div style="text-align:center; padding: 20px; opacity:0.5;">Нет сообщений</div>`;
+                        return;
+                    }
 
-                    container.innerHTML = finalMsgs.map(m => {
+                    container.innerHTML = finalMessages.map(m => {
                         const isMe = m.email === geEngine.state.session.email;
+                        const statusIcon = m.status === 'read' ? '✓✓' : '✓';
+                        
                         return `
-                            <div class="ge-msg-bubble ${isMe ? 'me' : 'them'}" ${isMe ? `onclick="geEngine.chat.showActions(event, '${m.id}', '${m.text.replace(/'/g, "\\'")}')"` : ''}>
+                            <div class="ge-msg-bubble ${isMe ? 'me' : 'them'}" 
+                                 ${isMe ? `onclick="geEngine.chat.showMsgOptions(event, '${m.id}', '${m.text.replace(/'/g, "\\'")}')"` : ''}>
                                 <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
                                 <div class="ge-msg-text">${m.text}</div>
                                 <div class="ge-msg-status-line">
-                                    ${m.edited ? '<span style="font-style:italic; font-size:10px; opacity:0.6;">изм.</span>' : ''}
+                                    ${m.isEdited ? '<span class="ge-edited-badge">(изменено)</span>' : ''}
                                     <span>${m.time}</span>
-                                    ${isMe ? `<span>✓</span>` : ''}
+                                    ${isMe ? `<span>${statusIcon}</span>` : ''}
                                 </div>
                             </div>
                         `;
@@ -910,7 +951,12 @@
 
             calls: {
                 initiate(type) {
-                    document.getElementById('ge-call-ui').style.display = 'flex';
+                    const overlay = document.getElementById('ge-call-ui');
+                    const targetName = document.getElementById('ge-active-name').innerText;
+                    document.getElementById('ge-call-name').innerText = targetName;
+                    document.getElementById('ge-call-av').innerText = targetName[0].toUpperCase();
+                    document.getElementById('ge-call-status').innerText = 'ВЫЗОВ...';
+                    overlay.style.display = 'flex';
                 },
                 hangup() { document.getElementById('ge-call-ui').style.display = 'none'; }
             },
@@ -918,102 +964,128 @@
             chat: {
                 async refresh() {
                     try {
-                        const res = await fetch(`/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`);
+                        const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`;
+                        const res = await fetch(url);
                         const data = await res.json();
                         geEngine.ui.renderChatList(data.rooms?.result);
-                        geEngine.ui.renderMessages(data.messages?.result);
+                        if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
+                            if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(data.messages?.result);
+                        }
                     } catch (e) {}
                 },
 
-                // ПОКАЗ МЕНЮ
-                showActions(e, id, text) {
+                // Показ меню Изменить/Удалить
+                showMsgOptions(e, id, text) {
                     e.stopPropagation();
-                    geEngine.state.selectedMsg = { id, text };
-                    const menu = document.getElementById('ge-msg-actions');
+                    const menu = document.getElementById('ge-msg-options');
+                    geEngine.state.selectedMsgData = { id, text };
                     menu.style.display = 'flex';
                     menu.style.left = e.clientX + 'px';
                     menu.style.top = e.clientY + 'px';
                     menu.classList.add('active');
                 },
 
-                // УДАЛЕНИЕ
-                async deleteMsg() {
-                    const msg = geEngine.state.selectedMsg;
-                    if(!msg) return;
+                // Переход в режим редактирования
+                startEdit() {
+                    const data = geEngine.state.selectedMsgData;
+                    if(!data) return;
+                    const input = document.getElementById('ge-main-input');
+                    input.value = data.text;
+                    input.focus();
+                    geEngine.state.editingMsgId = data.id;
+                    input.placeholder = "Редактирование сообщения...";
+                    document.getElementById('ge-msg-options').style.display = 'none';
+                },
+
+                // Удаление для всех (отправка флага isDeleted)
+                async deleteForEveryone() {
+                    const data = geEngine.state.selectedMsgData;
+                    if(!data || !confirm("Удалить сообщение для всех?")) return;
+                    
                     const payload = JSON.stringify({
-                        id: msg.id,
+                        id: data.id,
                         isDeleted: true,
                         email: geEngine.state.session.email
                     });
-                    await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { method: 'POST', body: payload });
-                    geEngine.chat.refresh();
-                },
 
-                // НАЧАЛО РЕДАКТИРОВАНИЯ
-                startEdit() {
-                    const msg = geEngine.state.selectedMsg;
-                    if(!msg) return;
-                    geEngine.state.isEditing = true;
-                    const input = document.getElementById('ge-main-input');
-                    input.value = msg.text;
-                    input.placeholder = "Редактирование...";
-                    input.focus();
+                    await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { 
+                        method: 'POST', body: payload 
+                    });
+                    
+                    document.getElementById('ge-msg-options').style.display = 'none';
+                    geEngine.chat.refresh();
                 },
 
                 async broadcast() {
                     const input = document.getElementById('ge-main-input');
                     const text = input.value.trim();
-                    if (!text) return;
-
-                    // Если редактируем — сохраняем старый ID, если нет — создаем новый
-                    const msgId = geEngine.state.isEditing ? geEngine.state.selectedMsg.id : (Date.now() + Math.random()).toString();
-
+                    if (!text || !geEngine.state.activeRoom) return;
+                    
+                    const isEditing = geEngine.state.editingMsgId !== null;
                     const payload = JSON.stringify({ 
-                        id: msgId,
+                        id: isEditing ? geEngine.state.editingMsgId : (Date.now() + Math.random().toString(36).substr(2, 9)),
                         username: geEngine.state.session.name, 
                         email: geEngine.state.session.email, 
                         text: text,
                         time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                        edited: geEngine.state.isEditing
+                        status: 'sent',
+                        isEdited: isEditing 
                     });
                     
                     input.value = '';
-                    input.placeholder = "Напишите ваше сообщение...";
-                    geEngine.state.isEditing = false;
-
-                    await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { method: 'POST', body: payload });
+                    geEngine.state.editingMsgId = null;
+                    input.placeholder = "Напишите ваше сообщение здесь...";
+                    
+                    await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { 
+                        method: 'POST', body: payload 
+                    });
                     geEngine.chat.refresh();
                 },
 
-                open(id) {
+                open(id, prettyName) {
                     geEngine.state.activeRoom = id;
-                    document.getElementById('ge-active-name').innerText = id;
+                    document.getElementById('ge-active-name').innerText = prettyName || id;
+                    document.getElementById('ge-active-av').innerText = (prettyName || id)[0].toUpperCase();
                     geEngine.chat.refresh();
                 },
 
                 removeRoom(e, rid) {
                     e.stopPropagation();
-                    geEngine.state.deletedRooms.push(rid);
-                    localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                    geEngine.chat.refresh();
-                },
-
-                addFriend() {
-                    const mail = prompt("Email:");
-                    if(mail) {
-                        const rid = "private-" + mail.split('@')[0];
-                        geEngine.state.localRooms.push(rid);
-                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                        geEngine.chat.open(rid);
+                    if(confirm("Удалить из списка?")) {
+                        geEngine.state.deletedRooms.push(rid);
+                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                        geEngine.chat.refresh();
                     }
                 },
 
+                deleteRoomPermanently(e, rid) {
+                    e.stopPropagation();
+                    if(confirm("Удалить группу полностью?")) {
+                        geEngine.state.deletedRooms.push(rid);
+                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                        geEngine.chat.refresh();
+                    }
+                },
+
+                async addFriend() {
+                    const mail = prompt("Email контакта:");
+                    if (!mail) return;
+                    const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                    const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
+                    const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
+                    geEngine.state.localRooms.push(roomId);
+                    localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                    geEngine.chat.open(roomId, mail.split('@')[0]);
+                },
+
                 createGroup() {
-                    const name = prompt("Группа:");
-                    if(name) {
+                    const name = prompt("Имя группы:");
+                    if (name) {
                         geEngine.state.localRooms.push(name);
+                        geEngine.state.createdRooms.push(name);
                         localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                        geEngine.chat.open(name);
+                        localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
+                        geEngine.chat.open(name, name);
                     }
                 }
             },
@@ -1024,13 +1096,14 @@
                 document.getElementById('ge-my-name').innerText = geEngine.state.session.name;
                 document.getElementById('ge-my-av').innerText = geEngine.state.session.name[0].toUpperCase();
 
+                // Закрытие всех меню при клике
                 document.addEventListener('click', () => {
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
-                    document.getElementById('ge-msg-actions').style.display = 'none';
+                    document.getElementById('ge-msg-options').style.display = 'none';
                 });
 
                 geEngine.chat.refresh();
-                setInterval(() => geEngine.chat.refresh(), 3000);
+                setInterval(() => geEngine.chat.refresh(), 4000);
             }
         };
 
