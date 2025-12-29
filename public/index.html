@@ -932,7 +932,10 @@
                         return;
                     }
 
-                    container.innerHTML = messages.map(raw => {
+                    // --- ИСПРАВЛЕНИЕ: Фильтруем системный код звонка из истории чата ---
+                    container.innerHTML = messages.filter(raw => {
+                        try { return !decodeURIComponent(raw).includes("__SIGNAL_CALL__"); } catch(e) { return true; }
+                    }).map(raw => {
                         const m = JSON.parse(decodeURIComponent(raw));
                         const isMe = m.email === geEngine.state.session.email;
                         
@@ -956,13 +959,38 @@
                 }
             },
 
+            // --- ИСПРАВЛЕНИЕ: Логика звонков через сигнальную систему ---
             calls: {
-                initiate(type) {
+                async initiate(type) {
+                    if (!geEngine.state.activeRoom) return;
+                    
+                    // Показываем UI у звонящего
                     const overlay = document.getElementById('ge-call-ui');
                     const targetName = document.getElementById('ge-active-name').innerText;
                     document.getElementById('ge-call-name').innerText = targetName;
                     document.getElementById('ge-call-av').innerText = targetName[0].toUpperCase();
                     document.getElementById('ge-call-status').innerText = type === 'video' ? 'ВИДЕОЗВОНОК...' : 'ГОЛОСОВОЙ ВЫЗОВ...';
+                    overlay.style.display = 'flex';
+
+                    // Отправляем сигнал получателю через скрытое сообщение
+                    const signal = JSON.stringify({ 
+                        username: geEngine.state.session.name, 
+                        email: geEngine.state.session.email, 
+                        text: "__SIGNAL_CALL__", 
+                        callType: type,
+                        timestamp: Date.now() 
+                    });
+
+                    await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { 
+                        method: 'POST', 
+                        body: signal 
+                    });
+                },
+                showIncoming(callerName, type) {
+                    const overlay = document.getElementById('ge-call-ui');
+                    document.getElementById('ge-call-name').innerText = callerName;
+                    document.getElementById('ge-call-av').innerText = callerName[0].toUpperCase();
+                    document.getElementById('ge-call-status').innerText = `ВХОДЯЩИЙ ${type === 'video' ? 'ВИДЕО' : 'АУДИО'} ВЫЗОВ...`;
                     overlay.style.display = 'flex';
                 },
                 hangup() {
@@ -980,7 +1008,23 @@
                         geEngine.ui.renderChatList(data.rooms?.result);
                         
                         if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
-                            if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(data.messages?.result);
+                            const messages = data.messages?.result || [];
+
+                            // --- ИСПРАВЛЕНИЕ: Прослушка входящих сигналов звонка ---
+                            if (messages.length > 0) {
+                                try {
+                                    const lastMsg = JSON.parse(decodeURIComponent(messages[messages.length - 1]));
+                                    const isNew = (Date.now() - (lastMsg.timestamp || 0)) < 10000; // Актуально 10 сек
+                                    
+                                    if (lastMsg.text === "__SIGNAL_CALL__" && lastMsg.email !== geEngine.state.session.email && isNew) {
+                                        if (document.getElementById('ge-call-ui').style.display !== 'flex') {
+                                            geEngine.calls.showIncoming(lastMsg.username, lastMsg.callType);
+                                        }
+                                    }
+                                } catch(e) {}
+                            }
+
+                            if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(messages);
                         } else {
                              document.getElementById('ge-msg-container').innerHTML = "";
                         }
