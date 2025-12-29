@@ -762,7 +762,6 @@
                 activeRoom: "general",
                 activeTab: "chats",
                 localRooms: JSON.parse(localStorage.getItem('ge_local_rooms') || "[]"),
-                // Список комнат, созданных этим пользователем
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
@@ -862,7 +861,6 @@
                         return;
                     }
 
-                    // Объединяем локальные комнаты и комнаты с сервера
                     let allRooms = Array.from(new Set([...(serverRooms || []), ...geEngine.state.localRooms]));
 
                     const filtered = allRooms.filter(rid => {
@@ -882,7 +880,6 @@
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherPart = parts.find(p => p !== myMailSafe);
                             if (otherPart) {
-                                // Попытка найти красивое имя из базы по email-части (упрощенно)
                                 displayName = otherPart;
                             }
                         }
@@ -896,8 +893,8 @@
                                 </div>
                                 <div class="ge-item-dots" onclick="geEngine.ui.toggleMenu(event, '${rid}')">⋮</div>
                                 <div id="menu-${rid}" class="ge-context-menu">
-                                    <button class="ge-menu-btn" onclick="geEngine.chat.removeRoom(event, '${rid}')">
-                                        ${isGroup ? 'Покинуть группу' : 'Удалить диалог'}
+                                    <button class="ge-menu-btn danger" onclick="geEngine.chat.removeRoom(event, '${rid}')">
+                                        ${isGroup ? 'Покинуть и очистить' : 'Удалить у обоих'}
                                     </button>
                                     ${isCreator && isGroup && rid !== 'general' ? `
                                         <button class="ge-menu-btn danger" onclick="geEngine.chat.deleteRoomPermanently(event, '${rid}')">
@@ -933,7 +930,18 @@
                         return;
                     }
 
-                    container.innerHTML = messages.map(raw => {
+                    // Фильтруем системные сообщения об удалении, чтобы они не отображались в чате
+                    const visibleMessages = messages.filter(raw => {
+                         const m = JSON.parse(decodeURIComponent(raw));
+                         return m.text !== "__SYSTEM_ROOM_DELETED__";
+                    });
+
+                    if (visibleMessages.length === 0) {
+                        container.innerHTML = `<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Чат очищен.</div>`;
+                        return;
+                    }
+
+                    container.innerHTML = visibleMessages.map(raw => {
                         const m = JSON.parse(decodeURIComponent(raw));
                         const isMe = m.email === geEngine.state.session.email;
                         
@@ -978,16 +986,39 @@
                         const res = await fetch(url);
                         const data = await res.json();
                         
-                        // Если с сервера пришли новые приватные комнаты, которых нет в локальном списке - добавляем
+                        // Логика обнаружения новых комнат
                         if(data.rooms?.result) {
                             let updated = false;
-                            data.rooms.result.forEach(rid => {
+                            for (const rid of data.rooms.result) {
+                                // Если мы нашли сообщение об удалении в комнате - удаляем её локально
+                                if (rid.startsWith('private-') || !rid.startsWith('private-')) {
+                                     const checkUrl = `/api/index?room=${rid}&user_email=${geEngine.state.session.email}`;
+                                     const checkRes = await fetch(checkUrl);
+                                     const checkData = await checkRes.json();
+                                     const messages = checkData.messages?.result || [];
+                                     
+                                     const isDeleted = messages.some(raw => JSON.parse(decodeURIComponent(raw)).text === "__SYSTEM_ROOM_DELETED__");
+                                     
+                                     if (isDeleted && !geEngine.state.deletedRooms.includes(rid)) {
+                                         geEngine.state.deletedRooms.push(rid);
+                                         geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== rid);
+                                         updated = true;
+                                         if(geEngine.state.activeRoom === rid) {
+                                             geEngine.state.activeRoom = "";
+                                         }
+                                         continue;
+                                     }
+                                }
+
                                 if(rid.startsWith('private-') && !geEngine.state.localRooms.includes(rid) && !geEngine.state.deletedRooms.includes(rid)) {
                                     geEngine.state.localRooms.push(rid);
                                     updated = true;
                                 }
-                            });
-                            if(updated) localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                            }
+                            if(updated) {
+                                localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                                localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                            }
                         }
 
                         geEngine.ui.renderChatList(data.rooms?.result);
@@ -1026,12 +1057,26 @@
                     document.getElementById('ge-active-av').innerText = (prettyName || id)[0].toUpperCase();
                     geEngine.chat.refresh();
                 },
-                removeRoom(e, rid) {
+                async removeRoom(e, rid) {
                     e.stopPropagation();
                     const isGroup = rid === 'general' || !rid.startsWith('private-');
-                    const confirmMsg = isGroup ? "Вы уверены, что хотите покинуть группу?" : "Удалить диалог?";
+                    const confirmMsg = isGroup ? "Покинуть группу и удалить историю у всех?" : "Удалить контакт и очистить чат у обоих пользователей?";
                     
                     if(confirm(confirmMsg)) {
+                        // Отправляем сигнал удаления в чат (его увидит refresh второго пользователя)
+                        const killSignal = JSON.stringify({ 
+                            username: "System", 
+                            email: "system@gelink.com", 
+                            text: "__SYSTEM_ROOM_DELETED__",
+                            time: "", 
+                            status: 'read' 
+                        });
+
+                        await fetch(`/api/index?room=${rid}&user_email=${geEngine.state.session.email}`, { 
+                            method: 'POST', 
+                            body: killSignal 
+                        });
+
                         geEngine.state.deletedRooms.push(rid);
                         geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== rid);
                         
@@ -1048,23 +1093,8 @@
                     }
                 },
                 deleteRoomPermanently(e, rid) {
-                    e.stopPropagation();
-                    if(confirm("Вы администратор этой группы. Удалить её полностью для всех?")) {
-                        geEngine.state.deletedRooms.push(rid);
-                        geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== rid);
-                        geEngine.state.createdRooms = geEngine.state.createdRooms.filter(r => r !== rid);
-                        
-                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                        localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
-
-                        if(geEngine.state.activeRoom === rid) {
-                            geEngine.state.activeRoom = "";
-                            document.getElementById('ge-active-name').innerText = "Выберите диалог";
-                            document.getElementById('ge-msg-container').innerHTML = "";
-                        }
-                        geEngine.chat.refresh();
-                    }
+                    // Используем ту же логику для полного удаления
+                    this.removeRoom(e, rid);
                 },
                 joinGeneral() {
                     geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== 'general');
@@ -1076,7 +1106,6 @@
                     if (!mail) return;
 
                     try {
-                        // 1. Пытаемся добавить контакт через API
                         const res = await fetch(`/api/index?action=addContact&user_email=${geEngine.state.session.email}&target_email=${mail}`);
                         const data = await res.json();
 
@@ -1085,8 +1114,6 @@
                             const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
                             const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
                             
-                            // 2. Чтобы у ДРУГОГО пользователя тоже появилась эта комната, отправляем "приветственное" системное сообщение в эту комнату
-                            // Сервер зафиксирует создание комнаты для обоих участников
                             const welcome = JSON.stringify({ 
                                 username: "Система", 
                                 email: "system@gelink.com", 
@@ -1100,7 +1127,6 @@
                                 body: welcome 
                             });
 
-                            // 3. Обновляем свой локальный список
                             if (!geEngine.state.localRooms.includes(roomId)) {
                                 geEngine.state.localRooms.push(roomId);
                                 localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
