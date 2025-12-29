@@ -414,6 +414,7 @@
             background: none;
             transition: 0.2s;
             border-bottom: 1px solid var(--border-soft);
+            width: 100%;
         }
 
         .ge-menu-btn:hover { background: var(--bg-body); }
@@ -498,6 +499,7 @@
             background: var(--ge-primary);
             color: white;
             border-bottom-right-radius: 4px;
+            cursor: pointer; /* Добавил указатель */
         }
 
         .ge-msg-bubble.them {
@@ -633,9 +635,20 @@
         .ge-hidden { display: none !important; }
         .ge-flex { display: flex !important; }
         .ge-error-text { color: var(--ge-error); font-size: 12px; margin-top: 5px; font-weight: 600; }
+
+        /* НОВОЕ МЕНЮ СООБЩЕНИЙ */
+        .ge-msg-menu {
+            position: fixed; z-index: 10000; background: var(--bg-panel); border: 1px solid var(--border-base);
+            border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); display: none; flex-direction: column; overflow: hidden; min-width: 140px;
+        }
     </style>
 </head>
 <body>
+
+    <div id="ge-msg-actions" class="ge-msg-menu">
+        <button class="ge-menu-btn" onclick="geEngine.chat.editMsg()">✎ Изменить</button>
+        <button class="ge-menu-btn danger" onclick="geEngine.chat.deleteMsg()">🗑 Удалить</button>
+    </div>
 
     <div id="ge-call-ui" class="ge-call-overlay">
         <div class="ge-call-avatar-big" id="ge-call-av">?</div>
@@ -762,14 +775,15 @@
                 activeRoom: "general",
                 activeTab: "chats",
                 localRooms: JSON.parse(localStorage.getItem('ge_local_rooms') || "[]"),
-                // Список комнат, созданных этим пользователем
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
-                ]
+                ],
+                // Новые поля для управления сообщениями
+                editingId: null, selectedMsg: null
             },
 
             auth: {
@@ -874,7 +888,6 @@
                     let html = filtered.map(rid => {
                         let displayName = rid;
                         let isGroup = rid === 'general' || !rid.startsWith('private-');
-                        // Проверяем, является ли пользователь создателем
                         const isCreator = geEngine.state.createdRooms.includes(rid);
 
                         if (rid.startsWith('private-')) {
@@ -921,30 +934,33 @@
                 },
                 renderMessages(messages) {
                     const container = document.getElementById('ge-msg-container');
-                    
                     if (!geEngine.state.activeRoom || geEngine.state.activeRoom === "") {
-                        container.innerHTML = "";
-                        return;
+                        container.innerHTML = ""; return;
                     }
-
                     if (!messages || messages.length === 0) {
                         container.innerHTML = `<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Здесь пока нет сообщений. Начните общение!</div>`;
                         return;
                     }
 
-                    container.innerHTML = messages.map(raw => {
-                        const m = JSON.parse(decodeURIComponent(raw));
+                    // Группировка для корректного отображения изменений/удалений
+                    const msgMap = new Map();
+                    messages.forEach(raw => {
+                        try {
+                            const m = JSON.parse(decodeURIComponent(raw));
+                            const id = m.mid || Math.random();
+                            msgMap.set(id, m);
+                        } catch(e){}
+                    });
+
+                    container.innerHTML = Array.from(msgMap.values()).filter(m => !m.isDel).map(m => {
                         const isMe = m.email === geEngine.state.session.email;
-                        
-                        let statusIcon = '🕒'; 
-                        if (m.status === 'read') statusIcon = '✓✓';
-                        else if (m.status === 'sent') statusIcon = '✓';
-                        
-                        const timeStr = m.time || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        let statusIcon = m.status === 'read' ? '✓✓' : '✓';
+                        const timeStr = m.time || "";
 
                         return `
-                            <div class="ge-msg-bubble ${isMe ? 'me' : 'them'}">
-                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
+                            <div class="ge-msg-bubble ${isMe ? 'me' : 'them'}" 
+                                 ${isMe ? `onclick="geEngine.chat.msgMenu(event, '${m.mid}', '${m.text.replace(/'/g, "\\'")}')"` : ''}>
+                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username} ${m.isEdited ? '(изм.)' : ''}</span>
                                 <div class="ge-msg-text">${m.text}</div>
                                 <div class="ge-msg-status-line">
                                     <span>${timeStr}</span>
@@ -965,9 +981,7 @@
                     document.getElementById('ge-call-status').innerText = type === 'video' ? 'ВИДЕОЗВОНОК...' : 'ГОЛОСОВОЙ ВЫЗОВ...';
                     overlay.style.display = 'flex';
                 },
-                hangup() {
-                    document.getElementById('ge-call-ui').style.display = 'none';
-                }
+                hangup() { document.getElementById('ge-call-ui').style.display = 'none'; }
             },
 
             chat: {
@@ -976,35 +990,59 @@
                         const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`;
                         const res = await fetch(url);
                         const data = await res.json();
-                        
                         geEngine.ui.renderChatList(data.rooms?.result);
-                        
                         if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
                             if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(data.messages?.result);
                         } else {
                              document.getElementById('ge-msg-container').innerHTML = "";
                         }
-                    } catch (e) { console.warn("Sync..."); }
+                    } catch (e) { }
                 },
+                // --- ФУНКЦИИ ДЛЯ СООБЩЕНИЙ ---
+                msgMenu(e, id, text) {
+                    e.stopPropagation();
+                    geEngine.state.selectedMsg = { id, text };
+                    const menu = document.getElementById('ge-msg-actions');
+                    menu.style.display = 'flex';
+                    menu.style.left = e.clientX + 'px';
+                    menu.style.top = e.clientY + 'px';
+                },
+                editMsg() {
+                    const s = geEngine.state.selectedMsg;
+                    geEngine.state.editingId = s.id;
+                    const input = document.getElementById('ge-main-input');
+                    input.value = s.text;
+                    input.focus();
+                    input.style.borderColor = "var(--ge-warning)";
+                },
+                async deleteMsg() {
+                    const s = geEngine.state.selectedMsg;
+                    const payload = JSON.stringify({ mid: s.id, isDel: true, email: geEngine.state.session.email });
+                    await fetch(`/api/index?room=${geEngine.state.activeRoom}`, { method: 'POST', body: payload });
+                    geEngine.chat.refresh();
+                },
+                // -----------------------------
                 async broadcast() {
                     const input = document.getElementById('ge-main-input');
                     const text = input.value.trim();
                     if (!text || !geEngine.state.activeRoom) return;
                     
-                    const now = new Date();
+                    const mId = geEngine.state.editingId || "m-" + Date.now();
                     const payload = JSON.stringify({ 
+                        mid: mId,
                         username: geEngine.state.session.name, 
                         email: geEngine.state.session.email, 
                         text: text,
-                        time: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                        status: 'sent' 
+                        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                        status: 'sent',
+                        isEdited: !!geEngine.state.editingId
                     });
                     
                     input.value = '';
-                    await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { 
-                        method: 'POST', 
-                        body: payload 
-                    });
+                    input.style.borderColor = "transparent";
+                    geEngine.state.editingId = null;
+                    
+                    await fetch(`/api/index?room=${geEngine.state.activeRoom}`, { method: 'POST', body: payload });
                     geEngine.chat.refresh();
                 },
                 open(id, prettyName) {
@@ -1016,41 +1054,18 @@
                 removeRoom(e, rid) {
                     e.stopPropagation();
                     const isGroup = rid === 'general' || !rid.startsWith('private-');
-                    const confirmMsg = isGroup ? "Вы уверены, что хотите покинуть группу?" : "Удалить контакт из списка?";
-                    
-                    if(confirm(confirmMsg)) {
+                    if(confirm(isGroup ? "Вы уверены?" : "Удалить контакт?")) {
                         geEngine.state.deletedRooms.push(rid);
-                        geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== rid);
-                        
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                        
-                        if(geEngine.state.activeRoom === rid) {
-                            geEngine.state.activeRoom = "";
-                            document.getElementById('ge-active-name').innerText = "Выберите диалог";
-                            document.getElementById('ge-active-av').innerText = "#";
-                            document.getElementById('ge-msg-container').innerHTML = "";
-                        }
+                        if(geEngine.state.activeRoom === rid) geEngine.state.activeRoom = "";
                         geEngine.chat.refresh();
                     }
                 },
-                // Новая функция для полного удаления группы создателем
                 deleteRoomPermanently(e, rid) {
                     e.stopPropagation();
-                    if(confirm("Вы администратор этой группы. Удалить её полностью для всех (локально)?")) {
+                    if(confirm("Удалить группу полностью?")) {
                         geEngine.state.deletedRooms.push(rid);
-                        geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== rid);
-                        geEngine.state.createdRooms = geEngine.state.createdRooms.filter(r => r !== rid);
-                        
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                        localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
-
-                        if(geEngine.state.activeRoom === rid) {
-                            geEngine.state.activeRoom = "";
-                            document.getElementById('ge-active-name').innerText = "Выберите диалог";
-                            document.getElementById('ge-msg-container').innerHTML = "";
-                        }
                         geEngine.chat.refresh();
                     }
                 },
@@ -1060,71 +1075,42 @@
                     geEngine.chat.open('general', 'general');
                 },
                 async addFriend() {
-                    const mail = prompt("Введите Email контакта:");
+                    const mail = prompt("Email:");
                     if (!mail) return;
-
                     try {
                         const res = await fetch(`/api/index?action=addContact&user_email=${geEngine.state.session.email}&target_email=${mail}`);
                         const data = await res.json();
-
                         if (data.status === 'success') {
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
                             const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
-                            
-                            if (!geEngine.state.localRooms.includes(roomId)) {
-                                geEngine.state.localRooms.push(roomId);
-                                localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                            }
-
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
-                            localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                            
                             geEngine.chat.open(roomId, mail.split('@')[0]);
-                        } else {
-                            alert("Ошибка: Пользователь не найден.");
                         }
-                    } catch (e) {
-                        alert("Ошибка сети.");
-                    }
+                    } catch (e) {}
                     geEngine.chat.refresh();
                 },
                 createGroup() {
                     const name = prompt("Имя группы:");
                     if (name) {
-                        const roomName = name.trim();
-                        if (!geEngine.state.localRooms.includes(roomName)) {
-                            geEngine.state.localRooms.push(roomName);
-                            // Помечаем, что именно мы создали эту группу
-                            geEngine.state.createdRooms.push(roomName);
-                            
-                            localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                            localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
-                        }
-                        
-                        geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomName);
-                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-
-                        geEngine.chat.open(roomName, roomName);
-                        geEngine.chat.refresh();
+                        geEngine.state.localRooms.push(name);
+                        geEngine.state.createdRooms.push(name);
+                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                        localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
+                        geEngine.chat.open(name, name);
                     }
                 }
             },
 
             init() {
-                if (geEngine.state.deletedRooms.includes("general")) {
-                    geEngine.state.activeRoom = "";
-                }
-
                 document.getElementById('ge-auth-layer').classList.add('ge-hidden');
                 document.getElementById('ge-main-app').classList.add('ge-flex');
                 document.getElementById('ge-my-name').innerText = geEngine.state.session.name;
                 document.getElementById('ge-my-av').innerText = geEngine.state.session.name[0].toUpperCase();
-
                 document.addEventListener('click', () => {
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
+                    document.getElementById('ge-msg-actions').style.display = 'none';
                 });
-
                 geEngine.chat.refresh();
                 setInterval(() => geEngine.chat.refresh(), 4000);
             }
@@ -1134,7 +1120,6 @@
             const saved = localStorage.getItem('ge_v9_token');
             if (saved) { geEngine.state.session = JSON.parse(saved); geEngine.init(); }
         };
-
         document.getElementById('ge-main-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') geEngine.chat.broadcast();
         });
