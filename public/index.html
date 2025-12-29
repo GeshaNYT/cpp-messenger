@@ -758,6 +758,8 @@
                 session: null,
                 activeRoom: "general",
                 activeTab: "chats",
+                // Список локально созданных комнат (чтобы они не пропадали до первого сообщения)
+                localRooms: JSON.parse(localStorage.getItem('ge_local_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 historyCalls: [
@@ -839,7 +841,7 @@
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
                     if(!isActive) menu.classList.add('active');
                 },
-                renderChatList(rooms) {
+                renderChatList(serverRooms) {
                     const scroller = document.getElementById('ge-chat-list-scroller');
                     const tab = geEngine.state.activeTab;
 
@@ -856,9 +858,10 @@
                         return;
                     }
 
-                    if (!rooms) return;
+                    // Объединяем комнаты от сервера и локально созданные
+                    let allRooms = Array.from(new Set([...(serverRooms || []), ...geEngine.state.localRooms]));
 
-                    const filtered = rooms.filter(rid => {
+                    const filtered = allRooms.filter(rid => {
                         if (geEngine.state.deletedRooms.includes(rid)) return false;
                         if (tab === 'chats') return rid.startsWith('private-');
                         if (tab === 'people') return rid === 'general' || !rid.startsWith('private-');
@@ -908,11 +911,14 @@
                 },
                 renderMessages(messages) {
                     const container = document.getElementById('ge-msg-container');
-                    if (!messages) return;
                     
-                    // Если активная комната не задана (пользователь вышел), не пытаемся отрисовывать сообщения
                     if (!geEngine.state.activeRoom || geEngine.state.activeRoom === "") {
                         container.innerHTML = "";
+                        return;
+                    }
+
+                    if (!messages || messages.length === 0) {
+                        container.innerHTML = `<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Здесь пока нет сообщений. Начните общение!</div>`;
                         return;
                     }
 
@@ -933,7 +939,6 @@
                                 <div class="ge-msg-status-line">
                                     <span>${timeStr}</span>
                                     ${isMe ? `<span>${statusIcon}</span>` : ''}
-                                }
                                 </div>
                             </div>
                         `;
@@ -957,24 +962,21 @@
 
             chat: {
                 async refresh() {
-                    // ЕСЛИ КОМНАТА ПУСТАЯ ИЛИ УДАЛЕНА - НЕ ОБНОВЛЯЕМ
-                    if (!geEngine.state.activeRoom || geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
-                        const scroller = document.getElementById('ge-chat-list-scroller');
-                        // Но список чатов все равно нужно отрендерить
-                        try {
-                           const res = await fetch(`/api/index?room=general&user_email=${geEngine.state.session.email}`);
-                           const data = await res.json();
-                           geEngine.ui.renderChatList(data.rooms?.result);
-                        } catch(e){}
-                        return;
-                    }
-
                     try {
-                        const url = `/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`;
+                        // Всегда запрашиваем список комнат от сервера
+                        const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`;
                         const res = await fetch(url);
                         const data = await res.json();
+                        
+                        // Рендерим список чатов с учетом локальных комнат
                         geEngine.ui.renderChatList(data.rooms?.result);
-                        if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(data.messages?.result);
+                        
+                        // Если комната выбрана и не удалена - рендерим сообщения
+                        if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
+                            if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(data.messages?.result);
+                        } else {
+                             document.getElementById('ge-msg-container').innerHTML = "";
+                        }
                     } catch (e) { console.warn("Sync..."); }
                 },
                 async broadcast() {
@@ -1011,7 +1013,11 @@
                     
                     if(confirm(confirmMsg)) {
                         geEngine.state.deletedRooms.push(rid);
+                        // Удаляем из локальных, если она там была
+                        geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== rid);
+                        
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
                         
                         if(geEngine.state.activeRoom === rid) {
                             geEngine.state.activeRoom = "";
@@ -1026,7 +1032,6 @@
                     geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== 'general');
                     localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                     geEngine.chat.open('general', 'general');
-                    geEngine.chat.refresh();
                 },
                 async addFriend() {
                     const mail = prompt("Введите Email контакта:");
@@ -1041,6 +1046,12 @@
                             const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
                             const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
                             
+                            // Добавляем в локальные, чтобы сразу видеть в меню
+                            if (!geEngine.state.localRooms.includes(roomId)) {
+                                geEngine.state.localRooms.push(roomId);
+                                localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                            }
+
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                             
@@ -1055,12 +1066,25 @@
                 },
                 createGroup() {
                     const name = prompt("Имя группы:");
-                    if (name) geEngine.chat.open(name.trim(), name.trim());
+                    if (name) {
+                        const roomName = name.trim();
+                        // ИСПРАВЛЕНИЕ: Добавляем в локальный список сразу
+                        if (!geEngine.state.localRooms.includes(roomName)) {
+                            geEngine.state.localRooms.push(roomName);
+                            localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                        }
+                        
+                        // Удаляем из списка удаленных, если она там была
+                        geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomName);
+                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+
+                        geEngine.chat.open(roomName, roomName);
+                        geEngine.chat.refresh(); // Принудительно рендерим меню
+                    }
                 }
             },
 
             init() {
-                // ИСПРАВЛЕНИЕ: Если "general" удален, сбрасываем стартовую комнату
                 if (geEngine.state.deletedRooms.includes("general")) {
                     geEngine.state.activeRoom = "";
                 }
