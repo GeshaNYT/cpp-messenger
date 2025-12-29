@@ -889,7 +889,7 @@
                                 <div class="ge-item-dots" onclick="geEngine.ui.toggleMenu(event, '${rid}')">⋮</div>
                                 <div id="menu-${rid}" class="ge-context-menu">
                                     <button class="ge-menu-btn danger" onclick="geEngine.chat.removeRoom(event, '${rid}')">
-                                        Очистить чат полностью
+                                        Удалить переписку
                                     </button>
                                 </div>
                             </div>
@@ -900,7 +900,6 @@
                     const container = document.getElementById('ge-msg-container');
                     if (!geEngine.state.activeRoom) return;
 
-                    // Очищаем сообщения от сигналов удаления и системных уведомлений инициализации
                     const cleanMsgs = (messages || []).filter(raw => {
                         const m = JSON.parse(decodeURIComponent(raw));
                         return m.text !== "__ROOM_PURGE_SIGNAL__" && m.text !== "__ROOM_INIT_HIDDEN__";
@@ -943,15 +942,12 @@
                         
                         if(data.rooms?.result) {
                             data.rooms.result.forEach(rid => {
-                                // Если комната не в удаленных, добавляем в локальный список
                                 if (!geEngine.state.localRooms.includes(rid) && !geEngine.state.deletedRooms.includes(rid)) {
                                     geEngine.state.localRooms.push(rid);
                                 }
                             });
                         }
 
-                        // Проверка сигнала ПОЛНОГО удаления во всех комнатах (синхронизация очистки)
-                        // Если в активной комнате есть сигнал PURGE — удаляем её локально у текущего пользователя
                         if (geEngine.state.activeRoom && data.messages?.result) {
                             const messages = data.messages.result.map(raw => JSON.parse(decodeURIComponent(raw)));
                             const hasPurge = messages.some(m => m.text === "__ROOM_PURGE_SIGNAL__");
@@ -994,8 +990,7 @@
                 },
                 async removeRoom(e, rid) {
                     e.stopPropagation();
-                    if(confirm("Вы уверены? Весь чат будет очищен у обоих участников!")) {
-                        // 1. Отправляем сигнал очистки на сервер (чтобы второй пользователь тоже удалил комнату)
+                    if(confirm("Вы уверены? Переписка будет полностью очищена у обоих участников.")) {
                         const purgeSignal = JSON.stringify({ 
                             username: "System", 
                             email: "system@gelink.com", 
@@ -1003,7 +998,6 @@
                         });
                         await fetch(`/api/index?room=${rid}&user_email=${geEngine.state.session.email}`, { method: 'POST', body: purgeSignal });
                         
-                        // 2. Локально помечаем комнату как удаленную
                         geEngine.state.deletedRooms.push(rid);
                         geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== rid);
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
@@ -1021,11 +1015,9 @@
                     const otherSafe = mail.replace(/[@.]/g, '').toLowerCase();
                     const roomId = `private-${[mySafe, otherSafe].sort().join('-')}`;
 
-                    // Выводим из черного списка "удаленных"
                     geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                     localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
 
-                    // Отправляем скрытое системное сообщение для инициализации комнаты (чтобы появилась в списке сразу)
                     const initMsg = JSON.stringify({ 
                         username: "Система", 
                         email: "system@gelink.com", 
