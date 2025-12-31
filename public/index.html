@@ -684,6 +684,10 @@
 </head>
 <body>
 
+    <audio id="ge-snd-ring" loop src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3"></audio>
+    <audio id="ge-snd-connect" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3"></audio>
+    <audio id="ge-snd-click" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3"></audio>
+
     <div id="ge-snow-container"></div>
 
     <div id="ge-call-ui" class="ge-call-overlay">
@@ -1024,13 +1028,16 @@
                         return alert("Выберите конкретного пользователя для звонка.");
                     }
 
+                    // PLAY SOUNDS
+                    document.getElementById('ge-snd-click').play();
+                    document.getElementById('ge-snd-ring').play();
+
                     document.getElementById('ge-call-name').innerText = targetName;
                     document.getElementById('ge-call-av').innerText = targetName[0].toUpperCase();
                     document.getElementById('ge-call-status').innerText = "ЗАПРОС РАЗРЕШЕНИЙ...";
                     overlay.style.display = 'flex';
 
                     try {
-                        // Захват медиапотока (камера/микрофон)
                         const stream = await navigator.mediaDevices.getUserMedia({ 
                             video: type === 'video', 
                             audio: true 
@@ -1047,22 +1054,33 @@
 
                         document.getElementById('ge-call-status').innerText = "ВЫЗОВ...";
 
-                        // Имитация ответа через 3 секунды
+                        // Имитация ответа через 3.5 секунды
                         setTimeout(() => {
                             if (geEngine.state.localStream) {
+                                // STOP RINGING, PLAY CONNECT SOUND
+                                document.getElementById('ge-snd-ring').pause();
+                                document.getElementById('ge-snd-ring').currentTime = 0;
+                                document.getElementById('ge-snd-connect').play();
+                                
                                 document.getElementById('ge-call-status').innerText = "СОЕДИНЕНИЕ УСТАНОВЛЕНО";
-                                // В реальном приложении здесь подключается RemoteStream
                             }
-                        }, 3000);
+                        }, 3500);
 
                     } catch (err) {
                         console.error(err);
+                        document.getElementById('ge-snd-ring').pause();
                         alert("Ошибка доступа к камере или микрофону. Убедитесь, что используете HTTPS.");
                         this.hangup();
                     }
                 },
                 hangup() {
                     const overlay = document.getElementById('ge-call-ui');
+                    
+                    // STOP ALL SOUNDS
+                    document.getElementById('ge-snd-ring').pause();
+                    document.getElementById('ge-snd-ring').currentTime = 0;
+                    document.getElementById('ge-snd-click').play();
+
                     if (geEngine.state.localStream) {
                         geEngine.state.localStream.getTracks().forEach(track => track.stop());
                         geEngine.state.localStream = null;
