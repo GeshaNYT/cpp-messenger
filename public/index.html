@@ -13,7 +13,7 @@
             --ge-primary-dark: #006dd4;
             --ge-primary-light: #339cff;
             --ge-primary-soft: rgba(0, 132, 255, 0.1);
-            --ge-accent-gradient: linear-gradient(135deg, var(--ge-primary) 0%, #00c6ff 100%);
+            --ge-accent-gradient: linear-gradient(135deg, #0084ff 0%, #00c6ff 100%);
             
             /* Статусы */
             --ge-success: #42b72a;
@@ -26,7 +26,7 @@
             --bg-panel: #ffffff;
             --bg-header: #ffffff;
             --bg-input: #f0f2f5;
-            --bg-bubble-me: var(--ge-primary);
+            --bg-bubble-me: #0084ff;
             --bg-bubble-other: #e4e6eb;
             
             --text-primary: #1c1e21;
@@ -75,40 +75,6 @@
             
             --border-base: #3e4042;
             --shadow-lg: 0 12px 28px rgba(0,0,0,0.5);
-        }
-
-        /* --- ЭФФЕКТ ОБЪЕМА И ЖИВОГО ЦВЕТА --- */
-        .ge-volume-effect {
-            position: relative;
-            overflow: hidden;
-            box-shadow: inset 0 2px 4px rgba(255,255,255,0.3), var(--shadow-md);
-        }
-        .ge-volume-effect::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; height: 50%;
-            background: linear-gradient(to bottom, rgba(255,255,255,0.2) 0%, transparent 100%);
-            pointer-events: none;
-        }
-
-        .ge-live-hue {
-            animation: ge-hue-anim 10s infinite alternate linear;
-        }
-        @keyframes ge-hue-anim {
-            from { filter: hue-rotate(0deg); }
-            to { filter: hue-rotate(15deg); }
-        }
-
-        /* --- ПОЛОСА ВЫБОРА ЦВЕТА --- */
-        .ge-color-strip {
-            height: 6px;
-            width: 100%;
-            background: linear-gradient(to right, #ff0000, #ff8000, #ffff00, #00ff00, #00ffff, #0000ff, #8000ff, #ff00ff);
-            border-radius: 3px;
-            margin: 15px 0;
-            cursor: crosshair;
-            position: relative;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
         /* --- БАЗОВЫЕ НАСТРОЙКИ --- */
@@ -345,7 +311,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 15px;
+            margin-bottom: 35px;
             position: relative; /* Для позиционирования поп-апа */
         }
 
@@ -830,8 +796,6 @@
 
         .ge-av-colors {
             display: flex;
-            flex-direction: column;
-            width: 100%;
             gap: 10px;
         }
 
@@ -851,7 +815,7 @@
         .ge-error-text { color: var(--ge-error); font-size: 12px; margin-top: 5px; font-weight: 600; }
     </style>
 </head>
-<body class="ge-live-hue">
+<body>
 
     <div id="ge-snow-container"></div>
 
@@ -859,7 +823,7 @@
         <video id="remoteVideo" class="ge-video-container" autoplay playsinline></video>
         <video id="localVideo" class="ge-local-video" autoplay muted playsinline></video>
 
-        <div class="ge-call-avatar-big ge-volume-effect" id="ge-call-av">?</div>
+        <div class="ge-call-avatar-big" id="ge-call-av">?</div>
         <h2 id="ge-call-name" style="font-size: 32px; margin-bottom: 10px;">Александр Петров</h2>
         <p id="ge-call-status" style="opacity: 0.6; font-size: 18px; letter-spacing: 1px;">УСТАНОВКА СОЕДИНЕНИЯ...</p>
         
@@ -873,12 +837,13 @@
             <h2 style="margin-bottom: 25px; text-align: center;">Настройки профиля</h2>
             
             <div class="ge-avatar-picker">
-                <div id="ge-edit-av-preview" class="ge-av-preview ge-volume-effect">?</div>
+                <div id="ge-edit-av-preview" class="ge-av-preview">?</div>
                 <div class="ge-av-colors">
-                    <label class="ge-label" style="text-align: center; width: 100%;">Цвет аватара (RGB)</label>
-                    <input type="color" id="ge-av-color-picker" 
-                           style="width: 100%; height: 40px; border: none; border-radius: 8px; cursor: pointer; background: none;"
-                           oninput="geEngine.profile.setAvColor(this.value)">
+                    <div class="ge-color-dot" style="background: linear-gradient(135deg, #0084ff 0%, #00c6ff 100%)" onclick="geEngine.profile.setAvColor('linear-gradient(135deg, #0084ff 0%, #00c6ff 100%)')"></div>
+                    <div class="ge-color-dot" style="background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)" onclick="geEngine.profile.setAvColor('linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)')"></div>
+                    <div class="ge-color-dot" style="background: linear-gradient(135deg, #1d976c 0%, #93f9b9 100%)" onclick="geEngine.profile.setAvColor('linear-gradient(135deg, #1d976c 0%, #93f9b9 100%)')"></div>
+                    <div class="ge-color-dot" style="background: linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%)" onclick="geEngine.profile.setAvColor('linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%)')"></div>
+                    <div class="ge-color-dot" style="background: #333" onclick="geEngine.profile.setAvColor('#333')"></div>
                 </div>
             </div>
 
@@ -954,7 +919,7 @@
             <header class="ge-sidebar-header">
                 <div class="ge-profile-wrapper">
                     <div class="ge-user-profile">
-                        <div class="ge-user-av ge-volume-effect" id="ge-my-av">?</div>
+                        <div class="ge-user-av" id="ge-my-av">?</div>
                         <div>
                             <b id="ge-my-name" style="font-size: 22px;">Пользователь</b>
                             <div style="font-size: 13px; color: var(--ge-online); font-weight: 800;">● ОНЛАЙН</div>
@@ -962,7 +927,7 @@
                     </div>
                     
                     <div style="position: relative;">
-                        <button class="ge-sidebar-settings-btn" onclick="geEngine.ui.toggleSettingsMenu(event)">⚙️</button>
+                        <button class="ge-sidebar-settings-btn" onclick="geEngine.ui.toggleSettingsMenu(event)"⚙️</button>
                         
                         <div id="ge-settings-popup" class="ge-settings-popup">
                             <button class="ge-popup-item" onclick="geEngine.ui.toggleTheme()">🌓 Сменить тему</button>
@@ -972,8 +937,6 @@
                     </div>
                 </div>
 
-                <div class="ge-color-strip" onclick="geEngine.ui.setGlobalHue(event)"></div>
-
                 <div class="ge-sidebar-nav">
                     <button id="nav-chats" class="ge-nav-tab active" onclick="geEngine.ui.setTab('chats')">ЧАТЫ</button>
                     <button id="nav-people" class="ge-nav-tab" onclick="geEngine.ui.setTab('people')">ГРУППЫ</button>
@@ -981,8 +944,8 @@
                 </div>
 
                 <div style="display: flex; gap: 12px;">
-                    <button class="ge-btn-submit ge-volume-effect" style="padding: 14px; font-size: 11px; margin: 0;" onclick="geEngine.chat.addFriend()">+ ДОБАВИТЬ</button>
-                    <button class="ge-btn-submit ge-volume-effect" style="padding: 14px; font-size: 11px; margin: 0; background: var(--bg-body); color: var(--text-primary); box-shadow: none;" onclick="geEngine.chat.createGroup()">+ ГРУППА</button>
+                    <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0;" onclick="geEngine.chat.addFriend()">+ ДОБАВИТЬ</button>
+                    <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0; background: var(--bg-body); color: var(--text-primary); box-shadow: none;" onclick="geEngine.chat.createGroup()">+ ГРУППА</button>
                 </div>
             </header>
 
@@ -999,7 +962,7 @@
         <section class="ge-chat-view">
             <header class="ge-view-header">
                 <div style="display: flex; align-items: center; gap: 20px;">
-                    <div class="ge-user-av ge-volume-effect" id="ge-active-av" style="width: 55px; height: 55px; background: #555;">#</div>
+                    <div class="ge-user-av" id="ge-active-av" style="width: 55px; height: 55px; background: #555;">#</div>
                     <div>
                         <b id="ge-active-name" style="font-size: 24px;">Выберите диалог</b>
                         <div id="ge-active-status" style="font-size: 13px; opacity: 0.6;">Система GeLink готова</div>
@@ -1007,8 +970,8 @@
                 </div>
 
                 <div class="ge-call-controls" id="ge-chat-actions">
-                    <button class="ge-call-btn-circle ge-volume-effect" onclick="geEngine.calls.initiate('audio')">📞</button>
-                    <button class="ge-call-btn-circle ge-volume-effect" onclick="geEngine.calls.initiate('video')">📹</button>
+                    <button class="ge-call-btn-circle" onclick="geEngine.calls.initiate('audio')">📞</button>
+                    <button class="ge-call-btn-circle" onclick="geEngine.calls.initiate('video')">📹</button>
                 </div>
             </header>
 
@@ -1017,7 +980,7 @@
 
             <footer class="ge-footer">
                 <input type="text" id="ge-main-input" class="ge-composer-input" placeholder="Напишите ваше сообщение здесь...">
-                <button class="ge-send-btn ge-volume-effect" onclick="geEngine.chat.broadcast()">➤</button>
+                <button class="ge-send-btn" onclick="geEngine.chat.broadcast()">➤</button>
             </footer>
         </section>
     </main>
@@ -1064,7 +1027,7 @@
                             return alert("Пользователь с таким Email уже существует! Используйте вход.");
                         }
 
-                        const newUser = { name: n, email: e, password: p, avColor: '#0084ff' };
+                        const newUser = { name: n, email: e, password: p, avColor: 'var(--ge-accent-gradient)' };
                         geEngine.state.usersDB.push(newUser);
                         localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
                         
@@ -1079,7 +1042,7 @@
                             return alert("Неверный email или пароль!");
                         }
                         
-                        geEngine.state.session = { name: user.name, email: user.email, avColor: user.avColor || '#0084ff' };
+                        geEngine.state.session = { name: user.name, email: user.email, avColor: user.avColor || 'var(--ge-accent-gradient)' };
                         n = user.name;
                     }
                     
@@ -1120,12 +1083,7 @@
                     const session = geEngine.state.session;
                     document.getElementById('prof-name').value = session.name;
                     document.getElementById('prof-pass').value = '';
-                    this.tempColor = session.avColor || '#0084ff';
-                    
-                    // Установка цвета в пикер при открытии
-                    const picker = document.getElementById('ge-av-color-picker');
-                    if(picker) picker.value = this.tempColor.startsWith('linear') ? '#0084ff' : this.tempColor;
-                    
+                    this.tempColor = session.avColor || 'var(--ge-accent-gradient)';
                     this.updatePreview();
                     document.getElementById('ge-modal-profile').style.display = 'flex';
                 },
@@ -1176,14 +1134,6 @@
             },
 
             ui: {
-                setGlobalHue(e) {
-                    const strip = e.currentTarget;
-                    const rect = strip.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const percent = (x / rect.width) * 100;
-                    const color = `hsl(${percent * 3.6}, 100%, 50%)`;
-                    document.documentElement.style.setProperty('--ge-primary', color);
-                },
                 toggleSettingsMenu(e) {
                     e.stopPropagation();
                     document.getElementById('ge-settings-popup').classList.toggle('active');
@@ -1214,7 +1164,7 @@
                     if (tab === 'calls') {
                         scroller.innerHTML = geEngine.state.historyCalls.map(c => `
                             <div class="ge-chat-item">
-                                <div class="ge-user-av ge-volume-effect" style="width:50px; height:50px; background:#f5f5f5; color:#555;">${c.type === 'video' ? '📹' : '📞'}</div>
+                                <div class="ge-user-av" style="width:50px; height:50px; background:#f5f5f5; color:#555;">${c.type === 'video' ? '📹' : '📞'}</div>
                                 <div class="ge-item-content">
                                     <b>${c.name}</b>
                                     <span style="color: ${c.status === 'Пропущенный' ? 'var(--ge-error)' : ''}">${c.status} • ${c.time}</span>
@@ -1249,7 +1199,7 @@
 
                         return `
                             <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}', '${displayName}')">
-                                <div class="ge-user-av ge-volume-effect" style="width:50px; height:50px; font-size:18px; background:#444;">${displayName[0].toUpperCase()}</div>
+                                <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:#444;">${displayName[0].toUpperCase()}</div>
                                 <div class="ge-item-content">
                                     <b>${displayName}</b>
                                     <span>${isGroup ? 'Групповой канал' : 'Активный зашифрованный канал'}</span>
@@ -1563,7 +1513,7 @@
                 const session = geEngine.state.session;
                 document.getElementById('ge-my-name').innerText = session.name;
                 document.getElementById('ge-my-av').innerText = session.name[0].toUpperCase();
-                document.getElementById('ge-my-av').style.background = session.avColor || '#0084ff';
+                document.getElementById('ge-my-av').style.background = session.avColor || 'var(--ge-accent-gradient)';
                 
                 // Закрытие всех меню при клике по экрану
                 document.addEventListener('click', () => {
