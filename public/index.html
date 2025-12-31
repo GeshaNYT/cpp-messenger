@@ -673,8 +673,26 @@
             z-index: 10;
         }
 
-        .btn-hangup { background: var(--ge-error); width: 80px; height: 80px; border-radius: 50%; color: white; font-size: 30px; display: flex; align-items: center; justify-content: center; }
+        /* Кнопки звонков */
+        .btn-call { width: 80px; height: 80px; border-radius: 50%; color: white; font-size: 30px; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .btn-hangup { background: var(--ge-error); }
         .btn-hangup:hover { transform: scale(1.1); background: #d63030; }
+        .btn-accept { background: var(--ge-success); }
+        .btn-accept:hover { transform: scale(1.1); background: #369b24; }
+
+        /* Входящий вызов (доп. стили) */
+        .ge-incoming-status {
+            animation: ge-blink 1.5s infinite;
+            color: var(--ge-primary-light);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        @keyframes ge-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
 
         /* СИСТЕМНЫЕ КЛАССЫ */
         .ge-hidden { display: none !important; }
@@ -686,6 +704,17 @@
 
     <div id="ge-snow-container"></div>
 
+    <div id="ge-incoming-call-ui" class="ge-call-overlay">
+        <div class="ge-call-avatar-big" id="ge-inc-av">?</div>
+        <h2 id="ge-inc-name" style="font-size: 32px; margin-bottom: 10px;">Входящий вызов...</h2>
+        <p class="ge-incoming-status">ЗВОНОК ОТ ПОЛЬЗОВАТЕЛЯ</p>
+        
+        <div class="ge-call-actions">
+            <button class="btn-call btn-accept" onclick="geEngine.calls.accept()">✔</button>
+            <button class="btn-call btn-hangup" onclick="geEngine.calls.reject()">✕</button>
+        </div>
+    </div>
+
     <div id="ge-call-ui" class="ge-call-overlay">
         <video id="remoteVideo" class="ge-video-container" autoplay playsinline></video>
         <video id="localVideo" class="ge-local-video" autoplay muted playsinline></video>
@@ -695,7 +724,7 @@
         <p id="ge-call-status" style="opacity: 0.6; font-size: 18px; letter-spacing: 1px;">УСТАНОВКА СОЕДИНЕНИЯ...</p>
         
         <div class="ge-call-actions">
-            <button class="btn-hangup" onclick="geEngine.calls.hangup()">✕</button>
+            <button class="btn-call btn-hangup" onclick="geEngine.calls.hangup()">✕</button>
         </div>
     </div>
 
@@ -817,6 +846,7 @@
                 isSnowing: false,
                 snowInterval: null,
                 localStream: null,
+                incomingTimer: null, // Таймер автосброса входящего
                 localRooms: JSON.parse(localStorage.getItem('ge_local_rooms') || "[]"),
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
@@ -1016,6 +1046,7 @@
             },
 
             calls: {
+                // ИСХОДЯЩИЙ ВЫЗОВ
                 async initiate(type) {
                     const overlay = document.getElementById('ge-call-ui');
                     const targetName = document.getElementById('ge-active-name').innerText;
@@ -1030,7 +1061,6 @@
                     overlay.style.display = 'flex';
 
                     try {
-                        // Захват медиапотока (камера/микрофон)
                         const stream = await navigator.mediaDevices.getUserMedia({ 
                             video: type === 'video', 
                             audio: true 
@@ -1047,20 +1077,65 @@
 
                         document.getElementById('ge-call-status').innerText = "ВЫЗОВ...";
 
-                        // Имитация ответа через 3 секунды
                         setTimeout(() => {
                             if (geEngine.state.localStream) {
                                 document.getElementById('ge-call-status').innerText = "СОЕДИНЕНИЕ УСТАНОВЛЕНО";
-                                // В реальном приложении здесь подключается RemoteStream
                             }
                         }, 3000);
 
                     } catch (err) {
                         console.error(err);
-                        alert("Ошибка доступа к камере или микрофону. Убедитесь, что используете HTTPS.");
+                        alert("Ошибка доступа к камере или микрофону.");
                         this.hangup();
                     }
                 },
+
+                // ВХОДЯЩИЙ ВЫЗОВ (ИНТЕРФЕЙС)
+                simulateInbound(callerName = "Александр Петров") {
+                    const incOverlay = document.getElementById('ge-incoming-call-ui');
+                    document.getElementById('ge-inc-name').innerText = callerName;
+                    document.getElementById('ge-inc-av').innerText = callerName[0].toUpperCase();
+                    
+                    incOverlay.style.display = 'flex';
+
+                    // Таймер на 30 секунд
+                    geEngine.state.incomingTimer = setTimeout(() => {
+                        this.reject();
+                        alert("Вызов пропущен");
+                    }, 30000);
+                },
+
+                // ПРИНЯТЬ ВЫЗОВ
+                async accept() {
+                    clearTimeout(geEngine.state.incomingTimer);
+                    document.getElementById('ge-incoming-call-ui').style.display = 'none';
+                    
+                    const caller = document.getElementById('ge-inc-name').innerText;
+                    
+                    // Открываем окно активного разговора
+                    const callUI = document.getElementById('ge-call-ui');
+                    document.getElementById('ge-call-name').innerText = caller;
+                    document.getElementById('ge-call-av').innerText = caller[0].toUpperCase();
+                    document.getElementById('ge-call-status').innerText = "ПОДКЛЮЧЕНИЕ...";
+                    callUI.style.display = 'flex';
+
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                        geEngine.state.localStream = stream;
+                        document.getElementById('ge-call-status').innerText = "В СЕТИ";
+                    } catch(e) {
+                        alert("Не удалось включить микрофон");
+                        this.hangup();
+                    }
+                },
+
+                // ОТКЛОНИТЬ ВХОДЯЩИЙ
+                reject() {
+                    clearTimeout(geEngine.state.incomingTimer);
+                    document.getElementById('ge-incoming-call-ui').style.display = 'none';
+                },
+
+                // СБРОСИТЬ ТЕКУЩИЙ
                 hangup() {
                     const overlay = document.getElementById('ge-call-ui');
                     if (geEngine.state.localStream) {
