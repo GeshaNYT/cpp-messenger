@@ -780,7 +780,7 @@
                             <div style="font-size: 13px; color: var(--ge-online); font-weight: 800;">● ОНЛАЙН</div>
                         </div>
                     </div>
-                    <button class="ge-sidebar-settings-btn" onclick="alert('Настройки профиля')">⚙️</button>
+                    <button class="ge-sidebar-settings-btn" onclick="geEngine.auth.deleteAccount()">⚙️</button>
                 </div>
 
                 <div class="ge-sidebar-nav">
@@ -899,6 +899,23 @@
                     if (confirm("Выйти?")) { 
                         localStorage.removeItem('ge_v9_token'); 
                         location.reload(); 
+                    }
+                },
+                deleteAccount() {
+                    if (confirm("ВНИМАНИЕ: Вы уверены, что хотите ПОЛНОСТЬЮ удалить свой аккаунт из системы? Это действие необратимо.")) {
+                        const currentEmail = geEngine.state.session.email;
+                        // Удаляем из базы данных
+                        geEngine.state.usersDB = geEngine.state.usersDB.filter(u => u.email !== currentEmail);
+                        localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
+                        
+                        // Чистим токены и локальные данные
+                        localStorage.removeItem('ge_v9_token');
+                        localStorage.removeItem('ge_local_rooms');
+                        localStorage.removeItem('ge_created_rooms');
+                        localStorage.removeItem('ge_deleted_rooms');
+                        
+                        alert("Ваш аккаунт был успешно удален.");
+                        location.reload();
                     }
                 }
             },
