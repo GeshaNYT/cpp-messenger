@@ -26,8 +26,8 @@
             --bg-panel: #ffffff;
             --bg-header: #ffffff;
             --bg-input: #f0f2f5;
-            --bg-bubble-me: linear-gradient(135deg, #0084ff 0%, #0073e6 100%);
-            --bg-bubble-other: #ffffff;
+            --bg-bubble-me: #0084ff;
+            --bg-bubble-other: #e4e6eb;
             
             --text-primary: #1c1e21;
             --text-secondary: #65676b;
@@ -63,18 +63,18 @@
 
         /* --- ТЕМНАЯ ТЕМА --- */
         [data-theme="dark"] {
-            --bg-body: #0a0a0a;
-            --bg-panel: #1a1a1a;
-            --bg-header: #1a1a1a;
-            --bg-input: #2d2d2d;
-            --bg-bubble-other: #2d2d2d;
+            --bg-body: #18191a;
+            --bg-panel: #242526;
+            --bg-header: #242526;
+            --bg-input: #3a3b3c;
+            --bg-bubble-other: #3a3b3c;
             
-            --text-primary: #f0f2f5;
+            --text-primary: #e4e6eb;
             --text-secondary: #b0b3b8;
-            --text-tertiary: #72767d;
+            --text-tertiary: #8a8d91;
             
-            --border-base: #333333;
-            --shadow-lg: 0 12px 28px rgba(0,0,0,0.6);
+            --border-base: #3e4042;
+            --shadow-lg: 0 12px 28px rgba(0,0,0,0.5);
         }
 
         /* --- БАЗОВЫЕ НАСТРОЙКИ --- */
@@ -89,7 +89,7 @@
         html, body {
             height: 100%;
             width: 100%;
-            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             background-color: var(--bg-body);
             color: var(--text-primary);
             overflow: hidden;
@@ -105,13 +105,15 @@
         button { cursor: pointer; transition: all 0.2s; }
 
         /* --- КАСТОМНЫЙ СКРОЛЛБАР --- */
-        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { 
-            background: rgba(188, 192, 196, 0.5); 
+            background: #bcc0c4; 
             border-radius: 10px; 
+            border: 2px solid transparent; 
+            background-clip: padding-box; 
         }
-        ::-webkit-scrollbar-thumb:hover { background: var(--ge-primary); }
+        ::-webkit-scrollbar-thumb:hover { background: #8d949e; }
 
         /* --- КНОПКА ПЕРЕКЛЮЧЕНИЯ ТЕМЫ --- */
         .ge-theme-toggler {
@@ -121,20 +123,19 @@
             justify-content: center;
             gap: 12px;
             padding: 14px;
-            background: var(--bg-input);
-            border: 1px solid var(--border-base);
+            background: var(--bg-panel);
+            border: 2px solid var(--ge-primary);
             border-radius: var(--radius-md);
-            color: var(--text-primary);
-            font-weight: 700;
+            color: var(--ge-primary);
+            font-weight: 800;
             font-size: 13px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
             margin-bottom: 12px;
         }
 
         .ge-theme-toggler:hover {
-            border-color: var(--ge-primary);
-            color: var(--ge-primary);
+            background: var(--ge-primary-soft);
             transform: translateY(-2px);
         }
 
@@ -157,7 +158,6 @@
             border-radius: 50%;
             opacity: 0.8;
             pointer-events: none;
-            filter: blur(1px);
         }
 
         /* --- МОДУЛЬ АВТОРИЗАЦИИ --- */
@@ -178,8 +178,8 @@
         .ge-auth-container {
             background: var(--bg-panel);
             width: 100%;
-            max-width: 480px;
-            padding: 50px;
+            max-width: 520px;
+            padding: 60px 50px;
             border-radius: var(--radius-xl);
             box-shadow: var(--shadow-xl);
             border: 1px solid var(--border-base);
@@ -193,17 +193,15 @@
         }
 
         .ge-brand-logo {
-            font-size: 72px;
+            font-size: 84px;
             font-weight: 900;
-            background: var(--ge-accent-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -4px;
+            color: var(--ge-primary);
+            letter-spacing: -5px;
             margin-bottom: 8px;
         }
 
         .ge-auth-tagline {
-            font-size: 16px;
+            font-size: 18px;
             color: var(--text-secondary);
             margin-bottom: 45px;
             font-weight: 500;
@@ -211,84 +209,79 @@
 
         .ge-auth-tabs {
             display: flex;
-            gap: 10px;
-            background: var(--bg-input);
-            padding: 6px;
-            border-radius: var(--radius-md);
-            margin-bottom: 30px;
+            gap: 25px;
+            justify-content: center;
+            margin-bottom: 40px;
         }
 
         .ge-auth-tab {
-            flex: 1;
-            padding: 12px 0;
-            font-size: 15px;
+            padding: 10px 0;
+            font-size: 19px;
             font-weight: 700;
             color: var(--text-tertiary);
-            border-radius: var(--radius-sm);
+            border-bottom: 3px solid transparent;
         }
 
         .ge-auth-tab.active {
-            background: var(--bg-panel);
             color: var(--ge-primary);
-            box-shadow: var(--shadow-sm);
+            border-bottom-color: var(--ge-primary);
         }
 
         .ge-form-group {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 22px;
             text-align: left;
         }
 
         .ge-field {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
         }
 
         .ge-label {
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 800;
             color: var(--text-secondary);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            padding-left: 4px;
+            letter-spacing: 0.5px;
+            padding-left: 5px;
         }
 
         .ge-input-core {
             width: 100%;
-            padding: 16px 20px;
+            padding: 18px 24px;
             background: var(--bg-input);
             border: 2px solid transparent;
             border-radius: var(--radius-md);
             color: var(--text-primary);
-            font-size: 15px;
-            transition: 0.3s;
+            font-size: 16px;
+            font-weight: 500;
+            box-shadow: var(--shadow-sm);
         }
 
         .ge-input-core:focus {
             background: var(--bg-panel);
             border-color: var(--ge-primary);
-            box-shadow: 0 0 0 4px var(--ge-primary-soft);
+            box-shadow: 0 0 0 5px var(--ge-primary-soft);
         }
 
         .ge-btn-submit {
             width: 100%;
-            padding: 18px;
+            padding: 22px;
             background: var(--ge-primary);
             color: white;
             border-radius: var(--radius-md);
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 800;
             box-shadow: var(--shadow-accent);
-            margin-top: 10px;
-            transition: 0.3s;
+            margin-top: 15px;
         }
 
         .ge-btn-submit:hover {
             background: var(--ge-primary-dark);
             transform: translateY(-2px);
-            box-shadow: 0 12px 24px rgba(0, 132, 255, 0.35);
         }
 
         /* --- ГЛАВНАЯ СТРУКТУРА МЕССЕНДЖЕРА --- */
@@ -306,30 +299,31 @@
             display: flex;
             flex-direction: column;
             z-index: 100;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.02);
         }
 
         .ge-sidebar-header {
-            padding: 30px;
+            padding: 35px 35px;
             border-bottom: 1px solid var(--border-base);
         }
 
         .ge-user-profile {
             display: flex;
             align-items: center;
-            gap: 20px;
-            margin-bottom: 25px;
+            gap: 22px;
+            margin-bottom: 35px;
         }
 
         .ge-user-av {
-            width: 64px;
-            height: 64px;
-            border-radius: 22px;
+            width: 75px;
+            height: 75px;
+            border-radius: 28px;
             background: var(--ge-accent-gradient);
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 900;
             box-shadow: var(--shadow-md);
             position: relative;
@@ -338,44 +332,31 @@
         .ge-user-av::after {
             content: '';
             position: absolute;
-            bottom: -2px;
-            right: -2px;
-            width: 16px;
-            height: 16px;
+            bottom: -4px;
+            right: -4px;
+            width: 18px;
+            height: 18px;
             background: var(--ge-online);
-            border: 3px solid var(--bg-panel);
+            border: 4px solid var(--bg-panel);
             border-radius: 50%;
-        }
-
-        .ge-sidebar-search {
-            margin-bottom: 20px;
-        }
-
-        .ge-search-input {
-            width: 100%;
-            padding: 12px 20px;
-            background: var(--bg-input);
-            border-radius: var(--radius-full);
-            font-size: 14px;
-            color: var(--text-primary);
         }
 
         .ge-sidebar-nav {
             display: flex;
-            background: var(--bg-input);
-            padding: 4px;
+            background: var(--bg-body);
+            padding: 6px;
             border-radius: var(--radius-md);
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
 
         .ge-nav-tab {
             flex: 1;
-            padding: 12px;
+            padding: 14px;
             text-align: center;
-            font-weight: 700;
+            font-weight: 800;
             font-size: 11px;
             color: var(--text-secondary);
-            border-radius: 10px;
+            border-radius: 12px;
             text-transform: uppercase;
         }
 
@@ -393,27 +374,27 @@
 
         .ge-chat-item {
             position: relative;
-            padding: 20px 30px;
+            padding: 24px 35px;
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 20px;
+            border-bottom: 1px solid var(--border-soft);
             cursor: pointer;
-            transition: 0.2s;
-            border-left: 4px solid transparent;
+            transition: var(--t-fast);
         }
 
         .ge-chat-item:hover { background: var(--bg-body); }
-        .ge-chat-item.active { 
-            background: var(--ge-primary-soft); 
-            border-left-color: var(--ge-primary); 
-        }
+        .ge-chat-item.active { background: var(--ge-primary-soft); border-left: 6px solid var(--ge-primary); }
 
-        .ge-item-content { flex: 1; overflow: hidden; }
-        .ge-item-content b { display: block; font-size: 16px; margin-bottom: 4px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .ge-item-content span { font-size: 13px; color: var(--text-secondary); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ge-item-content b { display: block; font-size: 17px; margin-bottom: 6px; color: var(--text-primary); }
+        .ge-item-content span { font-size: 13px; color: var(--text-secondary); }
 
         /* Меню трёх точек */
         .ge-item-dots {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
             width: 32px;
             height: 32px;
             display: flex;
@@ -421,18 +402,17 @@
             justify-content: center;
             border-radius: 50%;
             color: var(--text-tertiary);
-            font-size: 18px;
-            opacity: 0;
+            font-size: 20px;
             transition: 0.2s;
+            z-index: 10;
         }
 
-        .ge-chat-item:hover .ge-item-dots { opacity: 1; }
-        .ge-item-dots:hover { background: var(--border-base); color: var(--ge-primary); }
+        .ge-item-dots:hover { background: var(--border-soft); color: var(--ge-primary); }
 
         .ge-context-menu {
             position: absolute;
-            right: 40px;
-            top: 60px;
+            right: 25px;
+            top: 70%;
             background: var(--bg-panel);
             border: 1px solid var(--border-base);
             border-radius: var(--radius-sm);
@@ -440,7 +420,7 @@
             display: none;
             flex-direction: column;
             z-index: 1000;
-            min-width: 180px;
+            min-width: 160px;
             overflow: hidden;
         }
 
@@ -450,12 +430,14 @@
             padding: 12px 16px;
             text-align: left;
             font-size: 13px;
-            font-weight: 600;
+            font-weight: 700;
             color: var(--text-primary);
+            background: none;
+            transition: 0.2s;
             border-bottom: 1px solid var(--border-soft);
         }
 
-        .ge-menu-btn:hover { background: var(--ge-primary-soft); color: var(--ge-primary); }
+        .ge-menu-btn:hover { background: var(--bg-body); }
         .ge-menu-btn.danger { color: var(--ge-error); }
         .ge-menu-btn.danger:hover { background: rgba(250, 62, 62, 0.1); }
 
@@ -472,7 +454,7 @@
             height: var(--header-height);
             background: var(--bg-header);
             border-bottom: 1px solid var(--border-base);
-            padding: 0 40px;
+            padding: 0 45px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -481,157 +463,150 @@
 
         .ge-call-controls {
             display: flex;
-            gap: 12px;
+            gap: 15px;
         }
 
         .ge-call-btn-circle {
-            width: 46px;
-            height: 46px;
-            border-radius: 14px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
             background: var(--bg-input);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
+            font-size: 20px;
             color: var(--ge-primary);
-            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: 0.3s;
         }
 
         .ge-call-btn-circle:hover {
             background: var(--ge-primary);
             color: white;
-            transform: scale(1.1) rotate(5deg);
+            transform: scale(1.1);
         }
 
         .ge-messages-area {
             flex: 1;
-            padding: 30px 40px;
+            padding: 40px 50px;
             overflow-y: auto;
             display: flex;
             flex-direction: column-reverse;
-            gap: 16px;
-            background-image: 
-                radial-gradient(var(--border-base) 1px, transparent 1px);
-            background-size: 24px 24px;
+            gap: 20px;
+            background-image: radial-gradient(var(--border-base) 1px, transparent 1px);
+            background-size: 30px 30px;
         }
 
         .ge-msg-bubble {
-            max-width: 70%;
-            padding: 14px 18px;
-            border-radius: 22px;
-            font-size: 15px;
-            line-height: 1.5;
+            max-width: 65%;
+            padding: 12px 18px;
+            border-radius: 20px;
+            font-size: 16px;
+            line-height: 1.4;
             position: relative;
             box-shadow: var(--shadow-sm);
-            animation: ge-msg-pop 0.3s var(--ease);
+            animation: ge-msg-pop 0.4s var(--ease);
             display: flex;
             flex-direction: column;
         }
 
         @keyframes ge-msg-pop {
-            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            from { opacity: 0; transform: scale(0.9) translateY(10px); }
             to { opacity: 1; transform: scale(1) translateY(0); }
         }
 
         .ge-msg-bubble.me {
             align-self: flex-end;
-            background: var(--bg-bubble-me);
+            background: var(--ge-primary);
             color: white;
             border-bottom-right-radius: 4px;
         }
 
         .ge-msg-bubble.them {
             align-self: flex-start;
-            background: var(--bg-bubble-other);
+            background: var(--bg-panel);
             color: var(--text-primary);
             border-bottom-left-radius: 4px;
-            border: 1px solid var(--border-soft);
         }
 
         .ge-msg-meta-top {
-            font-size: 10px;
+            display: block;
+            font-size: 11px;
             font-weight: 800;
             text-transform: uppercase;
-            margin-bottom: 6px;
-            opacity: 0.6;
-            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            opacity: 0.7;
         }
 
+        /* --- СТРОКА СТАТУСА ПОД ТЕКСТОМ --- */
         .ge-msg-status-line {
             display: flex;
             align-items: center;
             justify-content: flex-end;
             gap: 6px;
-            margin-top: 6px;
-            font-size: 10px;
-            font-weight: 700;
-            opacity: 0.7;
+            margin-top: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            opacity: 0.8;
         }
         
-        .them .ge-msg-status-line { justify-content: flex-start; }
+        .them .ge-msg-status-line { justify-content: flex-start; opacity: 0.5; }
 
         /* ПАНЕЛЬ ВВОДА */
         .ge-footer {
-            padding: 25px 40px;
+            padding: 35px 50px;
             background: var(--bg-header);
             border-top: 1px solid var(--border-base);
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 25px;
         }
 
         .ge-composer-input {
             flex: 1;
-            padding: 16px 28px;
+            padding: 20px 35px;
             background: var(--bg-input);
             border-radius: var(--radius-full);
-            font-size: 15px;
+            font-size: 16px;
             color: var(--text-primary);
             border: 2px solid transparent;
-            transition: 0.3s;
         }
 
         .ge-composer-input:focus {
             background: var(--bg-header);
             border-color: var(--ge-primary);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
 
         .ge-send-btn {
-            width: 54px;
-            height: 54px;
+            width: 65px;
+            height: 65px;
             border-radius: 50%;
             background: var(--ge-primary);
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
+            font-size: 26px;
             box-shadow: var(--shadow-accent);
         }
 
-        .ge-send-btn:hover { transform: scale(1.1); background: var(--ge-primary-dark); }
+        .ge-send-btn:hover { transform: scale(1.1) rotate(5deg); }
 
         .ge-sidebar-footer {
-            padding: 25px;
-            background: var(--bg-panel);
+            padding: 30px;
             border-top: 1px solid var(--border-base);
             display: flex;
             flex-direction: column;
-            gap: 10px;
         }
 
         .ge-logout-btn {
             width: 100%;
-            padding: 14px;
+            padding: 16px;
             color: var(--ge-error);
             font-weight: 800;
-            font-size: 12px;
+            font-size: 14px;
             text-align: center;
             border-radius: var(--radius-md);
-            border: 1px solid var(--ge-error);
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            border: 2px solid var(--ge-error);
         }
 
         .ge-logout-btn:hover {
@@ -644,37 +619,28 @@
             position: fixed;
             inset: 0;
             z-index: 200000;
-            background: rgba(0,0,0,0.85);
-            backdrop-filter: blur(40px);
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(25px);
             display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             color: white;
-            text-align: center;
         }
 
         .ge-call-avatar-big {
-            width: 160px;
-            height: 160px;
-            border-radius: 54px;
+            width: 180px;
+            height: 180px;
+            border-radius: 60px;
             background: var(--ge-accent-gradient);
-            font-size: 64px;
+            font-size: 70px;
             font-weight: 900;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 24px;
-            box-shadow: 0 0 0 0 rgba(0, 132, 255, 0.4);
-            animation: ge-pulse 2s infinite;
-            position: relative;
+            margin-bottom: 30px;
+            box-shadow: 0 0 50px rgba(0,132,255,0.4);
             z-index: 5;
-        }
-
-        @keyframes ge-pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 132, 255, 0.7); }
-            70% { box-shadow: 0 0 0 40px rgba(0, 132, 255, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 132, 255, 0); }
         }
 
         .ge-video-container {
@@ -690,31 +656,30 @@
             position: absolute;
             bottom: 40px;
             right: 40px;
-            width: 220px;
-            height: 140px;
-            border-radius: 24px;
+            width: 240px;
+            height: 160px;
+            border-radius: 20px;
             background: #000;
-            border: 2px solid rgba(255,255,255,0.3);
+            border: 3px solid rgba(255,255,255,0.2);
             object-fit: cover;
             z-index: 10;
             display: none;
-            box-shadow: var(--shadow-xl);
         }
 
         .ge-call-actions {
-            margin-top: 50px;
+            margin-top: 60px;
             display: flex;
-            gap: 30px;
+            gap: 40px;
             z-index: 10;
         }
 
-        .btn-hangup { background: var(--ge-error); width: 72px; height: 72px; border-radius: 50%; color: white; font-size: 28px; display: flex; align-items: center; justify-content: center; }
-        .btn-hangup:hover { transform: scale(1.1) rotate(90deg); background: #ff5252; }
+        .btn-hangup { background: var(--ge-error); width: 80px; height: 80px; border-radius: 50%; color: white; font-size: 30px; display: flex; align-items: center; justify-content: center; }
+        .btn-hangup:hover { transform: scale(1.1); background: #d63030; }
 
         /* СИСТЕМНЫЕ КЛАССЫ */
         .ge-hidden { display: none !important; }
         .ge-flex { display: flex !important; }
-        .ge-error-text { color: var(--ge-error); font-size: 11px; margin-top: 5px; font-weight: 700; }
+        .ge-error-text { color: var(--ge-error); font-size: 12px; margin-top: 5px; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -730,8 +695,8 @@
         <video id="localVideo" class="ge-local-video" autoplay muted playsinline></video>
 
         <div class="ge-call-avatar-big" id="ge-call-av">?</div>
-        <h2 id="ge-call-name" style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">Александр Петров</h2>
-        <p id="ge-call-status" style="opacity: 0.6; font-size: 14px; letter-spacing: 2px; text-transform: uppercase;">Инициализация защищенного канала...</p>
+        <h2 id="ge-call-name" style="font-size: 32px; margin-bottom: 10px;">Александр Петров</h2>
+        <p id="ge-call-status" style="opacity: 0.6; font-size: 18px; letter-spacing: 1px;">УСТАНОВКА СОЕДИНЕНИЯ...</p>
         
         <div class="ge-call-actions">
             <button class="btn-hangup" onclick="geEngine.calls.hangup()">✕</button>
@@ -741,7 +706,7 @@
     <section id="ge-auth-layer" class="ge-auth-overlay">
         <div class="ge-auth-container">
             <div class="ge-brand-logo">GeLink</div>
-            <p class="ge-auth-tagline">Ultimate Enterprise Messenger v9.0</p>
+            <p class="ge-auth-tagline">Профессиональный мессенджер v9.0</p>
             
             <div class="ge-auth-tabs">
                 <button id="tab-login" class="ge-auth-tab active" onclick="geEngine.auth.switch('login')">Вход</button>
@@ -750,39 +715,39 @@
 
             <div id="ge-form-login" class="ge-form-group">
                 <div class="ge-field">
-                    <label class="ge-label">Рабочий Email</label>
-                    <input type="email" id="in-email" class="ge-input-core" placeholder="name@company.com">
+                    <label class="ge-label">Электронная почта</label>
+                    <input type="email" id="in-email" class="ge-input-core" placeholder="example@gelink.com">
                 </div>
                 <div class="ge-field">
-                    <label class="ge-label">Пароль</label>
+                    <label class="ge-label">Пароль доступа</label>
                     <input type="password" id="in-pass" class="ge-input-core" placeholder="••••••••">
                 </div>
-                <button class="ge-btn-submit" onclick="geEngine.auth.handle('login')">ВОЙТИ В СИСТЕМУ</button>
+                <button class="ge-btn-submit" onclick="geEngine.auth.handle('login')">ВОЙТИ В АККАУНТ</button>
             </div>
 
             <div id="ge-form-reg" class="ge-form-group ge-hidden">
                 <div class="ge-field">
-                    <label class="ge-label">Имя и Фамилия</label>
-                    <input type="text" id="up-name" class="ge-input-core" placeholder="Иван Иванов">
+                    <label class="ge-label">Ваше полное имя</label>
+                    <input type="text" id="up-name" class="ge-input-core" placeholder="Александр Петров">
                 </div>
                 <div class="ge-field">
-                    <label class="ge-label">Электронная почта</label>
-                    <input type="email" id="up-email" class="ge-input-core" placeholder="ivan@mail.ru">
+                    <label class="ge-label">Email для связи</label>
+                    <input type="email" id="up-email" class="ge-input-core" placeholder="name@domain.ru">
                 </div>
                 <div class="ge-field">
-                    <label class="ge-label">Пароль</label>
-                    <input type="password" id="up-pass" class="ge-input-core" placeholder="Минимум 8 знаков">
+                    <label class="ge-label">Придумайте пароль</label>
+                    <input type="password" id="up-pass" class="ge-input-core" placeholder="Мин. 8 символов">
                 </div>
                 <div class="ge-field">
-                    <label class="ge-label">Повтор пароля</label>
-                    <input type="password" id="up-confirm" class="ge-input-core" placeholder="Повторите пароль">
-                    <span id="up-error" class="ge-error-text ge-hidden">Пароли не совпадают</span>
+                    <label class="ge-label">Подтвердите пароль</label>
+                    <input type="password" id="up-confirm" class="ge-input-core" placeholder="Повторите ввод">
+                    <span id="up-error" class="ge-error-text ge-hidden">Пароли не совпадают!</span>
                 </div>
-                <button class="ge-btn-submit" onclick="geEngine.auth.handle('reg')">СОЗДАТЬ АККАУНТ</button>
+                <button class="ge-btn-submit" onclick="geEngine.auth.handle('reg')">ЗАРЕГИСТРИРОВАТЬСЯ</button>
             </div>
 
-            <div style="margin-top: 35px; font-size: 12px; color: var(--text-tertiary); line-height: 1.6;">
-                Используя GeLink, вы принимаете <br> <b>условия корпоративного обслуживания</b>.
+            <div style="margin-top: 40px; font-size: 13px; color: var(--text-tertiary); line-height: 1.5;">
+                При входе вы подтверждаете согласие с <br> <b>Политикой Конфиденциальности GeLink</b>.
             </div>
         </div>
     </section>
@@ -794,27 +759,20 @@
                 <div class="ge-user-profile">
                     <div class="ge-user-av" id="ge-my-av">?</div>
                     <div>
-                        <b id="ge-my-name" style="font-size: 20px; display: block; margin-bottom: 2px;">Пользователь</b>
-                        <div style="font-size: 11px; color: var(--ge-online); font-weight: 800; display: flex; align-items: center; gap: 5px;">
-                            <span style="width: 8px; height: 8px; background: var(--ge-online); border-radius: 50%;"></span>
-                            ONLINE
-                        </div>
+                        <b id="ge-my-name" style="font-size: 22px;">Пользователь</b>
+                        <div style="font-size: 13px; color: var(--ge-online); font-weight: 800;">● ОНЛАЙН</div>
                     </div>
                 </div>
 
-                <div class="ge-sidebar-search">
-                    <input type="text" class="ge-search-input" placeholder="Поиск сообщений и людей..." oninput="geEngine.chat.filter(this.value)">
-                </div>
-
                 <div class="ge-sidebar-nav">
-                    <button id="nav-chats" class="ge-nav-tab active" onclick="geEngine.ui.setTab('chats')">Чаты</button>
-                    <button id="nav-people" class="ge-nav-tab" onclick="geEngine.ui.setTab('people')">Группы</button>
-                    <button id="nav-calls" class="ge-nav-tab" onclick="geEngine.ui.setTab('calls')">Звонки</button>
+                    <button id="nav-chats" class="ge-nav-tab active" onclick="geEngine.ui.setTab('chats')">ЧАТЫ</button>
+                    <button id="nav-people" class="ge-nav-tab" onclick="geEngine.ui.setTab('people')">ГРУППЫ</button>
+                    <button id="nav-calls" class="ge-nav-tab" onclick="geEngine.ui.setTab('calls')">ЗВОНКИ</button>
                 </div>
 
-                <div style="display: flex; gap: 10px;">
-                    <button class="ge-btn-submit" style="padding: 12px; font-size: 11px; margin: 0;" onclick="geEngine.chat.addFriend()">+ КОНТАКТ</button>
-                    <button class="ge-btn-submit" style="padding: 12px; font-size: 11px; margin: 0; background: var(--bg-input); color: var(--text-primary); box-shadow: none; border: 1px solid var(--border-base);" onclick="geEngine.chat.createGroup()">+ ГРУППА</button>
+                <div style="display: flex; gap: 12px;">
+                    <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0;" onclick="geEngine.chat.addFriend()">+ ДОБАВИТЬ</button>
+                    <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0; background: var(--bg-body); color: var(--text-primary); box-shadow: none;" onclick="geEngine.chat.createGroup()">+ ГРУППА</button>
                 </div>
             </header>
 
@@ -822,19 +780,19 @@
                 </div>
 
             <footer class="ge-sidebar-footer">
-                <button class="ge-theme-toggler" onclick="geEngine.effects.toggleSnow()" id="btn-snow">❄️ Зимний режим: Выкл</button>
-                <button class="ge-theme-toggler" onclick="geEngine.ui.toggleTheme()">🌓 Сменить тему оформления</button>
-                <button class="ge-logout-btn" onclick="geEngine.auth.exit()">Выйти из профиля</button>
+                <button class="ge-theme-toggler" onclick="geEngine.effects.toggleSnow()" id="btn-snow">❄️ Снег: Выкл</button>
+                <button class="ge-theme-toggler" onclick="geEngine.ui.toggleTheme()">🌓 Переключить вид</button>
+                <button class="ge-logout-btn" onclick="geEngine.auth.exit()">ЗАВЕРШИТЬ СЕАНС</button>
             </footer>
         </aside>
 
         <section class="ge-chat-view">
             <header class="ge-view-header">
-                <div style="display: flex; align-items: center; gap: 18px;">
-                    <div class="ge-user-av" id="ge-active-av" style="width: 50px; height: 50px; border-radius: 18px; font-size: 20px;">#</div>
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div class="ge-user-av" id="ge-active-av" style="width: 55px; height: 55px; background: #555;">#</div>
                     <div>
-                        <b id="ge-active-name" style="font-size: 20px; display: block; margin-bottom: 2px;">Выберите диалог</b>
-                        <div id="ge-active-status" style="font-size: 12px; opacity: 0.6;">Система GeLink готова к работе</div>
+                        <b id="ge-active-name" style="font-size: 24px;">Выберите диалог</b>
+                        <div id="ge-active-status" style="font-size: 13px; opacity: 0.6;">Система GeLink готова</div>
                     </div>
                 </div>
 
@@ -848,7 +806,7 @@
                 </div>
 
             <footer class="ge-footer">
-                <input type="text" id="ge-main-input" class="ge-composer-input" placeholder="Введите сообщение...">
+                <input type="text" id="ge-main-input" class="ge-composer-input" placeholder="Напишите ваше сообщение здесь...">
                 <button class="ge-send-btn" onclick="geEngine.chat.broadcast()">➤</button>
             </footer>
         </section>
@@ -868,8 +826,8 @@
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 historyCalls: [
-                    {name: "HR Отдел", type: "video", time: "11:20", status: "Входящий"},
-                    {name: "Дмитрий К.", type: "audio", time: "15:40", status: "Пропущенный"}
+                    {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
+                    {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
                 ]
             },
 
@@ -890,11 +848,13 @@
                         p = document.getElementById('up-pass').value.trim();
                         pc = document.getElementById('up-confirm').value.trim();
 
-                        if (!n || !e || !p) return alert("Пожалуйста, заполните все поля!");
+                        if (!n || !e || !p) return alert("Заполните данные!");
                         if (p !== pc) { document.getElementById('up-error').classList.remove('ge-hidden'); return; }
 
                         const userExists = geEngine.state.usersDB.find(u => u.email === e);
-                        if (userExists) return alert("Этот Email уже зарегистрирован!");
+                        if (userExists) {
+                            return alert("Пользователь с таким Email уже существует!");
+                        }
 
                         const newUser = { name: n, email: e, password: p };
                         geEngine.state.usersDB.push(newUser);
@@ -904,10 +864,12 @@
                     } else {
                         e = document.getElementById('in-email').value.trim().toLowerCase();
                         p = document.getElementById('in-pass').value.trim();
-                        if (!e || !p) return alert("Введите учетные данные!");
+                        if (!e || !p) return alert("Введите логин и пароль!");
 
                         const user = geEngine.state.usersDB.find(u => u.email === e && u.password === p);
-                        if (!user) return alert("Неверный email или пароль!");
+                        if (!user) {
+                            return alert("Неверный email или пароль!");
+                        }
                         
                         geEngine.state.session = { name: user.name, email: user.email };
                     }
@@ -916,7 +878,7 @@
                     geEngine.init();
                 },
                 exit() {
-                    if (confirm("Вы действительно хотите завершить сессию?")) { 
+                    if (confirm("Выйти?")) { 
                         localStorage.removeItem('ge_v9_token'); 
                         location.reload(); 
                     }
@@ -926,8 +888,7 @@
             ui: {
                 toggleTheme() {
                     const html = document.documentElement;
-                    const current = html.getAttribute('data-theme');
-                    html.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+                    html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
                 },
                 setTab(tab) {
                     geEngine.state.activeTab = tab;
@@ -951,10 +912,10 @@
                     if (tab === 'calls') {
                         scroller.innerHTML = geEngine.state.historyCalls.map(c => `
                             <div class="ge-chat-item">
-                                <div class="ge-user-av" style="width:46px; height:46px; background:var(--bg-input); color:var(--text-tertiary);">${c.type === 'video' ? '📹' : '📞'}</div>
+                                <div class="ge-user-av" style="width:50px; height:50px; background:#f5f5f5; color:#555;">${c.type === 'video' ? '📹' : '📞'}</div>
                                 <div class="ge-item-content">
                                     <b>${c.name}</b>
-                                    <span style="color: ${c.status === 'Пропущенный' ? 'var(--ge-error)' : 'var(--ge-success)'}">${c.status} • ${c.time}</span>
+                                    <span style="color: ${c.status === 'Пропущенный' ? 'var(--ge-error)' : ''}">${c.status} • ${c.time}</span>
                                 </div>
                             </div>
                         `).join('');
@@ -979,24 +940,26 @@
                             const parts = rid.replace('private-', '').split('-');
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherPart = parts.find(p => p !== myMailSafe);
-                            if (otherPart) displayName = otherPart.split('gmailcom')[0] || otherPart;
+                            if (otherPart) {
+                                displayName = otherPart.split('gmailcom')[0] || otherPart;
+                            }
                         }
 
                         return `
                             <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}', '${displayName}')">
-                                <div class="ge-user-av" style="width:46px; height:46px; font-size:18px; background:var(--bg-input); color:var(--ge-primary); border: 1px solid var(--border-soft);">${displayName[0].toUpperCase()}</div>
+                                <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:#444;">${displayName[0].toUpperCase()}</div>
                                 <div class="ge-item-content">
                                     <b>${displayName}</b>
-                                    <span>${isGroup ? 'Групповой канал' : 'Личный диалог'}</span>
+                                    <span>${isGroup ? 'Групповой канал' : 'Активный зашифрованный канал'}</span>
                                 </div>
                                 <div class="ge-item-dots" onclick="geEngine.ui.toggleMenu(event, '${rid}')">⋮</div>
                                 <div id="menu-${rid}" class="ge-context-menu">
                                     <button class="ge-menu-btn" onclick="geEngine.chat.removeRoom(event, '${rid}')">
-                                        Скрыть из списка
+                                        ${isGroup ? 'Покинуть группу' : 'Удалить контакт'}
                                     </button>
                                     ${isCreator && isGroup && rid !== 'general' ? `
                                         <button class="ge-menu-btn danger" onclick="geEngine.chat.deleteRoomPermanently(event, '${rid}')">
-                                            Удалить навсегда
+                                            Удалить группу
                                         </button>
                                     ` : ''}
                                 </div>
@@ -1006,8 +969,9 @@
 
                     if (tab === 'people' && geEngine.state.deletedRooms.includes('general')) {
                         html += `
-                            <div class="ge-chat-item" style="border: 2px dashed var(--ge-primary); margin: 15px; border-radius: var(--radius-md); background: var(--ge-primary-soft); text-align: center;" onclick="geEngine.chat.joinGeneral()">
-                                <div style="width:100%"><b style="color: var(--ge-primary);">+ Вступить в GENERAL</b></div>
+                            <div class="ge-chat-item" style="border: 2px dashed var(--ge-primary); margin: 20px; border-radius: var(--radius-md); background: var(--ge-primary-soft); text-align: center; justify-content: center; display: flex; flex-direction: column;" onclick="geEngine.chat.joinGeneral()">
+                                <b style="color: var(--ge-primary); font-size: 16px;">+ Вступить в группу мессенджера</b>
+                                <span style="font-size: 12px; color: var(--text-secondary);">Вернуться в канал General</span>
                             </div>
                         `;
                     }
@@ -1017,7 +981,7 @@
                 renderMessages(messages) {
                     const container = document.getElementById('ge-msg-container');
                     
-                    if (!geEngine.state.activeRoom) {
+                    if (!geEngine.state.activeRoom || geEngine.state.activeRoom === "") {
                         container.innerHTML = "";
                         return;
                     }
@@ -1029,22 +993,28 @@
                     });
 
                     if (filteredMessages.length === 0) {
-                        container.innerHTML = `<div style="text-align:center; padding: 40px; opacity:0.3; font-size:13px; font-weight:600;">НЕТ СООБЩЕНИЙ</div>`;
+                        container.innerHTML = `<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Здесь пока нет сообщений. Начните общение!</div>`;
                         return;
                     }
 
                     container.innerHTML = filteredMessages.map(raw => {
                         let m;
-                        try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } 
-                        catch(e) { m = { username: 'System', text: 'Data Error', email: '' }; }
+                        try {
+                            m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw;
+                        } catch(e) { 
+                            m = { username: 'System', text: 'Ошибка данных', email: '' }; 
+                        }
                         
                         const isMe = m.email === geEngine.state.session.email;
-                        const statusIcon = isMe ? (m.status === 'read' ? '✓✓' : '✓') : '';
-                        const timeStr = m.time || "00:00";
+                        let statusIcon = '🕒'; 
+                        if (m.status === 'read') statusIcon = '✓✓';
+                        else if (m.status === 'sent') statusIcon = '✓';
+                        
+                        const timeStr = m.time || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
                         return `
                             <div class="ge-msg-bubble ${isMe ? 'me' : 'them'}">
-                                ${!isMe ? `<span class="ge-msg-meta-top">${m.username}</span>` : ''}
+                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
                                 <div class="ge-msg-text">${m.text}</div>
                                 <div class="ge-msg-status-line">
                                     <span>${timeStr}</span>
@@ -1063,22 +1033,26 @@
                     const targetName = document.getElementById('ge-active-name').innerText;
                     
                     if (!isIncoming && (geEngine.state.activeRoom === 'general' || !geEngine.state.activeRoom)) {
-                        return alert("Сначала выберите собеседника");
+                        return alert("Выберите пользователя для звонка.");
                     }
 
-                    if (!isIncoming) this.sendSignal('_SYSTEM_CALL_INIT_');
+                    if (!isIncoming) {
+                        this.sendSignal('_SYSTEM_CALL_INIT_');
+                    }
 
                     document.getElementById('ge-snd-click').play();
                     document.getElementById('ge-snd-ring').play();
 
-                    document.getElementById('ge-call-name').innerText = isIncoming ? "Входящий вызов" : targetName;
-                    document.getElementById('ge-call-av').innerText = targetName[0].toUpperCase();
-                    document.getElementById('ge-call-status').innerText = isIncoming ? "ОЖИДАНИЕ ПРИЕМА..." : "ВЫЗОВ...";
+                    document.getElementById('ge-call-name').innerText = isIncoming ? "Входящий вызов..." : targetName;
+                    document.getElementById('ge-call-av').innerText = isIncoming ? "📞" : targetName[0].toUpperCase();
+                    document.getElementById('ge-call-status').innerText = isIncoming ? "ОЖИДАНИЕ ПРИЕМА..." : "ВЫЗОВ (ожидание ответа)...";
                     overlay.style.display = 'flex';
 
                     if(this.callTimer) clearTimeout(this.callTimer);
                     this.callTimer = setTimeout(() => {
-                        if (overlay.style.display === 'flex') this.hangup();
+                        if (overlay.style.display === 'flex') {
+                            this.hangup();
+                        }
                     }, 30000);
 
                     try {
@@ -1093,7 +1067,9 @@
                             localVid.style.display = 'block';
                             document.getElementById('ge-call-av').style.display = 'none';
                         }
-                    } catch (err) { console.warn("Media error:", err); }
+                    } catch (err) {
+                        console.error("Ошибка камеры:", err);
+                    }
                 },
 
                 async sendSignal(signalText) {
@@ -1104,7 +1080,8 @@
                         time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                     });
                     await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { 
-                        method: 'POST', body: payload 
+                        method: 'POST', 
+                        body: payload 
                     });
                 },
 
@@ -1135,35 +1112,37 @@
 
                     if (geEngine.state.isSnowing) {
                         container.style.display = 'block';
-                        btn.innerText = "❄️ Зимний режим: Вкл";
-                        geEngine.state.snowInterval = setInterval(this.createSnowflake, 100);
+                        btn.innerText = "❄️ Снег: Вкл";
+                        geEngine.state.snowInterval = setInterval(this.createSnowflake, 150);
                     } else {
                         container.style.display = 'none';
                         container.innerHTML = "";
-                        btn.innerText = "❄️ Зимний режим: Выкл";
+                        btn.innerText = "❄️ Снег: Выкл";
                         clearInterval(geEngine.state.snowInterval);
                     }
                 },
                 createSnowflake() {
                     const container = document.getElementById('ge-snow-container');
                     const flake = document.createElement('div');
-                    const size = Math.random() * 4 + 2 + 'px';
+                    const size = Math.random() * 5 + 2 + 'px';
+                    const startPos = Math.random() * window.innerWidth;
+                    const duration = Math.random() * 3 + 4 + 's';
                     
                     flake.className = 'ge-snowflake';
                     flake.style.width = size;
                     flake.style.height = size;
-                    flake.style.left = Math.random() * window.innerWidth + 'px';
+                    flake.style.left = startPos + 'px';
                     flake.style.top = '-10px';
+                    flake.style.transition = `transform ${duration} linear, opacity ${duration} linear`;
                     
                     container.appendChild(flake);
 
-                    const duration = Math.random() * 3000 + 4000;
-                    const anim = flake.animate([
-                        { transform: 'translateY(0) translateX(0)', opacity: 0.8 },
-                        { transform: `translateY(${window.innerHeight + 20}px) translateX(${Math.random() * 50 - 25}px)`, opacity: 0 }
-                    ], { duration: duration, easing: 'linear' });
+                    setTimeout(() => {
+                        flake.style.transform = `translateY(${window.innerHeight + 20}px) translateX(${Math.random() * 40 - 20}px)`;
+                        flake.style.opacity = '0';
+                    }, 50);
 
-                    anim.onfinish = () => flake.remove();
+                    setTimeout(() => flake.remove(), parseFloat(duration) * 1000);
                 }
             },
 
@@ -1182,6 +1161,7 @@
                             rawMessages.forEach(raw => {
                                  let m;
                                  try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } catch(e) { return; }
+                                 
                                  if (m.text === '_SYSTEM_CALL_INIT_' && m.email !== geEngine.state.session.email) {
                                      if (document.getElementById('ge-call-ui').style.display !== 'flex') {
                                          geEngine.calls.initiate('audio', true);
@@ -1193,24 +1173,26 @@
                                 geEngine.ui.renderMessages(rawMessages);
                             }
                         }
-                    } catch (e) { /* silent sync */ }
+                    } catch (e) { console.warn("Sync..."); }
                 },
                 async broadcast() {
                     const input = document.getElementById('ge-main-input');
                     const text = input.value.trim();
                     if (!text || !geEngine.state.activeRoom) return;
                     
+                    const now = new Date();
                     const payload = JSON.stringify({ 
                         username: geEngine.state.session.name, 
                         email: geEngine.state.session.email, 
                         text: text,
-                        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                        time: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                         status: 'sent' 
                     });
                     
                     input.value = '';
                     await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { 
-                        method: 'POST', body: payload 
+                        method: 'POST', 
+                        body: payload 
                     });
                     geEngine.chat.refresh();
                 },
@@ -1222,18 +1204,18 @@
                 },
                 removeRoom(e, rid) {
                     e.stopPropagation();
-                    if(confirm("Удалить этот чат из списка?")) {
+                    if(confirm("Вы уверены?")) {
                         geEngine.state.deletedRooms.push(rid);
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                        location.reload();
+                        if(geEngine.state.activeRoom === rid) location.reload();
                     }
                 },
                 deleteRoomPermanently(e, rid) {
                     e.stopPropagation();
-                    if(confirm("ВНИМАНИЕ: Группа будет удалена полностью. Продолжить?")) {
+                    if(confirm("Удалить полностью?")) {
                         geEngine.state.deletedRooms.push(rid);
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                        location.reload();
+                        if(geEngine.state.activeRoom === rid) location.reload();
                     }
                 },
                 joinGeneral() {
@@ -1241,15 +1223,8 @@
                     localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                     geEngine.chat.open('general', 'general');
                 },
-                filter(val) {
-                    const items = document.querySelectorAll('.ge-chat-item');
-                    items.forEach(it => {
-                        const name = it.querySelector('b').innerText.toLowerCase();
-                        it.style.display = name.includes(val.toLowerCase()) ? 'flex' : 'none';
-                    });
-                },
                 async addFriend() {
-                    const mail = prompt("Введите Email пользователя:");
+                    const mail = prompt("Введите Email контакта:");
                     if (!mail) return;
                     const res = await fetch(`/api/index?action=addContact&user_email=${geEngine.state.session.email}&target_email=${mail}`);
                     const data = await res.json();
@@ -1266,7 +1241,7 @@
                     geEngine.chat.refresh();
                 },
                 createGroup() {
-                    const name = prompt("Введите название новой группы:");
+                    const name = prompt("Имя группы:");
                     if (name) {
                         geEngine.state.localRooms.push(name);
                         geEngine.state.createdRooms.push(name);
@@ -1283,11 +1258,9 @@
                 document.getElementById('ge-main-app').classList.add('ge-flex');
                 document.getElementById('ge-my-name').innerText = geEngine.state.session.name;
                 document.getElementById('ge-my-av').innerText = geEngine.state.session.name[0].toUpperCase();
-                
                 document.addEventListener('click', () => {
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
                 });
-                
                 geEngine.chat.refresh();
                 setInterval(() => geEngine.chat.refresh(), 4000);
             }
@@ -1295,10 +1268,7 @@
 
         window.onload = () => {
             const saved = localStorage.getItem('ge_v9_token');
-            if (saved) { 
-                geEngine.state.session = JSON.parse(saved); 
-                geEngine.init(); 
-            }
+            if (saved) { geEngine.state.session = JSON.parse(saved); geEngine.init(); }
         };
 
         document.getElementById('ge-main-input').addEventListener('keypress', (e) => {
