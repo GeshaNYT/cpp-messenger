@@ -312,6 +312,7 @@
             align-items: center;
             justify-content: space-between;
             margin-bottom: 35px;
+            position: relative; /* Для позиционирования поп-апа */
         }
 
         .ge-user-profile {
@@ -334,6 +335,58 @@
             transform: rotate(45deg);
         }
 
+        /* --- МАЛЕНЬКАЯ КОШКА (ПОП-АП НАСТРОЕК) --- */
+        .ge-settings-popup {
+            position: absolute;
+            top: 60px;
+            right: 0;
+            width: 240px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-base);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            animation: ge-pop-anim 0.2s var(--ease);
+        }
+
+        .ge-settings-popup.active {
+            display: flex;
+        }
+
+        @keyframes ge-pop-anim {
+            from { opacity: 0; transform: scale(0.9) translateY(-10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .ge-popup-item {
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-soft);
+            transition: 0.2s;
+            text-align: left;
+        }
+
+        .ge-popup-item:hover {
+            background: var(--bg-input);
+        }
+
+        .ge-popup-item.danger {
+            color: var(--ge-error);
+        }
+
+        .ge-popup-item.danger:hover {
+            background: rgba(250, 62, 62, 0.08);
+        }
+
+        /* Остальные стили из твоего кода... */
         .ge-user-av {
             width: 75px;
             height: 75px;
@@ -780,7 +833,16 @@
                             <div style="font-size: 13px; color: var(--ge-online); font-weight: 800;">● ОНЛАЙН</div>
                         </div>
                     </div>
-                    <button class="ge-sidebar-settings-btn" onclick="geEngine.auth.deleteAccount()">⚙️</button>
+                    
+                    <div style="position: relative;">
+                        <button class="ge-sidebar-settings-btn" onclick="geEngine.ui.toggleSettingsMenu(event)">⚙️</button>
+                        
+                        <div id="ge-settings-popup" class="ge-settings-popup">
+                            <button class="ge-popup-item" onclick="geEngine.ui.toggleTheme()">🌓 Сменить тему</button>
+                            <button class="ge-popup-item" onclick="alert('Скоро: Редактировать профиль')">👤 Профиль</button>
+                            <button class="ge-popup-item danger" onclick="geEngine.auth.deleteAccountFull()">🗑️ Удалить аккаунт</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="ge-sidebar-nav">
@@ -901,26 +963,33 @@
                         location.reload(); 
                     }
                 },
-                deleteAccount() {
-                    if (confirm("ВНИМАНИЕ: Вы уверены, что хотите ПОЛНОСТЬЮ удалить свой аккаунт из системы? Это действие необратимо.")) {
-                        const currentEmail = geEngine.state.session.email;
-                        // Удаляем из базы данных
-                        geEngine.state.usersDB = geEngine.state.usersDB.filter(u => u.email !== currentEmail);
-                        localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
-                        
-                        // Чистим токены и локальные данные
-                        localStorage.removeItem('ge_v9_token');
-                        localStorage.removeItem('ge_local_rooms');
-                        localStorage.removeItem('ge_created_rooms');
-                        localStorage.removeItem('ge_deleted_rooms');
-                        
-                        alert("Ваш аккаунт был успешно удален.");
-                        location.reload();
+                deleteAccountFull() {
+                    const c1 = confirm("⚠️ ВНИМАНИЕ! Вы собираетесь полностью удалить аккаунт.");
+                    if(c1) {
+                        const c2 = confirm("Это действие сотрет ваши данные из системы GeLink навсегда. Вы уверены?");
+                        if(c2) {
+                            const currentEmail = geEngine.state.session.email;
+                            
+                            // 1. Удаляем из базы пользователей
+                            geEngine.state.usersDB = geEngine.state.usersDB.filter(u => u.email !== currentEmail);
+                            localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
+                            
+                            // 2. Очищаем токен входа
+                            localStorage.removeItem('ge_v9_token');
+                            
+                            // 3. Сообщаем и перезагружаем
+                            alert("Ваш аккаунт был полностью удален. Прощайте!");
+                            location.reload();
+                        }
                     }
                 }
             },
 
             ui: {
+                toggleSettingsMenu(e) {
+                    e.stopPropagation();
+                    document.getElementById('ge-settings-popup').classList.toggle('active');
+                },
                 toggleTheme() {
                     const html = document.documentElement;
                     html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
@@ -1070,7 +1139,6 @@
                     overlay.style.display = 'flex';
 
                     try {
-                        // Захват медиапотока (камера/микрофон)
                         const stream = await navigator.mediaDevices.getUserMedia({ 
                             video: type === 'video', 
                             audio: true 
@@ -1087,17 +1155,15 @@
 
                         document.getElementById('ge-call-status').innerText = "ВЫЗОВ...";
 
-                        // Имитация ответа через 3 секунды
                         setTimeout(() => {
                             if (geEngine.state.localStream) {
                                 document.getElementById('ge-call-status').innerText = "СОЕДИНЕНИЕ УСТАНОВЛЕНО";
-                                // В реальном приложении здесь подключается RemoteStream
                             }
                         }, 3000);
 
                     } catch (err) {
                         console.error(err);
-                        alert("Ошибка доступа к камере или микрофону. Убедитесь, что используете HTTPS.");
+                        alert("Ошибка доступа к камере или микрофону.");
                         this.hangup();
                     }
                 },
@@ -1297,9 +1363,13 @@
                 document.getElementById('ge-main-app').classList.add('ge-flex');
                 document.getElementById('ge-my-name').innerText = geEngine.state.session.name;
                 document.getElementById('ge-my-av').innerText = geEngine.state.session.name[0].toUpperCase();
+                
+                // Закрытие всех меню при клике по экрану
                 document.addEventListener('click', () => {
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
+                    document.getElementById('ge-settings-popup').classList.remove('active');
                 });
+
                 geEngine.chat.refresh();
                 setInterval(() => geEngine.chat.refresh(), 4000);
             }
