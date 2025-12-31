@@ -485,6 +485,24 @@
             transform: scale(1.1);
         }
 
+        /* --- НОВАЯ КНОПКА НАСТРОЕК --- */
+        .ge-settings-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--text-secondary);
+            margin-left: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.3s;
+        }
+
+        .ge-settings-btn:hover {
+            color: var(--ge-primary);
+            transform: rotate(45deg);
+        }
+
         .ge-messages-area {
             flex: 1;
             padding: 40px 50px;
@@ -795,6 +813,7 @@
                 <div class="ge-call-controls" id="ge-chat-actions">
                     <button class="ge-call-btn-circle" onclick="geEngine.calls.initiate('audio')">📞</button>
                     <button class="ge-call-btn-circle" onclick="geEngine.calls.initiate('video')">📹</button>
+                    <button class="ge-settings-btn" title="Настройки">⚙️</button>
                 </div>
             </header>
 
