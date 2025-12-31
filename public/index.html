@@ -796,6 +796,8 @@
 
         .ge-av-colors {
             display: flex;
+            flex-direction: column;
+            width: 100%;
             gap: 10px;
         }
 
@@ -839,11 +841,10 @@
             <div class="ge-avatar-picker">
                 <div id="ge-edit-av-preview" class="ge-av-preview">?</div>
                 <div class="ge-av-colors">
-                    <div class="ge-color-dot" style="background: linear-gradient(135deg, #0084ff 0%, #00c6ff 100%)" onclick="geEngine.profile.setAvColor('linear-gradient(135deg, #0084ff 0%, #00c6ff 100%)')"></div>
-                    <div class="ge-color-dot" style="background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)" onclick="geEngine.profile.setAvColor('linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)')"></div>
-                    <div class="ge-color-dot" style="background: linear-gradient(135deg, #1d976c 0%, #93f9b9 100%)" onclick="geEngine.profile.setAvColor('linear-gradient(135deg, #1d976c 0%, #93f9b9 100%)')"></div>
-                    <div class="ge-color-dot" style="background: linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%)" onclick="geEngine.profile.setAvColor('linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%)')"></div>
-                    <div class="ge-color-dot" style="background: #333" onclick="geEngine.profile.setAvColor('#333')"></div>
+                    <label class="ge-label" style="text-align: center; width: 100%;">Цвет аватара (RGB)</label>
+                    <input type="color" id="ge-av-color-picker" 
+                           style="width: 100%; height: 40px; border: none; border-radius: 8px; cursor: pointer; background: none;"
+                           oninput="geEngine.profile.setAvColor(this.value)">
                 </div>
             </div>
 
@@ -1027,7 +1028,7 @@
                             return alert("Пользователь с таким Email уже существует! Используйте вход.");
                         }
 
-                        const newUser = { name: n, email: e, password: p, avColor: 'var(--ge-accent-gradient)' };
+                        const newUser = { name: n, email: e, password: p, avColor: '#0084ff' };
                         geEngine.state.usersDB.push(newUser);
                         localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
                         
@@ -1042,7 +1043,7 @@
                             return alert("Неверный email или пароль!");
                         }
                         
-                        geEngine.state.session = { name: user.name, email: user.email, avColor: user.avColor || 'var(--ge-accent-gradient)' };
+                        geEngine.state.session = { name: user.name, email: user.email, avColor: user.avColor || '#0084ff' };
                         n = user.name;
                     }
                     
@@ -1083,7 +1084,12 @@
                     const session = geEngine.state.session;
                     document.getElementById('prof-name').value = session.name;
                     document.getElementById('prof-pass').value = '';
-                    this.tempColor = session.avColor || 'var(--ge-accent-gradient)';
+                    this.tempColor = session.avColor || '#0084ff';
+                    
+                    // Установка цвета в пикер при открытии
+                    const picker = document.getElementById('ge-av-color-picker');
+                    if(picker) picker.value = this.tempColor.startsWith('linear') ? '#0084ff' : this.tempColor;
+                    
                     this.updatePreview();
                     document.getElementById('ge-modal-profile').style.display = 'flex';
                 },
@@ -1513,7 +1519,7 @@
                 const session = geEngine.state.session;
                 document.getElementById('ge-my-name').innerText = session.name;
                 document.getElementById('ge-my-av').innerText = session.name[0].toUpperCase();
-                document.getElementById('ge-my-av').style.background = session.avColor || 'var(--ge-accent-gradient)';
+                document.getElementById('ge-my-av').style.background = session.avColor || '#0084ff';
                 
                 // Закрытие всех меню при клике по экрану
                 document.addEventListener('click', () => {
