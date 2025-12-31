@@ -307,11 +307,31 @@
             border-bottom: 1px solid var(--border-base);
         }
 
+        .ge-profile-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 35px;
+        }
+
         .ge-user-profile {
             display: flex;
             align-items: center;
             gap: 22px;
-            margin-bottom: 35px;
+        }
+
+        .ge-sidebar-settings-btn {
+            font-size: 26px;
+            color: var(--text-tertiary);
+            padding: 8px;
+            border-radius: 12px;
+            transition: 0.3s;
+        }
+
+        .ge-sidebar-settings-btn:hover {
+            color: var(--ge-primary);
+            background: var(--ge-primary-soft);
+            transform: rotate(45deg);
         }
 
         .ge-user-av {
@@ -483,24 +503,6 @@
             background: var(--ge-primary);
             color: white;
             transform: scale(1.1);
-        }
-
-        /* --- НОВАЯ КНОПКА НАСТРОЕК --- */
-        .ge-settings-btn {
-            background: none;
-            border: none;
-            font-size: 24px;
-            color: var(--text-secondary);
-            margin-left: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: 0.3s;
-        }
-
-        .ge-settings-btn:hover {
-            color: var(--ge-primary);
-            transform: rotate(45deg);
         }
 
         .ge-messages-area {
@@ -770,12 +772,15 @@
         
         <aside class="ge-sidebar">
             <header class="ge-sidebar-header">
-                <div class="ge-user-profile">
-                    <div class="ge-user-av" id="ge-my-av">?</div>
-                    <div>
-                        <b id="ge-my-name" style="font-size: 22px;">Пользователь</b>
-                        <div style="font-size: 13px; color: var(--ge-online); font-weight: 800;">● ОНЛАЙН</div>
+                <div class="ge-profile-wrapper">
+                    <div class="ge-user-profile">
+                        <div class="ge-user-av" id="ge-my-av">?</div>
+                        <div>
+                            <b id="ge-my-name" style="font-size: 22px;">Пользователь</b>
+                            <div style="font-size: 13px; color: var(--ge-online); font-weight: 800;">● ОНЛАЙН</div>
+                        </div>
                     </div>
+                    <button class="ge-sidebar-settings-btn" onclick="alert('Настройки профиля')">⚙️</button>
                 </div>
 
                 <div class="ge-sidebar-nav">
@@ -813,7 +818,6 @@
                 <div class="ge-call-controls" id="ge-chat-actions">
                     <button class="ge-call-btn-circle" onclick="geEngine.calls.initiate('audio')">📞</button>
                     <button class="ge-call-btn-circle" onclick="geEngine.calls.initiate('video')">📹</button>
-                    <button class="ge-settings-btn" title="Настройки">⚙️</button>
                 </div>
             </header>
 
