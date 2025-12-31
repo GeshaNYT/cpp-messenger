@@ -986,12 +986,19 @@
                         return;
                     }
 
-                    if (!messages || messages.length === 0) {
+                    // ФИЛЬТРАЦИЯ: Убираем сигналы звонков из списка отрисовки
+                    const filteredMessages = (messages || []).filter(raw => {
+                         let m;
+                         try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } catch(e) { return true; }
+                         return m.text !== '_SYSTEM_CALL_INIT_';
+                    });
+
+                    if (filteredMessages.length === 0) {
                         container.innerHTML = `<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Здесь пока нет сообщений. Начните общение!</div>`;
                         return;
                     }
 
-                    container.innerHTML = messages.map(raw => {
+                    container.innerHTML = filteredMessages.map(raw => {
                         let m;
                         try {
                             m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw;
@@ -1030,7 +1037,7 @@
                         return alert("Выберите пользователя для звонка.");
                     }
 
-                    // 1. Сигналинг (только если мы звоним сами)
+                    // 1. Сигналинг
                     if (!isIncoming) {
                         this.sendSignal('_SYSTEM_CALL_INIT_');
                     }
@@ -1048,12 +1055,11 @@
                     if(this.callTimer) clearTimeout(this.callTimer);
                     this.callTimer = setTimeout(() => {
                         if (overlay.style.display === 'flex') {
-                            console.log("Звонок сброшен по таймауту 30с");
                             this.hangup();
                         }
                     }, 30000);
 
-                    // 4. Медиа (камера/микро)
+                    // 4. Медиа
                     try {
                         const stream = await navigator.mediaDevices.getUserMedia({ 
                             video: type === 'video', 
@@ -1067,7 +1073,7 @@
                             document.getElementById('ge-call-av').style.display = 'none';
                         }
                     } catch (err) {
-                        console.error("Медиа ошибка:", err);
+                        console.error("Ошибка камеры:", err);
                     }
                 },
 
@@ -1076,7 +1082,7 @@
                         username: "System", 
                         email: geEngine.state.session.email, 
                         text: signalText,
-                        time: new Date().toLocaleTimeString()
+                        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                     });
                     await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { 
                         method: 'POST', 
@@ -1155,21 +1161,23 @@
                         geEngine.ui.renderChatList(data.rooms?.result);
                         
                         if (geEngine.state.activeRoom) {
-                            const messages = data.messages?.result || [];
+                            const rawMessages = data.messages?.result || [];
                             
-                            // ДЕТЕКТОР ВХОДЯЩЕГО ЗВОНКА
-                            const lastMsg = messages[messages.length - 1];
-                            if (lastMsg && lastMsg.text === '_SYSTEM_CALL_INIT_' && lastMsg.email !== geEngine.state.session.email) {
-                                if (document.getElementById('ge-call-ui').style.display !== 'flex') {
-                                    geEngine.calls.initiate('audio', true);
-                                }
-                            }
+                            // ДЕТЕКТОР ВХОДЯЩЕГО ЗВОНКА (обработка скрытого сигнала)
+                            rawMessages.forEach(raw => {
+                                 let m;
+                                 try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } catch(e) { return; }
+                                 
+                                 if (m.text === '_SYSTEM_CALL_INIT_' && m.email !== geEngine.state.session.email) {
+                                     // Проверяем, не открыт ли звонок уже
+                                     if (document.getElementById('ge-call-ui').style.display !== 'flex') {
+                                         geEngine.calls.initiate('audio', true);
+                                     }
+                                 }
+                            });
 
-                            // Очищаем сообщения от системных сигналов для UI
-                            const visibleMsgs = messages.filter(m => m.text !== '_SYSTEM_CALL_INIT_');
-                            
                             if(geEngine.state.activeTab !== 'calls') {
-                                geEngine.ui.renderMessages(visibleMsgs);
+                                geEngine.ui.renderMessages(rawMessages);
                             }
                         }
                     } catch (e) { console.warn("Sync..."); }
@@ -1203,7 +1211,6 @@
                 },
                 removeRoom(e, rid) {
                     e.stopPropagation();
-                    const isGroup = rid === 'general' || !rid.startsWith('private-');
                     if(confirm("Вы уверены?")) {
                         geEngine.state.deletedRooms.push(rid);
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
@@ -1232,8 +1239,10 @@
                         const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                         const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
                         const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
-                        geEngine.state.localRooms.push(roomId);
-                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                        if(!geEngine.state.localRooms.includes(roomId)) {
+                             geEngine.state.localRooms.push(roomId);
+                             localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                        }
                         geEngine.chat.open(roomId, mail.split('@')[0]);
                     }
                     geEngine.chat.refresh();
