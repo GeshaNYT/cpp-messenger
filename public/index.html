@@ -1027,57 +1027,93 @@
             },
 
             calls: {
+                pc: null,
                 callTimer: null,
-                async initiate(type, isIncoming = false) {
+                
+                async initiate(type) {
                     const overlay = document.getElementById('ge-call-ui');
-                    const targetName = document.getElementById('ge-active-name').innerText;
-                    
-                    if (!isIncoming && (geEngine.state.activeRoom === 'general' || !geEngine.state.activeRoom)) {
-                        return alert("Выберите пользователя для звонка.");
-                    }
-
-                    if (!isIncoming) {
-                        this.sendSignal('_SYSTEM_CALL_INIT_');
-                    }
+                    if (geEngine.state.activeRoom === 'general' || !geEngine.state.activeRoom) return alert("Выберите диалог");
 
                     document.getElementById('ge-snd-click').play();
-                    document.getElementById('ge-snd-ring').play();
-
-                    document.getElementById('ge-call-name').innerText = isIncoming ? "Входящий вызов..." : targetName;
-                    document.getElementById('ge-call-av').innerText = isIncoming ? "📞" : targetName[0].toUpperCase();
-                    document.getElementById('ge-call-status').innerText = isIncoming ? "ОЖИДАНИЕ ПРИЕМА..." : "ВЫЗОВ (ожидание ответа)...";
+                    document.getElementById('ge-call-status').innerText = "ВЫЗОВ...";
                     overlay.style.display = 'flex';
 
-                    if(this.callTimer) clearTimeout(this.callTimer);
-                    this.callTimer = setTimeout(() => {
-                        if (overlay.style.display === 'flex') {
-                            this.hangup();
-                        }
-                    }, 30000);
+                    // 1. Получаем медиа-поток
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: type === 'video', 
+                        audio: true 
+                    });
+                    geEngine.state.localStream = stream;
+                    document.getElementById('localVideo').srcObject = stream;
+                    document.getElementById('localVideo').style.display = type === 'video' ? 'block' : 'none';
 
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ 
-                            video: type === 'video', 
-                            audio: true 
-                        });
-                        geEngine.state.localStream = stream;
-                        const localVid = document.getElementById('localVideo');
-                        localVid.srcObject = stream;
-                        if (type === 'video') {
-                            localVid.style.display = 'block';
-                            document.getElementById('ge-call-av').style.display = 'none';
+                    // 2. Создаем WebRTC соединение
+                    this.pc = new RTCPeerConnection({
+                        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                    });
+
+                    // Добавляем наши треки в соединение
+                    stream.getTracks().forEach(track => this.pc.addTrack(track, stream));
+
+                    // Слушаем удаленный поток
+                    this.pc.ontrack = (event) => {
+                        document.getElementById('remoteVideo').srcObject = event.streams[0];
+                        document.getElementById('ge-call-status').innerText = "В СЕТИ (00:01)";
+                        document.getElementById('ge-call-av').style.display = 'none';
+                    };
+
+                    // Создаем Offer (Предложение)
+                    const offer = await this.pc.createOffer();
+                    await this.pc.setLocalDescription(offer);
+
+                    // Отправляем сигнал другому пользователю через API чата
+                    this.sendSignal({
+                        type: 'offer',
+                        sdp: offer,
+                        callType: type
+                    });
+                },
+
+                async handleSignal(signal) {
+                    if (signal.type === 'offer') {
+                        // Логика входящего звонка
+                        if (confirm(`Входящий ${signal.callType === 'video' ? 'видеозвонок' : 'звонок'}. Принять?`)) {
+                            document.getElementById('ge-call-ui').style.display = 'flex';
+                            
+                            const stream = await navigator.mediaDevices.getUserMedia({ 
+                                video: signal.callType === 'video', 
+                                audio: true 
+                            });
+                            geEngine.state.localStream = stream;
+                            document.getElementById('localVideo').srcObject = stream;
+
+                            this.pc = new RTCPeerConnection({
+                                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                            });
+                            
+                            stream.getTracks().forEach(track => this.pc.addTrack(track, stream));
+                            this.pc.ontrack = (event) => {
+                                document.getElementById('remoteVideo').srcObject = event.streams[0];
+                                document.getElementById('ge-call-av').style.display = 'none';
+                            };
+
+                            await this.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                            const answer = await this.pc.createAnswer();
+                            await this.pc.setLocalDescription(answer);
+
+                            this.sendSignal({ type: 'answer', sdp: answer });
                         }
-                    } catch (err) {
-                        console.error("Ошибка камеры:", err);
+                    } else if (signal.type === 'answer' && this.pc) {
+                        await this.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
                     }
                 },
 
-                async sendSignal(signalText) {
+                async sendSignal(data) {
                     const payload = JSON.stringify({ 
-                        username: "System", 
+                        username: "SYSTEM_SIGNAL", 
                         email: geEngine.state.session.email, 
-                        text: signalText,
-                        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                        text: '_RTC_SIG_' + btoa(JSON.stringify(data)),
+                        time: new Date().getTime()
                     });
                     await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { 
                         method: 'POST', 
@@ -1086,21 +1122,16 @@
                 },
 
                 hangup() {
-                    if(this.callTimer) clearTimeout(this.callTimer);
-                    const overlay = document.getElementById('ge-call-ui');
-                    document.getElementById('ge-snd-ring').pause();
-                    document.getElementById('ge-snd-ring').currentTime = 0;
-                    document.getElementById('ge-snd-click').play();
-
-                    if (geEngine.state.localStream) {
-                        geEngine.state.localStream.getTracks().forEach(track => track.stop());
-                        geEngine.state.localStream = null;
+                    if (this.pc) {
+                        this.pc.close();
+                        this.pc = null;
                     }
-                    
-                    document.getElementById('localVideo').srcObject = null;
-                    document.getElementById('localVideo').style.display = 'none';
-                    document.getElementById('ge-call-av').style.display = 'flex';
-                    overlay.style.display = 'none';
+                    if (geEngine.state.localStream) {
+                        geEngine.state.localStream.getTracks().forEach(t => t.stop());
+                    }
+                    document.getElementById('ge-call-ui').style.display = 'none';
+                    document.getElementById('remoteVideo').srcObject = null;
+                    location.reload(); // Простой способ сбросить состояние WebRTC
                 }
             },
 
@@ -1158,22 +1189,31 @@
                         if (geEngine.state.activeRoom) {
                             const rawMessages = data.messages?.result || [];
                             
+                            // --- ВОТ ЭТОТ БЛОК ДЛЯ ЗВОНКОВ ---
+                            const nowMs = new Date().getTime();
                             rawMessages.forEach(raw => {
                                  let m;
-                                 try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } catch(e) { return; }
+                                 try { 
+                                     m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; 
+                                 } catch(e) { return; }
                                  
-                                 if (m.text === '_SYSTEM_CALL_INIT_' && m.email !== geEngine.state.session.email) {
-                                     if (document.getElementById('ge-call-ui').style.display !== 'flex') {
-                                         geEngine.calls.initiate('audio', true);
+                                 // Проверяем: это сигнал звонка? Не от меня ли он? И не старше ли он 15 секунд?
+                                 if (m.text && m.text.startsWith('_RTC_SIG_') && m.email !== geEngine.state.session.email) {
+                                     const signalTime = m.time || 0;
+                                     // Принимаем только свежие сигналы, чтобы звонок не всплывал при загрузке истории
+                                     if (nowMs - signalTime < 15000) { 
+                                         const signalData = JSON.parse(atob(m.text.replace('_RTC_SIG_', '')));
+                                         geEngine.calls.handleSignal(signalData);
                                      }
                                  }
                             });
+                            // -------------------------------
 
                             if(geEngine.state.activeTab !== 'calls') {
                                 geEngine.ui.renderMessages(rawMessages);
                             }
                         }
-                    } catch (e) { console.warn("Sync..."); }
+                    } catch (e) { console.warn("Sync error:", e); }
                 },
                 async broadcast() {
                     const input = document.getElementById('ge-main-input');
