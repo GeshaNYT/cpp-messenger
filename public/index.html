@@ -139,6 +139,27 @@
             transform: translateY(-2px);
         }
 
+        /* --- ЭФФЕКТ СНЕГА --- */
+        #ge-snow-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 99999;
+            overflow: hidden;
+            display: none;
+        }
+
+        .ge-snowflake {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
         /* --- МОДУЛЬ АВТОРИЗАЦИИ --- */
         .ge-auth-overlay {
             position: fixed;
@@ -637,6 +658,8 @@
 </head>
 <body>
 
+    <div id="ge-snow-container"></div>
+
     <div id="ge-call-ui" class="ge-call-overlay">
         <div class="ge-call-avatar-big" id="ge-call-av">?</div>
         <h2 id="ge-call-name" style="font-size: 32px; margin-bottom: 10px;">Александр Петров</h2>
@@ -724,6 +747,7 @@
                 </div>
 
             <footer class="ge-sidebar-footer">
+                <button class="ge-theme-toggler" onclick="geEngine.effects.toggleSnow()" id="btn-snow">❄️ Снег: Выкл</button>
                 <button class="ge-theme-toggler" onclick="geEngine.ui.toggleTheme()">🌓 Переключить вид</button>
                 <button class="ge-logout-btn" onclick="geEngine.auth.exit()">ЗАВЕРШИТЬ СЕАНС</button>
             </footer>
@@ -761,6 +785,8 @@
                 session: null,
                 activeRoom: "general",
                 activeTab: "chats",
+                isSnowing: false,
+                snowInterval: null,
                 localRooms: JSON.parse(localStorage.getItem('ge_local_rooms') || "[]"),
                 // Список комнат, созданных этим пользователем
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
@@ -973,6 +999,48 @@
                 },
                 hangup() {
                     document.getElementById('ge-call-ui').style.display = 'none';
+                }
+            },
+
+            effects: {
+                toggleSnow() {
+                    const container = document.getElementById('ge-snow-container');
+                    const btn = document.getElementById('btn-snow');
+                    geEngine.state.isSnowing = !geEngine.state.isSnowing;
+
+                    if (geEngine.state.isSnowing) {
+                        container.style.display = 'block';
+                        btn.innerText = "❄️ Снег: Вкл";
+                        geEngine.state.snowInterval = setInterval(this.createSnowflake, 150);
+                    } else {
+                        container.style.display = 'none';
+                        container.innerHTML = "";
+                        btn.innerText = "❄️ Снег: Выкл";
+                        clearInterval(geEngine.state.snowInterval);
+                    }
+                },
+                createSnowflake() {
+                    const container = document.getElementById('ge-snow-container');
+                    const flake = document.createElement('div');
+                    const size = Math.random() * 5 + 2 + 'px';
+                    const startPos = Math.random() * window.innerWidth;
+                    const duration = Math.random() * 3 + 4 + 's';
+                    
+                    flake.className = 'ge-snowflake';
+                    flake.style.width = size;
+                    flake.style.height = size;
+                    flake.style.left = startPos + 'px';
+                    flake.style.top = '-10px';
+                    flake.style.transition = `transform ${duration} linear, opacity ${duration} linear`;
+                    
+                    container.appendChild(flake);
+
+                    setTimeout(() => {
+                        flake.style.transform = `translateY(${window.innerHeight + 20}px) translateX(${Math.random() * 40 - 20}px)`;
+                        flake.style.opacity = '0';
+                    }, 50);
+
+                    setTimeout(() => flake.remove(), parseFloat(duration) * 1000);
                 }
             },
 
