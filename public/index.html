@@ -839,6 +839,9 @@
                     document.getElementById('ge-form-reg').classList.toggle('ge-hidden', mode !== 'reg');
                 },
                 handle(type) {
+                    // Исправление: Принудительно читаем БД из хранилища перед любым действием
+                    geEngine.state.usersDB = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
+                    
                     let n, e, p, pc;
                     if (type === 'reg') {
                         n = document.getElementById('up-name').value.trim();
@@ -851,7 +854,7 @@
 
                         const userExists = geEngine.state.usersDB.find(u => u.email === e);
                         if (userExists) {
-                            return alert("Пользователь с таким Email уже существует! Используйте вход.");
+                            return alert("Пользователь с таким Email уже существует!");
                         }
 
                         const newUser = { name: n, email: e, password: p };
@@ -870,7 +873,6 @@
                         }
                         
                         geEngine.state.session = { name: user.name, email: user.email };
-                        n = user.name;
                     }
                     
                     localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
@@ -1054,14 +1056,11 @@
 
                         document.getElementById('ge-call-status').innerText = "ВЫЗОВ...";
 
-                        // Имитация ответа через 3.5 секунды
                         setTimeout(() => {
                             if (geEngine.state.localStream) {
-                                // STOP RINGING, PLAY CONNECT SOUND
                                 document.getElementById('ge-snd-ring').pause();
                                 document.getElementById('ge-snd-ring').currentTime = 0;
                                 document.getElementById('ge-snd-connect').play();
-                                
                                 document.getElementById('ge-call-status').innerText = "СОЕДИНЕНИЕ УСТАНОВЛЕНО";
                             }
                         }, 3500);
@@ -1069,14 +1068,12 @@
                     } catch (err) {
                         console.error(err);
                         document.getElementById('ge-snd-ring').pause();
-                        alert("Ошибка доступа к камере или микрофону. Убедитесь, что используете HTTPS.");
+                        alert("Ошибка доступа к камере или микрофону.");
                         this.hangup();
                     }
                 },
                 hangup() {
                     const overlay = document.getElementById('ge-call-ui');
-                    
-                    // STOP ALL SOUNDS
                     document.getElementById('ge-snd-ring').pause();
                     document.getElementById('ge-snd-ring').currentTime = 0;
                     document.getElementById('ge-snd-click').play();
