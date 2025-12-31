@@ -139,27 +139,6 @@
             transform: translateY(-2px);
         }
 
-        /* --- ЭФФЕКТ СНЕГА --- */
-        #ge-snow-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 99999;
-            overflow: hidden;
-            display: none;
-        }
-
-        .ge-snowflake {
-            position: absolute;
-            background: white;
-            border-radius: 50%;
-            opacity: 0.8;
-            pointer-events: none;
-        }
-
         /* --- МОДУЛЬ АВТОРИЗАЦИИ --- */
         .ge-auth-overlay {
             position: fixed;
@@ -619,8 +598,8 @@
             position: fixed;
             inset: 0;
             z-index: 200000;
-            background: rgba(0,0,0,0.9);
-            backdrop-filter: blur(25px);
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(15px);
             display: none;
             flex-direction: column;
             align-items: center;
@@ -640,45 +619,15 @@
             justify-content: center;
             margin-bottom: 30px;
             box-shadow: 0 0 50px rgba(0,132,255,0.4);
-            z-index: 5;
-        }
-
-        .ge-video-container {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: none;
-        }
-
-        .ge-local-video {
-            position: absolute;
-            bottom: 40px;
-            right: 40px;
-            width: 240px;
-            height: 160px;
-            border-radius: 20px;
-            background: #000;
-            border: 3px solid rgba(255,255,255,0.2);
-            object-fit: cover;
-            z-index: 10;
-            display: none;
         }
 
         .ge-call-actions {
             margin-top: 60px;
             display: flex;
             gap: 40px;
-            z-index: 10;
         }
 
-        .btn-hangup { background: var(--ge-error); width: 80px; height: 80px; border-radius: 50%; color: white; font-size: 30px; display: flex; align-items: center; justify-content: center; }
-        .btn-hangup:hover { transform: scale(1.1); background: #d63030; }
-        
-        /* Кнопка ответа */
-        .btn-answer { background: var(--ge-success); width: 80px; height: 80px; border-radius: 50%; color: white; font-size: 30px; display: none; align-items: center; justify-content: center; }
-        .btn-answer:hover { transform: scale(1.1); background: #369a22; }
+        .btn-hangup { background: var(--ge-error); width: 80px; height: 80px; border-radius: 50%; color: white; font-size: 30px; }
 
         /* СИСТЕМНЫЕ КЛАССЫ */
         .ge-hidden { display: none !important; }
@@ -688,22 +637,12 @@
 </head>
 <body>
 
-    <audio id="ge-snd-ring" loop src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3"></audio>
-    <audio id="ge-snd-connect" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3"></audio>
-    <audio id="ge-snd-click" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3"></audio>
-
-    <div id="ge-snow-container"></div>
-
     <div id="ge-call-ui" class="ge-call-overlay">
-        <video id="remoteVideo" class="ge-video-container" autoplay playsinline></video>
-        <video id="localVideo" class="ge-local-video" autoplay muted playsinline></video>
-
         <div class="ge-call-avatar-big" id="ge-call-av">?</div>
         <h2 id="ge-call-name" style="font-size: 32px; margin-bottom: 10px;">Александр Петров</h2>
         <p id="ge-call-status" style="opacity: 0.6; font-size: 18px; letter-spacing: 1px;">УСТАНОВКА СОЕДИНЕНИЯ...</p>
         
         <div class="ge-call-actions">
-            <button id="ge-btn-answer" class="btn-answer" onclick="geEngine.calls.answer()">✓</button>
             <button class="btn-hangup" onclick="geEngine.calls.hangup()">✕</button>
         </div>
     </div>
@@ -785,7 +724,6 @@
                 </div>
 
             <footer class="ge-sidebar-footer">
-                <button class="ge-theme-toggler" onclick="geEngine.effects.toggleSnow()" id="btn-snow">❄️ Снег: Выкл</button>
                 <button class="ge-theme-toggler" onclick="geEngine.ui.toggleTheme()">🌓 Переключить вид</button>
                 <button class="ge-logout-btn" onclick="geEngine.auth.exit()">ЗАВЕРШИТЬ СЕАНС</button>
             </footer>
@@ -823,10 +761,8 @@
                 session: null,
                 activeRoom: "general",
                 activeTab: "chats",
-                isSnowing: false,
-                snowInterval: null,
-                localStream: null,
                 localRooms: JSON.parse(localStorage.getItem('ge_local_rooms') || "[]"),
+                // Список комнат, созданных этим пользователем
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
@@ -844,8 +780,6 @@
                     document.getElementById('ge-form-reg').classList.toggle('ge-hidden', mode !== 'reg');
                 },
                 handle(type) {
-                    geEngine.state.usersDB = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
-                    
                     let n, e, p, pc;
                     if (type === 'reg') {
                         n = document.getElementById('up-name').value.trim();
@@ -858,7 +792,7 @@
 
                         const userExists = geEngine.state.usersDB.find(u => u.email === e);
                         if (userExists) {
-                            return alert("Пользователь с таким Email уже существует!");
+                            return alert("Пользователь с таким Email уже существует! Используйте вход.");
                         }
 
                         const newUser = { name: n, email: e, password: p };
@@ -877,6 +811,7 @@
                         }
                         
                         geEngine.state.session = { name: user.name, email: user.email };
+                        n = user.name;
                     }
                     
                     localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
@@ -939,6 +874,7 @@
                     let html = filtered.map(rid => {
                         let displayName = rid;
                         let isGroup = rid === 'general' || !rid.startsWith('private-');
+                        // Проверяем, является ли пользователь создателем
                         const isCreator = geEngine.state.createdRooms.includes(rid);
 
                         if (rid.startsWith('private-')) {
@@ -991,21 +927,15 @@
                         return;
                     }
 
-                    // ФИЛЬТР: Скрываем системные сообщения о звонках из списка
-                    const visibleMessages = messages.filter(raw => {
-                        let m;
-                        try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } catch(e) { return true; }
-                        return m.text !== '_SYSTEM_CALL_INIT_';
-                    });
-
-                    if (visibleMessages.length === 0) {
+                    if (!messages || messages.length === 0) {
                         container.innerHTML = `<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Здесь пока нет сообщений. Начните общение!</div>`;
                         return;
                     }
 
-                    container.innerHTML = visibleMessages.map(raw => {
+                    container.innerHTML = messages.map(raw => {
                         let m;
                         try {
+                            // Исправлено: парсим сообщение, если оно строка
                             m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw;
                         } catch(e) { 
                             m = { username: 'System', text: 'Ошибка данных', email: '' }; 
@@ -1033,133 +963,16 @@
             },
 
             calls: {
-                callTimer: null,
-                async initiate(type, isIncoming = false) {
+                initiate(type) {
                     const overlay = document.getElementById('ge-call-ui');
                     const targetName = document.getElementById('ge-active-name').innerText;
-                    const btnAnswer = document.getElementById('ge-btn-answer');
-                    
-                    if (!isIncoming && (geEngine.state.activeRoom === 'general' || !geEngine.state.activeRoom)) {
-                        return alert("Выберите пользователя для звонка.");
-                    }
-
-                    // Кнопка ответа видна только при входящем
-                    btnAnswer.style.display = isIncoming ? 'flex' : 'none';
-
-                    if (!isIncoming) {
-                        this.sendSignal('_SYSTEM_CALL_INIT_');
-                    }
-
-                    document.getElementById('ge-snd-click').play();
-                    document.getElementById('ge-snd-ring').play();
-
-                    document.getElementById('ge-call-name').innerText = isIncoming ? "Входящий вызов..." : targetName;
-                    document.getElementById('ge-call-av').innerText = isIncoming ? "📞" : targetName[0].toUpperCase();
-                    document.getElementById('ge-call-status').innerText = isIncoming ? "ОЖИДАНИЕ ПРИЕМА..." : "ВЫЗОВ (ожидание ответа)...";
+                    document.getElementById('ge-call-name').innerText = targetName;
+                    document.getElementById('ge-call-av').innerText = targetName[0].toUpperCase();
+                    document.getElementById('ge-call-status').innerText = type === 'video' ? 'ВИДЕОЗВОНОК...' : 'ГОЛОСОВОЙ ВЫЗОВ...';
                     overlay.style.display = 'flex';
-
-                    if(this.callTimer) clearTimeout(this.callTimer);
-                    this.callTimer = setTimeout(() => {
-                        if (overlay.style.display === 'flex' && document.getElementById('ge-call-status').innerText !== "РАЗГОВОР...") {
-                            this.hangup();
-                        }
-                    }, 30000);
-
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ 
-                            video: type === 'video', 
-                            audio: true 
-                        });
-                        geEngine.state.localStream = stream;
-                        const localVid = document.getElementById('localVideo');
-                        localVid.srcObject = stream;
-                        if (type === 'video') {
-                            localVid.style.display = 'block';
-                            document.getElementById('ge-call-av').style.display = 'none';
-                        }
-                    } catch (err) {
-                        console.error("Медиа ошибка:", err);
-                    }
                 },
-
-                answer() {
-                    document.getElementById('ge-snd-ring').pause();
-                    document.getElementById('ge-call-status').innerText = "РАЗГОВОР...";
-                    document.getElementById('ge-btn-answer').style.display = 'none';
-                    document.getElementById('ge-snd-connect').play();
-                },
-
-                async sendSignal(signalText) {
-                    const payload = JSON.stringify({ 
-                        username: "System", 
-                        email: geEngine.state.session.email, 
-                        text: signalText,
-                        time: new Date().toLocaleTimeString()
-                    });
-                    await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { 
-                        method: 'POST', 
-                        body: payload 
-                    });
-                },
-
                 hangup() {
-                    if(this.callTimer) clearTimeout(this.callTimer);
-                    const overlay = document.getElementById('ge-call-ui');
-                    document.getElementById('ge-snd-ring').pause();
-                    document.getElementById('ge-snd-ring').currentTime = 0;
-                    document.getElementById('ge-snd-click').play();
-
-                    if (geEngine.state.localStream) {
-                        geEngine.state.localStream.getTracks().forEach(track => track.stop());
-                        geEngine.state.localStream = null;
-                    }
-                    
-                    document.getElementById('localVideo').srcObject = null;
-                    document.getElementById('localVideo').style.display = 'none';
-                    document.getElementById('ge-call-av').style.display = 'flex';
-                    overlay.style.display = 'none';
-                }
-            },
-
-            effects: {
-                toggleSnow() {
-                    const container = document.getElementById('ge-snow-container');
-                    const btn = document.getElementById('btn-snow');
-                    geEngine.state.isSnowing = !geEngine.state.isSnowing;
-
-                    if (geEngine.state.isSnowing) {
-                        container.style.display = 'block';
-                        btn.innerText = "❄️ Снег: Вкл";
-                        geEngine.state.snowInterval = setInterval(this.createSnowflake, 150);
-                    } else {
-                        container.style.display = 'none';
-                        container.innerHTML = "";
-                        btn.innerText = "❄️ Снег: Выкл";
-                        clearInterval(geEngine.state.snowInterval);
-                    }
-                },
-                createSnowflake() {
-                    const container = document.getElementById('ge-snow-container');
-                    const flake = document.createElement('div');
-                    const size = Math.random() * 5 + 2 + 'px';
-                    const startPos = Math.random() * window.innerWidth;
-                    const duration = Math.random() * 3 + 4 + 's';
-                    
-                    flake.className = 'ge-snowflake';
-                    flake.style.width = size;
-                    flake.style.height = size;
-                    flake.style.left = startPos + 'px';
-                    flake.style.top = '-10px';
-                    flake.style.transition = `transform ${duration} linear, opacity ${duration} linear`;
-                    
-                    container.appendChild(flake);
-
-                    setTimeout(() => {
-                        flake.style.transform = `translateY(${window.innerHeight + 20}px) translateX(${Math.random() * 40 - 20}px)`;
-                        flake.style.opacity = '0';
-                    }, 50);
-
-                    setTimeout(() => flake.remove(), parseFloat(duration) * 1000);
+                    document.getElementById('ge-call-ui').style.display = 'none';
                 }
             },
 
@@ -1172,25 +985,10 @@
                         
                         geEngine.ui.renderChatList(data.rooms?.result);
                         
-                        if (geEngine.state.activeRoom) {
-                            const messages = data.messages?.result || [];
-                            
-                            // ДЕТЕКТОР ВХОДЯЩЕГО ЗВОНКА
-                            const lastMsgRaw = messages[messages.length - 1];
-                            let lastMsg;
-                            if(lastMsgRaw) {
-                                try { lastMsg = typeof lastMsgRaw === 'string' ? JSON.parse(decodeURIComponent(lastMsgRaw)) : lastMsgRaw; } catch(e) {}
-                            }
-
-                            if (lastMsg && lastMsg.text === '_SYSTEM_CALL_INIT_' && lastMsg.email !== geEngine.state.session.email) {
-                                if (document.getElementById('ge-call-ui').style.display !== 'flex') {
-                                    geEngine.calls.initiate('audio', true);
-                                }
-                            }
-                            
-                            if(geEngine.state.activeTab !== 'calls') {
-                                geEngine.ui.renderMessages(messages);
-                            }
+                        if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
+                            if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(data.messages?.result);
+                        } else {
+                             document.getElementById('ge-msg-container').innerHTML = "";
                         }
                     } catch (e) { console.warn("Sync..."); }
                 },
@@ -1224,18 +1022,42 @@
                 removeRoom(e, rid) {
                     e.stopPropagation();
                     const isGroup = rid === 'general' || !rid.startsWith('private-');
-                    if(confirm("Вы уверены?")) {
+                    const confirmMsg = isGroup ? "Вы уверены, что хотите покинуть группу?" : "Удалить контакт из списка?";
+                    
+                    if(confirm(confirmMsg)) {
                         geEngine.state.deletedRooms.push(rid);
+                        geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== rid);
+                        
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                        if(geEngine.state.activeRoom === rid) location.reload();
+                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                        
+                        if(geEngine.state.activeRoom === rid) {
+                            geEngine.state.activeRoom = "";
+                            document.getElementById('ge-active-name').innerText = "Выберите диалог";
+                            document.getElementById('ge-active-av').innerText = "#";
+                            document.getElementById('ge-msg-container').innerHTML = "";
+                        }
+                        geEngine.chat.refresh();
                     }
                 },
+                // Новая функция для полного удаления группы создателем
                 deleteRoomPermanently(e, rid) {
                     e.stopPropagation();
-                    if(confirm("Удалить полностью?")) {
+                    if(confirm("Вы администратор этой группы. Удалить её полностью для всех (локально)?")) {
                         geEngine.state.deletedRooms.push(rid);
+                        geEngine.state.localRooms = geEngine.state.localRooms.filter(r => r !== rid);
+                        geEngine.state.createdRooms = geEngine.state.createdRooms.filter(r => r !== rid);
+                        
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                        if(geEngine.state.activeRoom === rid) location.reload();
+                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                        localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
+
+                        if(geEngine.state.activeRoom === rid) {
+                            geEngine.state.activeRoom = "";
+                            document.getElementById('ge-active-name').innerText = "Выберите диалог";
+                            document.getElementById('ge-msg-container').innerHTML = "";
+                        }
+                        geEngine.chat.refresh();
                     }
                 },
                 joinGeneral() {
@@ -1246,37 +1068,69 @@
                 async addFriend() {
                     const mail = prompt("Введите Email контакта:");
                     if (!mail) return;
-                    const res = await fetch(`/api/index?action=addContact&user_email=${geEngine.state.session.email}&target_email=${mail}`);
-                    const data = await res.json();
-                    if (data.status === 'success') {
-                        const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                        const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
-                        const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
-                        geEngine.state.localRooms.push(roomId);
-                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                        geEngine.chat.open(roomId, mail.split('@')[0]);
+
+                    try {
+                        const res = await fetch(`/api/index?action=addContact&user_email=${geEngine.state.session.email}&target_email=${mail}`);
+                        const data = await res.json();
+
+                        if (data.status === 'success') {
+                            const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                            const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
+                            const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
+                            
+                            if (!geEngine.state.localRooms.includes(roomId)) {
+                                geEngine.state.localRooms.push(roomId);
+                                localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                            }
+
+                            geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
+                            localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                            
+                            geEngine.chat.open(roomId, mail.split('@')[0]);
+                        } else {
+                            alert("Ошибка: Пользователь не найден.");
+                        }
+                    } catch (e) {
+                        alert("Ошибка сети.");
                     }
                     geEngine.chat.refresh();
                 },
                 createGroup() {
                     const name = prompt("Имя группы:");
                     if (name) {
-                        geEngine.state.localRooms.push(name);
-                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                        geEngine.chat.open(name, name);
+                        const roomName = name.trim();
+                        if (!geEngine.state.localRooms.includes(roomName)) {
+                            geEngine.state.localRooms.push(roomName);
+                            // Помечаем, что именно мы создали эту группу
+                            geEngine.state.createdRooms.push(roomName);
+                            
+                            localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                            localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
+                        }
+                        
+                        geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomName);
+                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+
+                        geEngine.chat.open(roomName, roomName);
                         geEngine.chat.refresh();
                     }
                 }
             },
 
             init() {
+                if (geEngine.state.deletedRooms.includes("general")) {
+                    geEngine.state.activeRoom = "";
+                }
+
                 document.getElementById('ge-auth-layer').classList.add('ge-hidden');
                 document.getElementById('ge-main-app').classList.add('ge-flex');
                 document.getElementById('ge-my-name').innerText = geEngine.state.session.name;
                 document.getElementById('ge-my-av').innerText = geEngine.state.session.name[0].toUpperCase();
+
                 document.addEventListener('click', () => {
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
                 });
+
                 geEngine.chat.refresh();
                 setInterval(() => geEngine.chat.refresh(), 4000);
             }
