@@ -675,6 +675,10 @@
 
         .btn-hangup { background: var(--ge-error); width: 80px; height: 80px; border-radius: 50%; color: white; font-size: 30px; display: flex; align-items: center; justify-content: center; }
         .btn-hangup:hover { transform: scale(1.1); background: #d63030; }
+        
+        /* Кнопка ответа */
+        .btn-answer { background: var(--ge-success); width: 80px; height: 80px; border-radius: 50%; color: white; font-size: 30px; display: none; align-items: center; justify-content: center; }
+        .btn-answer:hover { transform: scale(1.1); background: #369a22; }
 
         /* СИСТЕМНЫЕ КЛАССЫ */
         .ge-hidden { display: none !important; }
@@ -699,6 +703,7 @@
         <p id="ge-call-status" style="opacity: 0.6; font-size: 18px; letter-spacing: 1px;">УСТАНОВКА СОЕДИНЕНИЯ...</p>
         
         <div class="ge-call-actions">
+            <button id="ge-btn-answer" class="btn-answer" onclick="geEngine.calls.answer()">✓</button>
             <button class="btn-hangup" onclick="geEngine.calls.hangup()">✕</button>
         </div>
     </div>
@@ -986,12 +991,19 @@
                         return;
                     }
 
-                    if (!messages || messages.length === 0) {
+                    // ФИЛЬТР: Скрываем системные сообщения о звонках из списка
+                    const visibleMessages = messages.filter(raw => {
+                        let m;
+                        try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } catch(e) { return true; }
+                        return m.text !== '_SYSTEM_CALL_INIT_';
+                    });
+
+                    if (visibleMessages.length === 0) {
                         container.innerHTML = `<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Здесь пока нет сообщений. Начните общение!</div>`;
                         return;
                     }
 
-                    container.innerHTML = messages.map(raw => {
+                    container.innerHTML = visibleMessages.map(raw => {
                         let m;
                         try {
                             m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw;
@@ -1025,17 +1037,19 @@
                 async initiate(type, isIncoming = false) {
                     const overlay = document.getElementById('ge-call-ui');
                     const targetName = document.getElementById('ge-active-name').innerText;
+                    const btnAnswer = document.getElementById('ge-btn-answer');
                     
                     if (!isIncoming && (geEngine.state.activeRoom === 'general' || !geEngine.state.activeRoom)) {
                         return alert("Выберите пользователя для звонка.");
                     }
 
-                    // 1. Сигналинг (только если мы звоним сами)
+                    // Кнопка ответа видна только при входящем
+                    btnAnswer.style.display = isIncoming ? 'flex' : 'none';
+
                     if (!isIncoming) {
                         this.sendSignal('_SYSTEM_CALL_INIT_');
                     }
 
-                    // 2. Звук и Вид
                     document.getElementById('ge-snd-click').play();
                     document.getElementById('ge-snd-ring').play();
 
@@ -1044,16 +1058,13 @@
                     document.getElementById('ge-call-status').innerText = isIncoming ? "ОЖИДАНИЕ ПРИЕМА..." : "ВЫЗОВ (ожидание ответа)...";
                     overlay.style.display = 'flex';
 
-                    // 3. Таймер на 30 секунд (АВТОСБРОС)
                     if(this.callTimer) clearTimeout(this.callTimer);
                     this.callTimer = setTimeout(() => {
-                        if (overlay.style.display === 'flex') {
-                            console.log("Звонок сброшен по таймауту 30с");
+                        if (overlay.style.display === 'flex' && document.getElementById('ge-call-status').innerText !== "РАЗГОВОР...") {
                             this.hangup();
                         }
                     }, 30000);
 
-                    // 4. Медиа (камера/микро)
                     try {
                         const stream = await navigator.mediaDevices.getUserMedia({ 
                             video: type === 'video', 
@@ -1069,6 +1080,13 @@
                     } catch (err) {
                         console.error("Медиа ошибка:", err);
                     }
+                },
+
+                answer() {
+                    document.getElementById('ge-snd-ring').pause();
+                    document.getElementById('ge-call-status').innerText = "РАЗГОВОР...";
+                    document.getElementById('ge-btn-answer').style.display = 'none';
+                    document.getElementById('ge-snd-connect').play();
                 },
 
                 async sendSignal(signalText) {
@@ -1158,18 +1176,20 @@
                             const messages = data.messages?.result || [];
                             
                             // ДЕТЕКТОР ВХОДЯЩЕГО ЗВОНКА
-                            const lastMsg = messages[messages.length - 1];
+                            const lastMsgRaw = messages[messages.length - 1];
+                            let lastMsg;
+                            if(lastMsgRaw) {
+                                try { lastMsg = typeof lastMsgRaw === 'string' ? JSON.parse(decodeURIComponent(lastMsgRaw)) : lastMsgRaw; } catch(e) {}
+                            }
+
                             if (lastMsg && lastMsg.text === '_SYSTEM_CALL_INIT_' && lastMsg.email !== geEngine.state.session.email) {
                                 if (document.getElementById('ge-call-ui').style.display !== 'flex') {
                                     geEngine.calls.initiate('audio', true);
                                 }
                             }
-
-                            // Очищаем сообщения от системных сигналов для UI
-                            const visibleMsgs = messages.filter(m => m.text !== '_SYSTEM_CALL_INIT_');
                             
                             if(geEngine.state.activeTab !== 'calls') {
-                                geEngine.ui.renderMessages(visibleMsgs);
+                                geEngine.ui.renderMessages(messages);
                             }
                         }
                     } catch (e) { console.warn("Sync..."); }
