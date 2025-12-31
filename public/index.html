@@ -673,26 +673,8 @@
             z-index: 10;
         }
 
-        /* Кнопки звонков */
-        .btn-call { width: 80px; height: 80px; border-radius: 50%; color: white; font-size: 30px; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-        .btn-hangup { background: var(--ge-error); }
+        .btn-hangup { background: var(--ge-error); width: 80px; height: 80px; border-radius: 50%; color: white; font-size: 30px; display: flex; align-items: center; justify-content: center; }
         .btn-hangup:hover { transform: scale(1.1); background: #d63030; }
-        .btn-accept { background: var(--ge-success); }
-        .btn-accept:hover { transform: scale(1.1); background: #369b24; }
-
-        /* Входящий вызов (доп. стили) */
-        .ge-incoming-status {
-            animation: ge-blink 1.5s infinite;
-            color: var(--ge-primary-light);
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        @keyframes ge-blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
 
         /* СИСТЕМНЫЕ КЛАССЫ */
         .ge-hidden { display: none !important; }
@@ -702,18 +684,11 @@
 </head>
 <body>
 
-    <div id="ge-snow-container"></div>
+    <audio id="ge-snd-ring" loop src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3"></audio>
+    <audio id="ge-snd-connect" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3"></audio>
+    <audio id="ge-snd-click" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3"></audio>
 
-    <div id="ge-incoming-call-ui" class="ge-call-overlay">
-        <div class="ge-call-avatar-big" id="ge-inc-av">?</div>
-        <h2 id="ge-inc-name" style="font-size: 32px; margin-bottom: 10px;">Входящий вызов...</h2>
-        <p class="ge-incoming-status">ЗВОНОК ОТ ПОЛЬЗОВАТЕЛЯ</p>
-        
-        <div class="ge-call-actions">
-            <button class="btn-call btn-accept" onclick="geEngine.calls.accept()">✔</button>
-            <button class="btn-call btn-hangup" onclick="geEngine.calls.reject()">✕</button>
-        </div>
-    </div>
+    <div id="ge-snow-container"></div>
 
     <div id="ge-call-ui" class="ge-call-overlay">
         <video id="remoteVideo" class="ge-video-container" autoplay playsinline></video>
@@ -724,7 +699,7 @@
         <p id="ge-call-status" style="opacity: 0.6; font-size: 18px; letter-spacing: 1px;">УСТАНОВКА СОЕДИНЕНИЯ...</p>
         
         <div class="ge-call-actions">
-            <button class="btn-call btn-hangup" onclick="geEngine.calls.hangup()">✕</button>
+            <button class="btn-hangup" onclick="geEngine.calls.hangup()">✕</button>
         </div>
     </div>
 
@@ -846,7 +821,6 @@
                 isSnowing: false,
                 snowInterval: null,
                 localStream: null,
-                incomingTimer: null, // Таймер автосброса входящего
                 localRooms: JSON.parse(localStorage.getItem('ge_local_rooms') || "[]"),
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
@@ -865,6 +839,9 @@
                     document.getElementById('ge-form-reg').classList.toggle('ge-hidden', mode !== 'reg');
                 },
                 handle(type) {
+                    // Исправление: Принудительно читаем БД из хранилища перед любым действием
+                    geEngine.state.usersDB = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
+                    
                     let n, e, p, pc;
                     if (type === 'reg') {
                         n = document.getElementById('up-name').value.trim();
@@ -877,7 +854,7 @@
 
                         const userExists = geEngine.state.usersDB.find(u => u.email === e);
                         if (userExists) {
-                            return alert("Пользователь с таким Email уже существует! Используйте вход.");
+                            return alert("Пользователь с таким Email уже существует!");
                         }
 
                         const newUser = { name: n, email: e, password: p };
@@ -896,7 +873,6 @@
                         }
                         
                         geEngine.state.session = { name: user.name, email: user.email };
-                        n = user.name;
                     }
                     
                     localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
@@ -1046,7 +1022,6 @@
             },
 
             calls: {
-                // ИСХОДЯЩИЙ ВЫЗОВ
                 async initiate(type) {
                     const overlay = document.getElementById('ge-call-ui');
                     const targetName = document.getElementById('ge-active-name').innerText;
@@ -1054,6 +1029,10 @@
                     if (geEngine.state.activeRoom === 'general' || !geEngine.state.activeRoom) {
                         return alert("Выберите конкретного пользователя для звонка.");
                     }
+
+                    // PLAY SOUNDS
+                    document.getElementById('ge-snd-click').play();
+                    document.getElementById('ge-snd-ring').play();
 
                     document.getElementById('ge-call-name').innerText = targetName;
                     document.getElementById('ge-call-av').innerText = targetName[0].toUpperCase();
@@ -1079,65 +1058,26 @@
 
                         setTimeout(() => {
                             if (geEngine.state.localStream) {
+                                document.getElementById('ge-snd-ring').pause();
+                                document.getElementById('ge-snd-ring').currentTime = 0;
+                                document.getElementById('ge-snd-connect').play();
                                 document.getElementById('ge-call-status').innerText = "СОЕДИНЕНИЕ УСТАНОВЛЕНО";
                             }
-                        }, 3000);
+                        }, 3500);
 
                     } catch (err) {
                         console.error(err);
+                        document.getElementById('ge-snd-ring').pause();
                         alert("Ошибка доступа к камере или микрофону.");
                         this.hangup();
                     }
                 },
-
-                // ВХОДЯЩИЙ ВЫЗОВ (ИНТЕРФЕЙС)
-                simulateInbound(callerName = "Александр Петров") {
-                    const incOverlay = document.getElementById('ge-incoming-call-ui');
-                    document.getElementById('ge-inc-name').innerText = callerName;
-                    document.getElementById('ge-inc-av').innerText = callerName[0].toUpperCase();
-                    
-                    incOverlay.style.display = 'flex';
-
-                    // Таймер на 30 секунд
-                    geEngine.state.incomingTimer = setTimeout(() => {
-                        this.reject();
-                        alert("Вызов пропущен");
-                    }, 30000);
-                },
-
-                // ПРИНЯТЬ ВЫЗОВ
-                async accept() {
-                    clearTimeout(geEngine.state.incomingTimer);
-                    document.getElementById('ge-incoming-call-ui').style.display = 'none';
-                    
-                    const caller = document.getElementById('ge-inc-name').innerText;
-                    
-                    // Открываем окно активного разговора
-                    const callUI = document.getElementById('ge-call-ui');
-                    document.getElementById('ge-call-name').innerText = caller;
-                    document.getElementById('ge-call-av').innerText = caller[0].toUpperCase();
-                    document.getElementById('ge-call-status').innerText = "ПОДКЛЮЧЕНИЕ...";
-                    callUI.style.display = 'flex';
-
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-                        geEngine.state.localStream = stream;
-                        document.getElementById('ge-call-status').innerText = "В СЕТИ";
-                    } catch(e) {
-                        alert("Не удалось включить микрофон");
-                        this.hangup();
-                    }
-                },
-
-                // ОТКЛОНИТЬ ВХОДЯЩИЙ
-                reject() {
-                    clearTimeout(geEngine.state.incomingTimer);
-                    document.getElementById('ge-incoming-call-ui').style.display = 'none';
-                },
-
-                // СБРОСИТЬ ТЕКУЩИЙ
                 hangup() {
                     const overlay = document.getElementById('ge-call-ui');
+                    document.getElementById('ge-snd-ring').pause();
+                    document.getElementById('ge-snd-ring').currentTime = 0;
+                    document.getElementById('ge-snd-click').play();
+
                     if (geEngine.state.localStream) {
                         geEngine.state.localStream.getTracks().forEach(track => track.stop());
                         geEngine.state.localStream = null;
