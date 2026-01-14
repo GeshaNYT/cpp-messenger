@@ -1233,6 +1233,7 @@
                 toggleTheme() {
                     const html = document.documentElement;
                     html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+                    document.getElementById('ge-settings-popup').classList.remove('active');
                 },
                 setTab(tab) {
                     geEngine.state.activeTab = tab;
