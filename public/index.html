@@ -1276,19 +1276,28 @@
 
                     let html = filtered.map(rid => {
                         let displayName = rid;
+                        let avColor = '#444';
                         let isGroup = rid === 'general' || !rid.startsWith('private-');
                         const isCreator = geEngine.state.createdRooms.includes(rid);
 
                         if (rid.startsWith('private-')) {
                             const parts = rid.replace('private-', '').split('-');
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                            const otherPart = parts.find(p => p !== myMailSafe);
-                            if (otherPart) displayName = otherPart.split('gmailcom')[0] || otherPart;
+                            const otherMailSafePart = parts.find(p => p !== myMailSafe);
+                            
+                            // Пытаемся найти пользователя в базе для получения реального имени и цвета
+                            const user = geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
+                            if (user) {
+                                displayName = user.name;
+                                avColor = user.avColor;
+                            } else if (otherMailSafePart) {
+                                displayName = otherMailSafePart.split('gmailcom')[0] || otherMailSafePart;
+                            }
                         }
 
                         return `
                             <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}', '${displayName}')">
-                                <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:#444;">${displayName[0].toUpperCase()}</div>
+                                <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:${avColor};">${displayName[0].toUpperCase()}</div>
                                 <div class="ge-item-content">
                                     <b>${displayName}</b>
                                     <span>${isGroup ? 'Групповой канал' : 'Активный зашифрованный канал'}</span>
@@ -1321,13 +1330,23 @@
                     if (!geEngine.state.activeRoom || geEngine.state.activeRoom === "") {
                         container.innerHTML = ""; return;
                     }
-                    if (!messages || messages.length === 0) {
+
+                    // Фильтрация системных сообщений EmailJS и пустых строк
+                    const validMessages = (messages || []).filter(raw => {
+                        try {
+                            const m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw;
+                            return m.username !== 'System' && m.text && !m.text.includes('EmailJS');
+                        } catch(e) { return false; }
+                    });
+
+                    if (validMessages.length === 0) {
                         container.innerHTML = `<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Здесь пока нет сообщений.</div>`;
                         return;
                     }
-                    container.innerHTML = messages.map(raw => {
+
+                    container.innerHTML = validMessages.map(raw => {
                         let m;
-                        try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } catch(e) { m = { username: 'System', text: 'Ошибка данных', email: '' }; }
+                        try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } catch(e) { return ''; }
                         const isMe = m.email === geEngine.state.session.email;
                         let statusIcon = m.status === 'read' ? '✓✓' : (m.status === 'sent' ? '✓' : '🕒');
                         const timeStr = m.time || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -1453,16 +1472,30 @@
                     geEngine.chat.open('general', 'general');
                 },
                 async addFriend() {
-                    const mail = prompt("Email:");
+                    const mail = prompt("Введите Email пользователя для добавления:");
                     if (mail) {
+                        const targetUser = geEngine.state.usersDB.find(u => u.email.toLowerCase() === mail.toLowerCase());
+                        if (!targetUser) {
+                            return alert("Пользователь с таким Email не найден в базе GeLink.");
+                        }
+                        if (targetUser.email === geEngine.state.session.email) {
+                            return alert("Нельзя добавить самого себя.");
+                        }
+
                         const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                        const otherMailSafe = mail.replace(/[@.]/g, '').toLowerCase();
+                        const otherMailSafe = targetUser.email.replace(/[@.]/g, '').toLowerCase();
                         const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
+                        
                         if (!geEngine.state.localRooms.includes(roomId)) {
                             geEngine.state.localRooms.push(roomId);
                             localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
                         }
-                        geEngine.chat.open(roomId, mail.split('@')[0]);
+                        
+                        // Убираем из списка удаленных, если был там
+                        geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
+                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+
+                        geEngine.chat.open(roomId, targetUser.name);
                     }
                 },
                 createGroup() {
