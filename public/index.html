@@ -8,25 +8,9 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script type="text/javascript">
         (function() {
-            emailjs.init("24KwSc-sCHg4vftp94MSj");
-
-            // Функция отправки
-            const sendOTP = (userEmail, generatedCode) => {
-              const templateParams = {
-              to_email: userEmail,
-              passcode: generatedCode, // Имя 'passcode' должно совпадать с {{passcode}} в шаблоне!
-              time: "15 минут"
-            };
-
-            emailjs.send("service_m7095tg", "template_rfib6ri", templateParams)
-              .then(() => {
-                 alert("Код отправлен на вашу почту!");
-              })
-              .catch((err) => {
-                console.error("Ошибка:", err);
-                alert("Ошибка отправки. Проверьте консоль.");
-              });
-            };
+            // Инициализация вашим Public Key
+            emailjs.init("cnvoZ3PqIBehf1lbC");
+        })();
     </script>
 
     <style>
@@ -336,7 +320,7 @@
             align-items: center;
             justify-content: space-between;
             margin-bottom: 35px;
-            position: relative; /* Для позиционирования поп-апа */
+            position: relative; 
         }
 
         .ge-user-profile {
@@ -463,7 +447,6 @@
             box-shadow: var(--shadow-sm);
         }
 
-        /* Список чатов */
         .ge-chat-list {
             flex: 1;
             overflow-y: auto;
@@ -486,7 +469,6 @@
         .ge-item-content b { display: block; font-size: 17px; margin-bottom: 6px; color: var(--text-primary); }
         .ge-item-content span { font-size: 13px; color: var(--text-secondary); }
 
-        /* Меню трёх точек */
         .ge-item-dots {
             position: absolute;
             right: 20px;
@@ -538,7 +520,6 @@
         .ge-menu-btn.danger { color: var(--ge-error); }
         .ge-menu-btn.danger:hover { background: rgba(250, 62, 62, 0.1); }
 
-        /* ОСНОВНАЯ ОБЛАСТЬ ЧАТА */
         .ge-chat-view {
             flex: 1;
             display: flex;
@@ -634,7 +615,6 @@
             opacity: 0.7;
         }
 
-        /* --- СТРОКА СТАТУСА ПОД ТЕКСТОМ --- */
         .ge-msg-status-line {
             display: flex;
             align-items: center;
@@ -648,7 +628,6 @@
         
         .them .ge-msg-status-line { justify-content: flex-start; opacity: 0.5; }
 
-        /* ПАНЕЛЬ ВВОДА */
         .ge-footer {
             padding: 35px 50px;
             background: var(--bg-header);
@@ -711,7 +690,6 @@
             color: white;
         }
 
-        /* ИНТЕРФЕЙС ЗВОНКА ОВЕРЛЕЙ */
         .ge-call-overlay {
             position: fixed;
             inset: 0;
@@ -773,7 +751,6 @@
         .btn-hangup { background: var(--ge-error); width: 80px; height: 80px; border-radius: 50%; color: white; font-size: 30px; display: flex; align-items: center; justify-content: center; }
         .btn-hangup:hover { transform: scale(1.1); background: #d63030; }
 
-        /* --- МОДАЛЬНОЕ ОКНО ПРОФИЛЯ --- */
         .ge-modal-overlay {
             position: fixed;
             inset: 0;
@@ -833,7 +810,6 @@
 
         .ge-color-dot.active { border-color: var(--text-primary); transform: scale(1.2); }
 
-        /* СИСТЕМНЫЕ КЛАССЫ */
         .ge-hidden { display: none !important; }
         .ge-flex { display: flex !important; }
         .ge-error-text { color: var(--ge-error); font-size: 12px; margin-top: 5px; font-weight: 600; }
@@ -1045,7 +1021,6 @@
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
                 ],
-                // Временные данные для OTP
                 currentOTP: null,
                 pendingUser: null
             },
@@ -1056,28 +1031,32 @@
                     document.getElementById('tab-reg').classList.toggle('active', mode === 'reg');
                     document.getElementById('ge-form-login').classList.toggle('ge-hidden', mode !== 'login');
                     document.getElementById('ge-form-reg').classList.toggle('ge-hidden', mode !== 'reg');
-                    // Сбрасываем секции OTP при переключении
                     document.getElementById('login-otp-section').classList.add('ge-hidden');
                     document.getElementById('login-fields-main').classList.remove('ge-hidden');
                     document.getElementById('reg-otp-section').classList.add('ge-hidden');
                     document.getElementById('reg-fields-main').classList.remove('ge-hidden');
                 },
 
-                // Генерация и отправка кода
+                // ИСПРАВЛЕННАЯ ФУНКЦИЯ ОТПРАВКИ
                 async sendOTPEmail(email, name) {
                     const code = Math.floor(100000 + Math.random() * 900000).toString();
                     geEngine.state.currentOTP = code;
                     
+                    const templateParams = {
+                        email: email,       // Должно совпадать с {{email}} в To Email шаблона
+                        to_name: name,
+                        passcode: code,     // Должно совпадать с {{passcode}} в теле письма
+                        time: "15 минут"    // Должно совпадать с {{time}} в теле письма
+                    };
+
                     try {
-                        await emailjs.send("service_m7095tg", "template_gelink", {
-                            to_email: email,
-                            to_name: name,
-                            code: code
-                        });
+                        // Используем ваши актуальные Service ID и Template ID
+                        await emailjs.send("service_m7095tg", "template_rfib6ri", templateParams);
                         console.log("OTP Sent to " + email);
                         return true;
                     } catch (error) {
-                        alert("Ошибка отправки письма. Проверьте соединение.");
+                        console.error("EmailJS Error:", error);
+                        alert("Ошибка отправки письма. Проверьте соединение или настройки EmailJS.");
                         return false;
                     }
                 },
@@ -1097,7 +1076,6 @@
                         const userExists = geEngine.state.usersDB.find(u => u.email === e);
                         if (userExists) return alert("Этот Email уже занят!");
 
-                        // Сохраняем во временный стейт и шлем код
                         geEngine.state.pendingUser = { name: n, email: e, password: p, avColor: 'var(--ge-accent-gradient)' };
                         
                         this.sendOTPEmail(e, n).then(success => {
@@ -1141,7 +1119,6 @@
                         geEngine.state.session = { name: user.name, email: user.email, avColor: user.avColor || 'var(--ge-accent-gradient)' };
                         localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
                         
-                        // Сброс
                         geEngine.state.currentOTP = null;
                         geEngine.state.pendingUser = null;
                         
