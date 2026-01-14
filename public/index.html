@@ -1162,10 +1162,16 @@
                         const c2 = confirm("Это действие сотрет ваши данные из системы GeLink навсегда. Вы уверены?");
                         if(c2) {
                             const currentEmail = geEngine.state.session.email;
+                            
+                            // 1. Удаляем из базы пользователей
                             geEngine.state.usersDB = geEngine.state.usersDB.filter(u => u.email !== currentEmail);
                             localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
+                            
+                            // 2. Очищаем токен входа
                             localStorage.removeItem('ge_v9_token');
-                            alert("Ваш аккаунт был полностью удален.");
+                            
+                            // 3. Сообщаем и перезагружаем
+                            alert("Ваш аккаунт был полностью удален. Прощайте!");
                             location.reload();
                         }
                     }
@@ -1202,6 +1208,7 @@
 
                     if (!newName) return alert("Имя не может быть пустым!");
 
+                    // Обновляем DB
                     geEngine.state.usersDB = geEngine.state.usersDB.map(u => {
                         if (u.email === email) {
                             u.name = newName;
@@ -1212,10 +1219,12 @@
                     });
                     localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
 
+                    // Обновляем сессию
                     geEngine.state.session.name = newName;
                     geEngine.state.session.avColor = this.tempColor;
                     localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
 
+                    // Обновляем UI
                     document.getElementById('ge-my-name').innerText = newName;
                     document.getElementById('ge-my-av').innerText = newName[0].toUpperCase();
                     document.getElementById('ge-my-av').style.background = this.tempColor;
@@ -1267,6 +1276,7 @@
                     }
 
                     let allRooms = Array.from(new Set([...(serverRooms || []), ...geEngine.state.localRooms]));
+
                     const filtered = allRooms.filter(rid => {
                         if (geEngine.state.deletedRooms.includes(rid)) return false;
                         if (tab === 'chats') return rid.startsWith('private-');
