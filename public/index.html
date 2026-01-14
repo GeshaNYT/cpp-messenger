@@ -8,8 +8,25 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script type="text/javascript">
         (function() {
-            emailjs.init("cnvoZ3PqIBehf1lbC"); // Твой Public Key
-        })();
+            emailjs.init("24KwSc-sCHg4vftp94MSj");
+
+            // Функция отправки
+            const sendOTP = (userEmail, generatedCode) => {
+              const templateParams = {
+              to_email: userEmail,
+              passcode: generatedCode, // Имя 'passcode' должно совпадать с {{passcode}} в шаблоне!
+              time: "15 минут"
+            };
+
+            emailjs.send("service_m7095tg", "template_rfib6ri", templateParams)
+              .then(() => {
+                 alert("Код отправлен на вашу почту!");
+              })
+              .catch((err) => {
+                console.error("Ошибка:", err);
+                alert("Ошибка отправки. Проверьте консоль.");
+              });
+            };
     </script>
 
     <style>
