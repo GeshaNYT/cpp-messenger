@@ -1158,7 +1158,6 @@
                 },
                 deleteAccountFull() {
                     const c1 = confirm("⚠️ ВНИМАНИЕ! Вы собираетесь полностью удалить аккаунт.");
-                    const c1 = confirm("⚠️ ВНИМАНИЕ! Вы собираетесь полностью удалить аккаунт.");
                     if(c1) {
                         const c2 = confirm("Это действие сотрет ваши данные из системы GeLink навсегда. Вы уверены?");
                         if(c2) {
@@ -1182,7 +1181,6 @@
                     this.tempColor = session.avColor || 'var(--ge-accent-gradient)';
                     this.updatePreview();
                     document.getElementById('ge-modal-profile').style.display = 'flex';
-                    document.getElementById('ge-settings-popup').classList.remove('active');
                 },
                 close() {
                     document.getElementById('ge-modal-profile').style.display = 'none';
@@ -1235,7 +1233,6 @@
                 toggleTheme() {
                     const html = document.documentElement;
                     html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-                    document.getElementById('ge-settings-popup').classList.remove('active');
                 },
                 setTab(tab) {
                     geEngine.state.activeTab = tab;
