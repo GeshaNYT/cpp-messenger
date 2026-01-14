@@ -899,18 +899,22 @@
             <div id="ge-form-reg" class="ge-form-group ge-hidden">
                 <div id="reg-fields-main">
                     <div class="ge-field">
+                        <label class="ge-label">Уникальный никнейм (только латиница)</label>
+                        <input type="text" id="up-nick" class="ge-input-core" placeholder="ivan_ge_2024">
+                    </div>
+                    <div class="ge-field" style="margin-top:10px;">
                         <label class="ge-label">Ваше полное имя</label>
                         <input type="text" id="up-name" class="ge-input-core" placeholder="Александр Петров">
                     </div>
-                    <div class="ge-field" style="margin-top:20px;">
+                    <div class="ge-field" style="margin-top:10px;">
                         <label class="ge-label">Email для связи</label>
                         <input type="email" id="up-email" class="ge-input-core" placeholder="name@domain.ru">
                     </div>
-                    <div class="ge-field" style="margin-top:20px;">
+                    <div class="ge-field" style="margin-top:10px;">
                         <label class="ge-label">Придумайте пароль</label>
                         <input type="password" id="up-pass" class="ge-input-core" placeholder="Мин. 8 символов">
                     </div>
-                    <div class="ge-field" style="margin-top:20px;">
+                    <div class="ge-field" style="margin-top:10px;">
                         <label class="ge-label">Подтвердите пароль</label>
                         <input type="password" id="up-confirm" class="ge-input-core" placeholder="Повторите ввод">
                         <span id="up-error" class="ge-error-text ge-hidden">Пароли не совпадают!</span>
@@ -1037,37 +1041,44 @@
                     document.getElementById('reg-fields-main').classList.remove('ge-hidden');
                 },
 
-                // ИСПРАВЛЕННАЯ ФУНКЦИЯ ОТПРАВКИ
                 async sendOTPEmail(email, name) {
                     const code = Math.floor(100000 + Math.random() * 900000).toString();
                     geEngine.state.currentOTP = code;
                     
                     const templateParams = {
-                        email: email,       // Должно совпадать с {{email}} в To Email шаблона
+                        email: email,
                         to_name: name,
-                        passcode: code,     // Должно совпадать с {{passcode}} в теле письма
-                        time: "15 минут"    // Должно совпадать с {{time}} в теле письма
+                        passcode: code,
+                        time: "15 минут"
                     };
 
                     try {
-                        // Используем ваши актуальные Service ID и Template ID
                         await emailjs.send("service_m7095tg", "template_rfib6ri", templateParams);
                         console.log("OTP Sent to " + email);
                         return true;
                     } catch (error) {
                         console.error("EmailJS Error:", error);
-                        alert("Ошибка отправки письма. Проверьте соединение или настройки EmailJS.");
+                        alert("Ошибка отправки письма. Проверьте соединение.");
                         return false;
                     }
                 },
 
                 handle(type) {
-                    let n, e, p, pc;
+                    let n, e, p, pc, nick;
                     if (type === 'reg') {
+                        nick = document.getElementById('up-nick').value.trim().toLowerCase();
                         n = document.getElementById('up-name').value.trim();
                         e = document.getElementById('up-email').value.trim().toLowerCase();
                         p = document.getElementById('up-pass').value.trim();
                         pc = document.getElementById('up-confirm').value.trim();
+
+                        // ВАЛИДАЦИЯ НИКНЕЙМА
+                        const nickRegex = /^[a-z0-9_]{3,20}$/;
+                        if (!nickRegex.test(nick)) return alert("Никнейм должен быть от 3 до 20 символов и содержать только латиницу, цифры или подчеркивание.");
+                        
+                        // ПРОВЕРКА УНИКАЛЬНОСТИ
+                        const nickTaken = geEngine.state.usersDB.find(u => u.nickname === nick);
+                        if (nickTaken) return alert("Этот никнейм уже занят другим пользователем.");
 
                         if (!n || !e || !p) return alert("Заполните данные!");
                         if (p !== pc) { document.getElementById('up-error').classList.remove('ge-hidden'); return; }
@@ -1076,7 +1087,13 @@
                         const userExists = geEngine.state.usersDB.find(u => u.email === e);
                         if (userExists) return alert("Этот Email уже занят!");
 
-                        geEngine.state.pendingUser = { name: n, email: e, password: p, avColor: 'var(--ge-accent-gradient)' };
+                        geEngine.state.pendingUser = { 
+                            nickname: nick, 
+                            name: n, 
+                            email: e, 
+                            password: p, 
+                            avColor: 'var(--ge-accent-gradient)' 
+                        };
                         
                         this.sendOTPEmail(e, n).then(success => {
                             if(success) {
@@ -1116,7 +1133,12 @@
                             localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
                         }
 
-                        geEngine.state.session = { name: user.name, email: user.email, avColor: user.avColor || 'var(--ge-accent-gradient)' };
+                        geEngine.state.session = { 
+                            name: user.name, 
+                            nickname: user.nickname, 
+                            email: user.email, 
+                            avColor: user.avColor || 'var(--ge-accent-gradient)' 
+                        };
                         localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
                         
                         geEngine.state.currentOTP = null;
