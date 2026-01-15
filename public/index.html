@@ -853,6 +853,10 @@
                     <input type="text" id="prof-name" class="ge-input-core">
                 </div>
                 <div class="ge-field">
+                    <label class="ge-label">Ваш уникальный никнейм</label>
+                    <input type="text" id="prof-nick" class="ge-input-core" placeholder="ivan_ge_2024">
+                </div>
+                <div class="ge-field">
                     <label class="ge-label">Новый пароль (оставьте пустым, если не меняете)</label>
                     <input type="password" id="prof-pass" class="ge-input-core" placeholder="••••••••">
                 </div>
@@ -1183,6 +1187,7 @@
 
                     const session = geEngine.state.session;
                     document.getElementById('prof-name').value = session.name;
+                    document.getElementById('prof-nick').value = session.nickname || '';
                     document.getElementById('prof-pass').value = '';
                     this.tempColor = session.avColor || 'var(--ge-accent-gradient)';
                     this.updatePreview();
@@ -1203,14 +1208,26 @@
                 },
                 save() {
                     const newName = document.getElementById('prof-name').value.trim();
+                    const newNick = document.getElementById('prof-nick').value.trim().toLowerCase();
                     const newPass = document.getElementById('prof-pass').value.trim();
                     const email = geEngine.state.session.email;
 
                     if (!newName) return alert("Имя не может быть пустым!");
+                    
+                    // Валидация ника
+                    const nickRegex = /^[a-z0-9_]{3,20}$/;
+                    if (!nickRegex.test(newNick)) return alert("Никнейм должен быть от 3 до 20 символов (латиница, цифры, подчёркивание).");
+
+                    // Проверка на уникальность (если ник изменился)
+                    if (newNick !== geEngine.state.session.nickname) {
+                        const nickTaken = geEngine.state.usersDB.find(u => u.nickname === newNick && u.email !== email);
+                        if (nickTaken) return alert("Этот никнейм уже занят!");
+                    }
 
                     geEngine.state.usersDB = geEngine.state.usersDB.map(u => {
                         if (u.email === email) {
                             u.name = newName;
+                            u.nickname = newNick;
                             u.avColor = this.tempColor;
                             if (newPass) u.password = newPass;
                         }
@@ -1219,6 +1236,7 @@
                     localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
 
                     geEngine.state.session.name = newName;
+                    geEngine.state.session.nickname = newNick;
                     geEngine.state.session.avColor = this.tempColor;
                     localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
 
