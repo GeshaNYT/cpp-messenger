@@ -1305,8 +1305,16 @@
                     let allRooms = Array.from(new Set([...(serverRooms || []), ...geEngine.state.localRooms]));
                     const filtered = allRooms.filter(rid => {
                         if (geEngine.state.deletedRooms.includes(rid)) return false;
-                        if (tab === 'chats') return rid.startsWith('private-');
-                        if (tab === 'people') return rid === 'general' || !rid.startsWith('private-');
+                        
+                        // Логика фильтрации приватных чатов
+                        if (rid.startsWith('private-')) {
+                            const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                            if (!rid.includes(myMailSafe)) return false; // Скрываем, если текущего пользователя нет в ID комнаты
+                            if (tab !== 'chats') return false; // Показываем только во вкладке ЧАТЫ
+                        } else {
+                            if (tab !== 'people') return false; // Группы показываем только во вкладке ГРУППЫ
+                        }
+                        
                         return true;
                     });
 
