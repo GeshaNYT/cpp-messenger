@@ -1490,9 +1490,14 @@
                     geEngine.chat.open('general', 'general');
                 },
                 async addFriend() {
-                    const input = prompt("Введите Email или уникальный никнейм пользователя:");
+                    const input = prompt("Введите Email или уникальный никнейм пользователя (например @nick):");
                     if (input) {
-                        const targetValue = input.trim().toLowerCase();
+                        let targetValue = input.trim().toLowerCase();
+                        
+                        // Удаляем символ @ в начале, если он есть
+                        if (targetValue.startsWith('@')) {
+                            targetValue = targetValue.substring(1);
+                        }
                         
                         // ПРОВЕРКА: Ищем пользователя по Email ИЛИ по Никнейму
                         const targetUser = geEngine.state.usersDB.find(u => 
