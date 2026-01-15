@@ -1490,12 +1490,20 @@
                     geEngine.chat.open('general', 'general');
                 },
                 async addFriend() {
-                    const mail = prompt("Введите Email пользователя для добавления:");
-                    if (mail) {
-                        const targetUser = geEngine.state.usersDB.find(u => u.email.toLowerCase() === mail.toLowerCase());
+                    const input = prompt("Введите Email или уникальный никнейм пользователя:");
+                    if (input) {
+                        const targetValue = input.trim().toLowerCase();
+                        
+                        // ПРОВЕРКА: Ищем пользователя по Email ИЛИ по Никнейму
+                        const targetUser = geEngine.state.usersDB.find(u => 
+                            u.email.toLowerCase() === targetValue || 
+                            (u.nickname && u.nickname.toLowerCase() === targetValue)
+                        );
+
                         if (!targetUser) {
-                            return alert("Пользователь с таким Email не найден в базе GeLink.");
+                            return alert("Пользователь с такими данными не найден в базе GeLink.");
                         }
+
                         if (targetUser.email === geEngine.state.session.email) {
                             return alert("Нельзя добавить самого себя.");
                         }
