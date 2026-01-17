@@ -1023,7 +1023,7 @@
                 localStream: null,
                 localRooms: [], 
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
-                deletedRooms: [], // Заполняется динамически в init()
+                deletedRooms: [], 
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
@@ -1494,7 +1494,9 @@
                         let targetValue = input.trim().toLowerCase();
                         if (targetValue.startsWith('@')) targetValue = targetValue.substring(1);
                         
-                        const targetUser = geEngine.state.usersDB.find(u => 
+                        // Ищем пользователя в "базе" (которая хранится в localStorage)
+                        const db = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
+                        const targetUser = db.find(u => 
                             u.email.toLowerCase() === targetValue || 
                             (u.nickname && u.nickname.toLowerCase() === targetValue)
                         );
@@ -1506,13 +1508,11 @@
                         const otherMailSafe = targetUser.email.replace(/[@.]/g, '').toLowerCase();
                         const roomId = `private-${[myEmailSafe, otherMailSafe].sort().join('-')}`;
                         
-                        // 1. Добавляем в локальные контакты ТЕКУЩЕГО пользователя
                         if (!geEngine.state.localRooms.includes(roomId)) {
                             geEngine.state.localRooms.push(roomId);
                             localStorage.setItem(`ge_contacts_${myEmailSafe}`, JSON.stringify(geEngine.state.localRooms));
                         }
 
-                        // 2. Убираем из списка удаленных, чтобы чат появился в списке
                         geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                         localStorage.setItem(`ge_deleted_rooms_${myEmailSafe}`, JSON.stringify(geEngine.state.deletedRooms));
 
@@ -1540,7 +1540,8 @@
                 const session = geEngine.state.session;
                 const myEmailSafe = session.email.replace(/[@.]/g, '').toLowerCase();
                 
-                // ЗАГРУЗКА ИНДИВИДУАЛЬНЫХ ДАННЫХ
+                // Актуализируем базу пользователей при каждом входе
+                geEngine.state.usersDB = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
                 geEngine.state.localRooms = JSON.parse(localStorage.getItem(`ge_contacts_${myEmailSafe}`) || "[]");
                 geEngine.state.deletedRooms = JSON.parse(localStorage.getItem(`ge_deleted_rooms_${myEmailSafe}`) || "[]");
 
