@@ -1489,44 +1489,54 @@
                     geEngine.chat.open('general', 'general');
                 },
 async addFriend() {
-                    const input = prompt("Введите Email пользователя:");
-                    if (!input) return;
+    const input = prompt("Введите Email или @никнейм пользователя:");
+    if (!input) return;
 
-                    const targetEmail = input.trim().toLowerCase();
-                    const myEmail = geEngine.state.session.email;
+    // Очищаем ввод: нижний регистр и удаляем @
+    let target = input.trim().toLowerCase();
+    if (target.startsWith('@')) target = target.substring(1);
+    
+    const myEmail = geEngine.state.session.email;
 
-                    try {
-                        // 1. Делаем запрос к твоему API для проверки и добавления
-                        const res = await fetch(`/api/index?action=addContact&user_email=${myEmail}&target_email=${targetEmail}`);
-                        const data = await res.json();
+    try {
+        // 1. Спрашиваем сервер: "Есть ли такой пользователь (почта или ник) в базе?"
+        const response = await fetch(`/api/index?action=addContact&user_email=${myEmail}&target_email=${target}`);
+        const data = await response.json();
 
-                        if (data.status === 'success') {
-                            // 2. Генерируем ID комнаты (общий для обоих)
-                            const mySafe = myEmail.replace(/[@.]/g, '').toLowerCase();
-                            const targetSafe = targetEmail.replace(/[@.]/g, '').toLowerCase();
-                            const roomId = `private-${[mySafe, targetSafe].sort().join('-')}`;
+        if (data.status === 'success') {
+            // 2. Генерируем уникальный ID комнаты для двоих
+            const mySafe = myEmail.replace(/[@.]/g, '').toLowerCase();
+            const targetSafe = target.replace(/[@.]/g, '').toLowerCase();
+            const roomId = `private-${[mySafe, targetSafe].sort().join('-')}`;
+            
+            // 3. Локальное сохранение (для интерфейса)
+            if (!geEngine.state.localRooms.includes(roomId)) {
+                geEngine.state.localRooms.push(roomId);
+                localStorage.setItem(`ge_contacts_${mySafe}`, JSON.stringify(geEngine.state.localRooms));
+            }
 
-                            // 3. Сообщаем серверу, что оба пользователя теперь участники этой комнаты
-                            // Это нужно, чтобы чат появился в списке комнат (user_rooms)
-                            await fetch(`/api/index?room=${roomId}&user_email=${myEmail}`, { method: 'POST', body: JSON.stringify({
-                                username: "System", text: "Чат создан", time: "00:00"
-                            })});
-                            
-                            // Добавляем комнату и второму пользователю (через пустой пост от его имени)
-                            await fetch(`/api/index?room=${roomId}&user_email=${targetEmail}`, { method: 'POST', body: JSON.stringify({
-                                username: "System", text: "Связь установлена", time: "00:00"
-                            })});
+            // 4. ГЛОБАЛЬНАЯ СИНХРОНИЗАЦИЯ
+            // Отправляем пустой системный пост, чтобы сервер добавил roomId в user_rooms ОБОИМ пользователям
+            await fetch(`/api/index?room=${roomId}&user_email=${myEmail}`, { 
+                method: 'POST', 
+                body: JSON.stringify({ system: true, text: "init" }) 
+            });
+            
+            // Пытаемся "постучаться" и к другу, чтобы у него тоже всплыл этот чат
+            await fetch(`/api/index?room=${roomId}&user_email=${target}`, { 
+                method: 'POST', 
+                body: JSON.stringify({ system: true, text: "init" }) 
+            });
 
-                            alert("Пользователь добавлен в контакты!");
-                            geEngine.chat.open(roomId, targetEmail);
-                        } else {
-                            alert("Ошибка: " + (data.message === 'User not found' ? "Пользователь не найден в системе GeLink" : data.message));
-                        }
-                    } catch (e) {
-                        console.error(e);
-                        alert("Ошибка при связи с сервером.");
-                    }
-                },
+            geEngine.chat.open(roomId, target);
+            alert("Пользователь добавлен!");
+        } else {
+            alert("Пользователь не найден. Убедитесь, что он хотя бы раз заходил в сеть.");
+        }
+    } catch (e) {
+        alert("Ошибка связи с сервером.");
+    }
+},
                 createGroup() {
                     const name = prompt("Имя группы:");
                     if (name) {
