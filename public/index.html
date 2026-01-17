@@ -1492,49 +1492,45 @@ async addFriend() {
     const input = prompt("Введите Email или @никнейм пользователя:");
     if (!input) return;
 
-    // Очищаем ввод: нижний регистр и удаляем @
     let target = input.trim().toLowerCase();
     if (target.startsWith('@')) target = target.substring(1);
     
     const myEmail = geEngine.state.session.email;
+    const myNickname = geEngine.state.session.nickname || "";
 
     try {
-        // 1. Спрашиваем сервер: "Есть ли такой пользователь (почта или ник) в базе?"
-        const response = await fetch(`/api/index?action=addContact&user_email=${myEmail}&target_email=${target}`);
-        const data = await response.json();
+        // 1. Спрашиваем сервер и просим создать связь в Redis
+        const res = await fetch(`/api/index?action=addContact&user_email=${myEmail}&target_email=${target}`);
+        const data = await res.json();
 
         if (data.status === 'success') {
-            // 2. Генерируем уникальный ID комнаты для двоих
+            const roomId = data.roomId;
             const mySafe = myEmail.replace(/[@.]/g, '').toLowerCase();
-            const targetSafe = target.replace(/[@.]/g, '').toLowerCase();
-            const roomId = `private-${[mySafe, targetSafe].sort().join('-')}`;
-            
-            // 3. Локальное сохранение (для интерфейса)
+
+            // 2. Локально сохраняем в список, чтобы не ждать обновления
             if (!geEngine.state.localRooms.includes(roomId)) {
                 geEngine.state.localRooms.push(roomId);
                 localStorage.setItem(`ge_contacts_${mySafe}`, JSON.stringify(geEngine.state.localRooms));
             }
 
-            // 4. ГЛОБАЛЬНАЯ СИНХРОНИЗАЦИЯ
-            // Отправляем пустой системный пост, чтобы сервер добавил roomId в user_rooms ОБОИМ пользователям
-            await fetch(`/api/index?room=${roomId}&user_email=${myEmail}`, { 
-                method: 'POST', 
-                body: JSON.stringify({ system: true, text: "init" }) 
-            });
-            
-            // Пытаемся "постучаться" и к другу, чтобы у него тоже всплыл этот чат
-            await fetch(`/api/index?room=${roomId}&user_email=${target}`, { 
-                method: 'POST', 
-                body: JSON.stringify({ system: true, text: "init" }) 
+            // 3. Отправляем "сигнальное" сообщение, чтобы прописать никнейм в базу
+            await fetch(`/api/index?room=${roomId}&user_email=${myEmail}&user_nickname=${myNickname}`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    username: "System",
+                    text: "Начало чата",
+                    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                })
             });
 
             geEngine.chat.open(roomId, target);
             alert("Пользователь добавлен!");
         } else {
-            alert("Пользователь не найден. Убедитесь, что он хотя бы раз заходил в сеть.");
+            alert("Пользователь не найден. Он должен хотя бы раз зайти в мессенджер.");
         }
     } catch (e) {
-        alert("Ошибка связи с сервером.");
+        console.error(e);
+        alert("Ошибка сети.");
     }
 },
                 createGroup() {
