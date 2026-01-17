@@ -1499,7 +1499,7 @@ async addFriend() {
     const myNickname = geEngine.state.session.nickname || "";
 
     try {
-        // 1. Спрашиваем сервер и просим создать связь в Redis
+        // 1. Спрашиваем сервер: есть ли такой юзер и создаем связь в Redis
         const res = await fetch(`/api/index?action=addContact&user_email=${myEmail}&target_email=${target}`);
         const data = await res.json();
 
@@ -1507,30 +1507,31 @@ async addFriend() {
             const roomId = data.roomId;
             const mySafe = myEmail.replace(/[@.]/g, '').toLowerCase();
 
-            // 2. Локально сохраняем в список, чтобы не ждать обновления
+            // 2. Локальное сохранение для мгновенного отображения в списке
             if (!geEngine.state.localRooms.includes(roomId)) {
                 geEngine.state.localRooms.push(roomId);
                 localStorage.setItem(`ge_contacts_${mySafe}`, JSON.stringify(geEngine.state.localRooms));
             }
 
-            // 3. Отправляем "сигнальное" сообщение, чтобы прописать никнейм в базу
+            // 3. Отправляем системное сообщение, чтобы "разбудить" чат и передать свои данные
             await fetch(`/api/index?room=${roomId}&user_email=${myEmail}&user_nickname=${myNickname}`, {
                 method: 'POST',
                 body: JSON.stringify({
                     username: "System",
-                    text: "Начало чата",
+                    text: "Пользователь добавил вас в друзья",
                     time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                 })
             });
 
+            // Открываем чат
             geEngine.chat.open(roomId, target);
-            alert("Пользователь добавлен!");
+            alert("Пользователь найден и добавлен!");
         } else {
-            alert("Пользователь не найден. Он должен хотя бы раз зайти в мессенджер.");
+            alert("Пользователь не найден. Он должен зайти в GeLink хотя бы один раз.");
         }
     } catch (e) {
         console.error(e);
-        alert("Ошибка сети.");
+        alert("Ошибка связи с сервером.");
     }
 },
                 createGroup() {
