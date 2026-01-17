@@ -1488,35 +1488,52 @@
                     localStorage.setItem(`ge_deleted_rooms_${myEmailSafe}`, JSON.stringify(geEngine.state.deletedRooms));
                     geEngine.chat.open('general', 'general');
                 },
-                async addFriend() {
+async addFriend() {
                     const input = prompt("Введите Email или @никнейм пользователя:");
                     if (input) {
                         let targetValue = input.trim().toLowerCase();
                         if (targetValue.startsWith('@')) targetValue = targetValue.substring(1);
                         
-                        // Ищем пользователя по ВСЕЙ базе данных (не только локально)
+                        // 1. Пытаемся получить актуальную базу пользователей
                         const db = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
                         const targetUser = db.find(u => 
                             u.email.toLowerCase() === targetValue || 
                             (u.nickname && u.nickname.toLowerCase() === targetValue)
                         );
 
-                        if (!targetUser) return alert("Пользователь не найден в глобальной базе GeLink.");
-                        if (targetUser.email === geEngine.state.session.email) return alert("Это ваш собственный аккаунт.");
+                        if (!targetUser) {
+                            return alert("Пользователь не найден. Убедитесь, что Email или никнейм введены верно.");
+                        }
+                        
+                        if (targetUser.email === geEngine.state.session.email) {
+                            return alert("Вы не можете добавить самого себя.");
+                        }
 
                         const myEmailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                         const otherMailSafe = targetUser.email.replace(/[@.]/g, '').toLowerCase();
+                        
+                        // Создаем уникальный ID комнаты, который будет одинаковым у обоих пользователей
                         const roomId = `private-${[myEmailSafe, otherMailSafe].sort().join('-')}`;
                         
-                        // Добавляем в локальный список контактов, если его там нет
+                        // 2. Добавляем в локальный список контактов
                         if (!geEngine.state.localRooms.includes(roomId)) {
                             geEngine.state.localRooms.push(roomId);
                             localStorage.setItem(`ge_contacts_${myEmailSafe}`, JSON.stringify(geEngine.state.localRooms));
                         }
 
-                        // Убираем из списка удаленных, если он там был
+                        // 3. Принудительно убираем из списка удаленных
                         geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                         localStorage.setItem(`ge_deleted_rooms_${myEmailSafe}`, JSON.stringify(geEngine.state.deletedRooms));
+
+                        // 4. Отправляем "сигнальное" сообщение на сервер, чтобы создать комнату в глобальной базе
+                        await fetch(`/api/index?room=${roomId}&user_email=${geEngine.state.session.email}`, { 
+                            method: 'POST', 
+                            body: JSON.stringify({
+                                username: "System",
+                                text: `Contact added: ${geEngine.state.session.name}`,
+                                system: true
+                            }) 
+                        });
 
                         geEngine.chat.open(roomId, targetUser.name);
                     }
