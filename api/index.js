@@ -1,33 +1,38 @@
 export default async function handler(request, response) {
     const url = "https://giving-bass-54270.upstash.io";
     const token = "AdP-AAIncDE2YmY4MWI5Y2VlZDI0NGI2ODI3ZTlhOTlkZWJhYWNhNHAxNTQyNzA";
-    
-    // Достаем user_nickname из запроса для регистрации ника
-    const { room = 'general', user_email, user_nickname, action, target_email } = request.query;
     const headers = { Authorization: `Bearer ${token}` };
 
-    // --- 1. ДОБАВЛЕНИЕ В КОНТАКТЫ (Глобальный поиск по базе) ---
+    const { room = 'general', user_email, user_nickname, action, target_email } = request.query;
+
+    // --- КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Авто-регистрация при любом запросе ---
+    if (user_email) {
+        const emailLower = user_email.toLowerCase();
+        // Сохраняем email в базу "всех пользователей" сразу
+        await fetch(`${url}/sadd/all_users/${emailLower}`, { headers });
+        
+        // Если есть ник, сохраняем и его для поиска по нику
+        if (user_nickname) {
+            const nickLower = user_nickname.replace('@', '').toLowerCase();
+            await fetch(`${url}/sadd/all_users/${nickLower}`, { headers });
+        }
+    }
+
+    // --- ЛОГИКА ДОБАВЛЕНИЯ В КОНТАКТЫ (action === 'addContact') ---
     if (action === 'addContact' && user_email && target_email) {
         const cleanTarget = target_email.replace('@', '').toLowerCase();
-        const myEmail = user_email.toLowerCase();
-
-        // Проверяем, существует ли цель (почта или ник) в Redis
+        
         const checkRes = await fetch(`${url}/sismember/all_users/${cleanTarget}`, { headers });
         const isExist = await checkRes.json();
 
         if (isExist.result === 1) {
-            // Создаем уникальный ID комнаты (всегда одинаковый для этой пары людей)
-            const mySafe = myEmail.replace(/[@.]/g, '');
-            const targetSafe = cleanTarget.replace(/[@.]/g, '');
+            const mySafe = user_email.replace(/[@.]/g, '').toLowerCase();
+            const targetSafe = cleanTarget.replace(/[@.]/g, '').toLowerCase();
             const roomId = `private-${[mySafe, targetSafe].sort().join('-')}`;
 
-            // Привязываем комнату к ОБОИМ пользователям в Redis
-            await fetch(`${url}/sadd/user_rooms:${myEmail}/${roomId}`, { headers });
+            await fetch(`${url}/sadd/user_rooms:${user_email.toLowerCase()}/${roomId}`, { headers });
             await fetch(`${url}/sadd/user_rooms:${cleanTarget}/${roomId}`, { headers });
             
-            // Сохраняем в список контактов отправителя
-            await fetch(`${url}/sadd/contacts:${myEmail}/${cleanTarget}`, { headers });
-
             return response.status(200).json({ status: 'success', roomId });
         } else {
             return response.status(404).json({ status: 'error', message: 'User not found' });
