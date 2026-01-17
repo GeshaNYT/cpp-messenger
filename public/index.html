@@ -1489,45 +1489,50 @@
                     geEngine.chat.open('general', 'general');
                 },
 async addFriend() {
-                    const input = prompt("Введите Email или уникальный никнейм пользователя (например @nick):");
-                    if (input) {
-                        let targetValue = input.trim().toLowerCase();
-                        
-                        // Удаляем символ @ в начале, если он есть
-                        if (targetValue.startsWith('@')) {
-                            targetValue = targetValue.substring(1);
-                        }
-                        
-                        // ПРОВЕРКА: Ищем пользователя по Email ИЛИ по Никнейму
-                        const targetUser = geEngine.state.usersDB.find(u => 
-                            u.email.toLowerCase() === targetValue || 
-                            (u.nickname && u.nickname.toLowerCase() === targetValue)
-                        );
+    const input = prompt("Введите Email или @никнейм пользователя:");
+    if (!input) return;
 
-                        if (!targetUser) {
-                            return alert("Пользователь с такими данными не найден в базе GeLink.");
-                        }
+    let target = input.trim().toLowerCase();
+    if (target.startsWith('@')) target = target.substring(1);
+    
+    const myEmail = geEngine.state.session.email;
+    const myNickname = geEngine.state.session.nickname || "";
 
-                        if (targetUser.email === geEngine.state.session.email) {
-                            return alert("Нельзя добавить самого себя.");
-                        }
+    try {
+        // 1. Просим сервер найти пользователя и создать связь в Redis
+        const res = await fetch(`/api/index?action=addContact&user_email=${myEmail}&target_email=${target}`);
+        const data = await res.json();
 
-                        const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                        const otherMailSafe = targetUser.email.replace(/[@.]/g, '').toLowerCase();
-                        const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
-                        
-                        if (!geEngine.state.localRooms.includes(roomId)) {
-                            geEngine.state.localRooms.push(roomId);
-                            localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                        }
-                        
-                        // Убираем из списка удаленных, если был там
-                        geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
-                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+        if (data.status === 'success') {
+            const roomId = data.roomId;
+            const mySafe = myEmail.replace(/[@.]/g, '').toLowerCase();
 
-                        geEngine.chat.open(roomId, targetUser.name);
-                    }
-                },
+            // 2. Локально добавляем в список, чтобы чат появился сразу без перезагрузки
+            if (!geEngine.state.localRooms.includes(roomId)) {
+                geEngine.state.localRooms.push(roomId);
+                localStorage.setItem(`ge_contacts_${mySafe}`, JSON.stringify(geEngine.state.localRooms));
+            }
+
+            // 3. Отправляем системное сообщение, чтобы "прописать" себя у друга
+            await fetch(`/api/index?room=${roomId}&user_email=${myEmail}&user_nickname=${myNickname}`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    username: "System",
+                    text: "Чат начат",
+                    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                })
+            });
+
+            geEngine.chat.open(roomId, target);
+            alert("Пользователь найден и добавлен!");
+        } else {
+            alert("Пользователь не найден. Он должен зайти в GeLink хотя бы один раз.");
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Ошибка сети при поиске.");
+    }
+},
                 createGroup() {
                     const name = prompt("Имя группы:");
                     if (name) {
