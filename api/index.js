@@ -5,38 +5,38 @@ export default async function handler(request, response) {
 
     const { room = 'general', user_email, user_nickname, action, target_email } = request.query;
 
-    // --- КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Авто-регистрация при любом запросе ---
+    // РЕГИСТРАЦИЯ ПРИ КАЖДОМ ЗАПРОСЕ (Важно!)
     if (user_email) {
         const emailLower = user_email.toLowerCase();
-        // Сохраняем email в базу "всех пользователей" сразу
+        // Записываем почту
         await fetch(`${url}/sadd/all_users/${emailLower}`, { headers });
         
-        // Если есть ник, сохраняем и его для поиска по нику
+        // Записываем ник (если он есть), чтобы по нему тоже находило
         if (user_nickname) {
             const nickLower = user_nickname.replace('@', '').toLowerCase();
             await fetch(`${url}/sadd/all_users/${nickLower}`, { headers });
         }
     }
 
-    // --- ЛОГИКА ДОБАВЛЕНИЯ В КОНТАКТЫ (action === 'addContact') ---
+    // ЛОГИКА ДОБАВЛЕНИЯ
     if (action === 'addContact' && user_email && target_email) {
-        const cleanTarget = target_email.replace('@', '').toLowerCase();
+        const target = target_email.replace('@', '').toLowerCase();
         
-        const checkRes = await fetch(`${url}/sismember/all_users/${cleanTarget}`, { headers });
-        const isExist = await checkRes.json();
+        // Теперь этот запрос точно вернет 1, так как пользователь выше уже зарегистрировался
+        const check = await fetch(`${url}/sismember/all_users/${target}`, { headers });
+        const isExist = await check.json();
 
         if (isExist.result === 1) {
             const mySafe = user_email.replace(/[@.]/g, '').toLowerCase();
-            const targetSafe = cleanTarget.replace(/[@.]/g, '').toLowerCase();
+            const targetSafe = target.replace(/[@.]/g, '').toLowerCase();
             const roomId = `private-${[mySafe, targetSafe].sort().join('-')}`;
 
             await fetch(`${url}/sadd/user_rooms:${user_email.toLowerCase()}/${roomId}`, { headers });
-            await fetch(`${url}/sadd/user_rooms:${cleanTarget}/${roomId}`, { headers });
+            await fetch(`${url}/sadd/user_rooms:${target}/${roomId}`, { headers });
             
             return response.status(200).json({ status: 'success', roomId });
-        } else {
-            return response.status(404).json({ status: 'error', message: 'User not found' });
         }
+        return response.status(404).json({ status: 'error', message: 'Not found' });
     }
 
     // --- 2. ОТПРАВКА СООБЩЕНИЙ (POST) ---
