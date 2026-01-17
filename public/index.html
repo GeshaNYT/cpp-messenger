@@ -1525,11 +1525,19 @@
                         const otherMailSafe = targetUser.email.replace(/[@.]/g, '').toLowerCase();
                         const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
                         
+                        // 1. Обновляем локальные контакты ТЕКУЩЕГО пользователя
                         if (!geEngine.state.localRooms.includes(roomId)) {
                             geEngine.state.localRooms.push(roomId);
-                            // ПРИВЯЗКА К EMAIL: Сохраняем контакты только для этого пользователя
-                            const userKey = `ge_contacts_${geEngine.state.session.email.replace(/[@.]/g, '')}`;
-                            localStorage.setItem(userKey, JSON.stringify(geEngine.state.localRooms));
+                            const myKey = `ge_contacts_${myMailSafe}`;
+                            localStorage.setItem(myKey, JSON.stringify(geEngine.state.localRooms));
+                        }
+
+                        // 2. ДВУСТОРОННЕЕ ДОБАВЛЕНИЕ: Добавляем контакт ВТОРОМУ пользователю в его хранилище
+                        const otherKey = `ge_contacts_${otherMailSafe}`;
+                        let otherContacts = JSON.parse(localStorage.getItem(otherKey) || "[]");
+                        if (!otherContacts.includes(roomId)) {
+                            otherContacts.push(roomId);
+                            localStorage.setItem(otherKey, JSON.stringify(otherContacts));
                         }
                         
                         geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
@@ -1543,8 +1551,7 @@
                         geEngine.state.localRooms.push(name);
                         geEngine.state.createdRooms.push(name);
                         
-                        // ПРИВЯЗКА К EMAIL: Сохраняем группы только для этого пользователя
-                        const userKey = `ge_contacts_${geEngine.state.session.email.replace(/[@.]/g, '')}`;
+                        const userKey = `ge_contacts_${geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase()}`;
                         localStorage.setItem(userKey, JSON.stringify(geEngine.state.localRooms));
                         localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
                         
@@ -1558,8 +1565,8 @@
                 document.getElementById('ge-main-app').classList.add('ge-flex');
                 const session = geEngine.state.session;
                 
-                // ЗАГРУЗКА КОНТАКТОВ КОНКРЕТНОГО ПОЛЬЗОВАТЕЛЯ
-                const userKey = `ge_contacts_${session.email.replace(/[@.]/g, '')}`;
+                // ЗАГРУЗКА КОНТАКТОВ КОНКРЕТНОГО ПОЛЬЗОВАТЕЛЯ С ПРИВЕДЕНИЕМ К НИЖНЕМУ РЕГИСТРУ
+                const userKey = `ge_contacts_${session.email.replace(/[@.]/g, '').toLowerCase()}`;
                 geEngine.state.localRooms = JSON.parse(localStorage.getItem(userKey) || "[]");
 
                 document.getElementById('ge-my-name').innerText = session.name;
