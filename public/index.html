@@ -1021,7 +1021,7 @@
                 isSnowing: false,
                 snowInterval: null,
                 localStream: null,
-                localRooms: JSON.parse(localStorage.getItem('ge_local_rooms') || "[]"),
+                localRooms: [], 
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
@@ -1511,25 +1511,15 @@
                     const input = prompt("Введите Email или уникальный никнейм пользователя (например @nick):");
                     if (input) {
                         let targetValue = input.trim().toLowerCase();
+                        if (targetValue.startsWith('@')) targetValue = targetValue.substring(1);
                         
-                        // Удаляем символ @ в начале, если он есть
-                        if (targetValue.startsWith('@')) {
-                            targetValue = targetValue.substring(1);
-                        }
-                        
-                        // ПРОВЕРКА: Ищем пользователя по Email ИЛИ по Никнейму
                         const targetUser = geEngine.state.usersDB.find(u => 
                             u.email.toLowerCase() === targetValue || 
                             (u.nickname && u.nickname.toLowerCase() === targetValue)
                         );
 
-                        if (!targetUser) {
-                            return alert("Пользователь с такими данными не найден в базе GeLink.");
-                        }
-
-                        if (targetUser.email === geEngine.state.session.email) {
-                            return alert("Нельзя добавить самого себя.");
-                        }
+                        if (!targetUser) return alert("Пользователь с такими данными не найден.");
+                        if (targetUser.email === geEngine.state.session.email) return alert("Нельзя добавить самого себя.");
 
                         const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                         const otherMailSafe = targetUser.email.replace(/[@.]/g, '').toLowerCase();
@@ -1537,13 +1527,13 @@
                         
                         if (!geEngine.state.localRooms.includes(roomId)) {
                             geEngine.state.localRooms.push(roomId);
-                            localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                            // ПРИВЯЗКА К EMAIL: Сохраняем контакты только для этого пользователя
+                            const userKey = `ge_contacts_${geEngine.state.session.email.replace(/[@.]/g, '')}`;
+                            localStorage.setItem(userKey, JSON.stringify(geEngine.state.localRooms));
                         }
                         
-                        // Убираем из списка удаленных, если был там
                         geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-
                         geEngine.chat.open(roomId, targetUser.name);
                     }
                 },
@@ -1552,8 +1542,12 @@
                     if (name) {
                         geEngine.state.localRooms.push(name);
                         geEngine.state.createdRooms.push(name);
-                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                        
+                        // ПРИВЯЗКА К EMAIL: Сохраняем группы только для этого пользователя
+                        const userKey = `ge_contacts_${geEngine.state.session.email.replace(/[@.]/g, '')}`;
+                        localStorage.setItem(userKey, JSON.stringify(geEngine.state.localRooms));
                         localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
+                        
                         geEngine.chat.open(name, name);
                     }
                 }
@@ -1563,6 +1557,11 @@
                 document.getElementById('ge-auth-layer').classList.add('ge-hidden');
                 document.getElementById('ge-main-app').classList.add('ge-flex');
                 const session = geEngine.state.session;
+                
+                // ЗАГРУЗКА КОНТАКТОВ КОНКРЕТНОГО ПОЛЬЗОВАТЕЛЯ
+                const userKey = `ge_contacts_${session.email.replace(/[@.]/g, '')}`;
+                geEngine.state.localRooms = JSON.parse(localStorage.getItem(userKey) || "[]");
+
                 document.getElementById('ge-my-name').innerText = session.name;
                 document.getElementById('ge-my-av').innerText = session.name[0].toUpperCase();
                 document.getElementById('ge-my-av').style.background = session.avColor || 'var(--ge-accent-gradient)';
