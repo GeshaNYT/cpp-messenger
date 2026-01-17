@@ -1433,15 +1433,24 @@
 
             chat: {
                 async refresh() {
-                    try {
-                        const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`;
-                        const res = await fetch(url);
-                        const data = await res.json();
-                        geEngine.ui.renderChatList(data.rooms?.result);
-                        if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
-                            if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(data.messages?.result);
-                        }
-                    } catch (e) {}
+                    const room = geEngine.state.currentRoom || 'general';
+                    const email = geEngine.state.session.email;
+                    const nick = geEngine.state.session.nickname || "";
+
+                    // Добавляем параметры в URL, чтобы сервер всегда знал, кто делает запрос
+                    const res = await fetch(`/api/index?room=${room}&user_email=${email}&user_nickname=${nick}`);
+                    const data = await res.json();
+
+                    if (data.messages) {
+                        // Логика отрисовки сообщений (твоя старая)
+                        geEngine.ui.renderMessages(data.messages);
+                    }
+                    
+                    if (data.rooms) {
+                        // Обновляем список чатов (чтобы новый друг появился сам)
+                        geEngine.state.localRooms = data.rooms.result || [];
+                        geEngine.ui.renderRooms();
+                    }
                 },
                 async broadcast() {
                     const input = document.getElementById('ge-main-input');
