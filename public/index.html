@@ -1494,25 +1494,27 @@
                         let targetValue = input.trim().toLowerCase();
                         if (targetValue.startsWith('@')) targetValue = targetValue.substring(1);
                         
-                        // Ищем пользователя в "базе" (которая хранится в localStorage)
+                        // Ищем пользователя по ВСЕЙ базе данных (не только локально)
                         const db = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
                         const targetUser = db.find(u => 
                             u.email.toLowerCase() === targetValue || 
                             (u.nickname && u.nickname.toLowerCase() === targetValue)
                         );
 
-                        if (!targetUser) return alert("Пользователь не найден.");
-                        if (targetUser.email === geEngine.state.session.email) return alert("Это вы.");
+                        if (!targetUser) return alert("Пользователь не найден в глобальной базе GeLink.");
+                        if (targetUser.email === geEngine.state.session.email) return alert("Это ваш собственный аккаунт.");
 
                         const myEmailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                         const otherMailSafe = targetUser.email.replace(/[@.]/g, '').toLowerCase();
                         const roomId = `private-${[myEmailSafe, otherMailSafe].sort().join('-')}`;
                         
+                        // Добавляем в локальный список контактов, если его там нет
                         if (!geEngine.state.localRooms.includes(roomId)) {
                             geEngine.state.localRooms.push(roomId);
                             localStorage.setItem(`ge_contacts_${myEmailSafe}`, JSON.stringify(geEngine.state.localRooms));
                         }
 
+                        // Убираем из списка удаленных, если он там был
                         geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                         localStorage.setItem(`ge_deleted_rooms_${myEmailSafe}`, JSON.stringify(geEngine.state.deletedRooms));
 
