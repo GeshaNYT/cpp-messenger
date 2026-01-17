@@ -931,7 +931,7 @@
                         <label class="ge-label" style="color:var(--ge-primary)">Мы отправили код на вашу почту</label>
                         <input type="text" id="up-otp" class="ge-input-core" placeholder="000000" maxlength="6" style="text-align:center; font-size:24px; letter-spacing:5px;">
                     </div>
-                    <button class="ge-btn-submit" onclick="geEngine.auth.verifyOTP('reg')">ЗАВЕРШИТЬ РЕГИСТРАЦИЮ</button>
+                    <button class="ge-btn-submit" onclick="geEngine.verifyOTP('reg')">ЗАВЕРШИТЬ РЕГИСТРАЦИЮ</button>
                 </div>
             </div>
 
@@ -1079,14 +1079,16 @@
                         const nickRegex = /^[a-z0-9_]{3,20}$/;
                         if (!nickRegex.test(nick)) return alert("Никнейм должен быть от 3 до 20 символов и содержать только латиницу, цифры или подчеркивание.");
                         
-                        const nickTaken = geEngine.state.usersDB.find(u => u.nickname === nick);
+                        // ПРОВЕРКА ВО ВСЕЙ БАЗЕ
+                        const allUsers = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
+                        const nickTaken = allUsers.find(u => u.nickname === nick);
                         if (nickTaken) return alert("Этот никнейм уже занят другим пользователем.");
 
                         if (!n || !e || !p) return alert("Заполните данные!");
                         if (p !== pc) { document.getElementById('up-error').classList.remove('ge-hidden'); return; }
                         if (p.length < 8) return alert("Пароль слишком короткий!");
 
-                        const userExists = geEngine.state.usersDB.find(u => u.email === e);
+                        const userExists = allUsers.find(u => u.email === e);
                         if (userExists) return alert("Этот Email уже занят!");
 
                         geEngine.state.pendingUser = { 
@@ -1109,7 +1111,8 @@
                         p = document.getElementById('in-pass').value.trim();
                         if (!e || !p) return alert("Введите логин и пароль!");
 
-                        const user = geEngine.state.usersDB.find(u => u.email === e && u.password === p);
+                        const allUsers = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
+                        const user = allUsers.find(u => u.email === e && u.password === p);
                         if (!user) return alert("Неверный email или пароль!");
                         
                         geEngine.state.pendingUser = user;
@@ -1131,8 +1134,9 @@
                         const user = geEngine.state.pendingUser;
                         
                         if (type === 'reg') {
-                            geEngine.state.usersDB.push(user);
-                            localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
+                            const allUsers = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
+                            allUsers.push(user);
+                            localStorage.setItem('ge_users_db', JSON.stringify(allUsers));
                         }
 
                         geEngine.state.session = { 
@@ -1165,8 +1169,9 @@
                         const c2 = confirm("Это действие сотрет ваши данные из системы GeLink навсегда. Вы уверены?");
                         if(c2) {
                             const currentEmail = geEngine.state.session.email;
-                            geEngine.state.usersDB = geEngine.state.usersDB.filter(u => u.email !== currentEmail);
-                            localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
+                            let allUsers = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
+                            allUsers = allUsers.filter(u => u.email !== currentEmail);
+                            localStorage.setItem('ge_users_db', JSON.stringify(allUsers));
                             localStorage.removeItem('ge_v9_token');
                             alert("Ваш аккаунт был полностью удален.");
                             location.reload();
@@ -1210,12 +1215,13 @@
                     const nickRegex = /^[a-z0-9_]{3,20}$/;
                     if (!nickRegex.test(newNick)) return alert("Никнейм должен быть от 3 до 20 символов.");
 
+                    let allUsers = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
                     if (newNick !== geEngine.state.session.nickname) {
-                        const nickTaken = geEngine.state.usersDB.find(u => u.nickname === newNick && u.email !== email);
+                        const nickTaken = allUsers.find(u => u.nickname === newNick && u.email !== email);
                         if (nickTaken) return alert("Этот никнейм уже занят!");
                     }
 
-                    geEngine.state.usersDB = geEngine.state.usersDB.map(u => {
+                    allUsers = allUsers.map(u => {
                         if (u.email === email) {
                             u.name = newName;
                             u.nickname = newNick;
@@ -1224,7 +1230,7 @@
                         }
                         return u;
                     });
-                    localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
+                    localStorage.setItem('ge_users_db', JSON.stringify(allUsers));
 
                     geEngine.state.session.name = newName;
                     geEngine.state.session.nickname = newNick;
@@ -1295,6 +1301,8 @@
                         return true;
                     });
 
+                    const allUsers = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
+
                     let html = filtered.map(rid => {
                         let displayName = rid;
                         let avColor = '#444';
@@ -1305,7 +1313,7 @@
                             const parts = rid.replace('private-', '').split('-');
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherMailSafePart = parts.find(p => p !== myMailSafe);
-                            const user = geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
+                            const user = allUsers.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
                             if (user) {
                                 displayName = user.name;
                                 avColor = user.avColor;
@@ -1494,9 +1502,9 @@
                         let targetValue = input.trim().toLowerCase();
                         if (targetValue.startsWith('@')) targetValue = targetValue.substring(1);
                         
-                        // Ищем пользователя в "базе" (которая хранится в localStorage)
-                        const db = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
-                        const targetUser = db.find(u => 
+                        // ИЩЕМ В ГЛОБАЛЬНОЙ БАЗЕ
+                        const allUsers = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
+                        const targetUser = allUsers.find(u => 
                             u.email.toLowerCase() === targetValue || 
                             (u.nickname && u.nickname.toLowerCase() === targetValue)
                         );
@@ -1540,7 +1548,7 @@
                 const session = geEngine.state.session;
                 const myEmailSafe = session.email.replace(/[@.]/g, '').toLowerCase();
                 
-                // Актуализируем базу пользователей при каждом входе
+                // Актуализируем базу данных и локальные контакты
                 geEngine.state.usersDB = JSON.parse(localStorage.getItem('ge_users_db') || "[]");
                 geEngine.state.localRooms = JSON.parse(localStorage.getItem(`ge_contacts_${myEmailSafe}`) || "[]");
                 geEngine.state.deletedRooms = JSON.parse(localStorage.getItem(`ge_deleted_rooms_${myEmailSafe}`) || "[]");
