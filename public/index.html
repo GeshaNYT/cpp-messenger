@@ -1081,7 +1081,7 @@
                 </div>
                 <div class="ge-field">
                     <label class="ge-label">Новый пароль (оставьте пустым, если не меняете)</label>
-                    <input type="password" id="prof-pass" class="ge-input-core" placeholder="••••••••">
+                    <input type="password" id="prof-pass" class="ge-input-core" placeholder="••••••••" oninput="geEngine.auth.filterLatinPass(this)">
                 </div>
                 <div style="display: flex; gap: 15px;">
                     <button class="ge-btn-submit" style="background: var(--bg-input); color: var(--text-primary); box-shadow: none;" onclick="geEngine.profile.close()">ОТМЕНА</button>
@@ -1193,7 +1193,7 @@
                     <div class="ge-field" style="margin-top:10px;">
                         <label class="ge-label">Придумайте пароль</label>
                         <div class="ge-pw-wrap">
-                            <input type="password" id="up-pass" class="ge-input-core" placeholder="Мин. 8 символов" oninput="geEngine.auth.checkPassMatch()">
+                            <input type="password" id="up-pass" class="ge-input-core" placeholder="Мин. 8 символов" oninput="geEngine.auth.filterLatinPass(this);geEngine.auth.checkPassMatch()">
                             <button type="button" class="ge-eye-btn" onclick="geEngine.auth.toggleEye('up-pass', this)" tabindex="-1">
                                 <svg id="eye-pass-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                             </button>
@@ -1202,7 +1202,7 @@
                     <div class="ge-field" style="margin-top:10px;">
                         <label class="ge-label">Подтвердите пароль</label>
                         <div class="ge-pw-wrap">
-                            <input type="password" id="up-confirm" class="ge-input-core" placeholder="Повторите ввод" oninput="geEngine.auth.checkPassMatch()">
+                            <input type="password" id="up-confirm" class="ge-input-core" placeholder="Повторите ввод" oninput="geEngine.auth.filterLatinPass(this);geEngine.auth.checkPassMatch()">
                             <button type="button" class="ge-eye-btn" onclick="geEngine.auth.toggleEye('up-confirm', this)" tabindex="-1">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                             </button>
@@ -1427,6 +1427,7 @@
                             return;
                         }
                         if (p.length < 8) return alert("Пароль слишком короткий!");
+                        if (/[а-яёА-ЯЁ]/.test(p)) return alert("Пароль должен содержать только латинские символы!");
 
                         const userExists = geEngine.state.usersDB.find(u => u.email === e);
                         if (userExists) return alert("Этот Email уже занят!");
@@ -1521,6 +1522,16 @@
                         errEl.classList.remove('ge-hidden');
                     }
                 },
+                filterLatinPass(input) {
+                    // Оставляем только латиницу, цифры и спецсимволы (без кириллицы)
+                    const pos = input.selectionStart;
+                    const cleaned = input.value.replace(/[а-яёА-ЯЁ]/g, '');
+                    if (cleaned !== input.value) {
+                        input.value = cleaned;
+                        // Восстанавливаем позицию курсора
+                        input.setSelectionRange(pos - 1, pos - 1);
+                    }
+                },
                 togglePrivacy() {
                     const box = document.getElementById('up-privacy-box');
                     const check = document.getElementById('up-privacy-check');
@@ -1612,7 +1623,10 @@
                             u.name = newName;
                             u.nickname = newNick;
                             u.avColor = this.tempColor;
-                            if (newPass) u.password = newPass;
+                            if (newPass) {
+                            if (/[а-яёА-ЯЁ]/.test(newPass)) return alert("Пароль должен содержать только латинские символы!");
+                            u.password = newPass;
+                        }
                         }
                         return u;
                     });
