@@ -1356,6 +1356,7 @@
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 serverContacts: [],   // email-адреса контактов с сервера
+                contactNames: JSON.parse(localStorage.getItem('ge_contact_names') || "{}"),  // email -> имя
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
@@ -1736,13 +1737,20 @@
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherMailSafePart = parts.find(p => p !== myMailSafe);
                             
-                            // Пытаемся найти пользователя в базе для получения реального имени и цвета
+                            // 1. Ищем в локальной БД (тот же браузер)
                             const user = geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
                             if (user) {
                                 displayName = user.name;
-                                avColor = user.avColor;
-                            } else if (otherMailSafePart) {
-                                displayName = otherMailSafePart.split('gmailcom')[0] || otherMailSafePart;
+                                avColor = user.avColor || '#444';
+                            } else {
+                                // 2. Ищем в кэше имён контактов (сохранённых при addFriend)
+                                const cachedEmail = Object.keys(geEngine.state.contactNames).find(e => e.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
+                                if (cachedEmail) {
+                                    displayName = geEngine.state.contactNames[cachedEmail];
+                                } else if (otherMailSafePart) {
+                                    // 3. Запасной вариант — обрезаем safe-часть (лучше чем ничего)
+                                    displayName = otherMailSafePart;
+                                }
                             }
                         }
 
@@ -2154,6 +2162,20 @@
                         // Сохраняем серверные контакты для звонков
                         geEngine.state.serverContacts = data.contacts?.result || [];
 
+                        // Подтягиваем имена серверных контактов если нет в кэше
+                        for (const email of geEngine.state.serverContacts) {
+                            if (!geEngine.state.contactNames[email] && !geEngine.state.usersDB.find(u => u.email === email)) {
+                                fetch(`/api/index?action=findUser&query=${encodeURIComponent(email)}`)
+                                    .then(r => r.json())
+                                    .then(d => {
+                                        if (d.status === 'found' && d.profile?.name) {
+                                            geEngine.state.contactNames[email] = decodeURIComponent(d.profile.name);
+                                            localStorage.setItem('ge_contact_names', JSON.stringify(geEngine.state.contactNames));
+                                        }
+                                    }).catch(() => {});
+                            }
+                        }
+
                         // Объединяем серверные комнаты с локальными (группы)
                         const serverRooms = data.rooms?.result || [];
                         const allRooms = Array.from(new Set([...serverRooms, ...geEngine.state.localRooms]));
@@ -2277,6 +2299,9 @@
 
                         if (addData.status === 'success') {
                             const roomId = addData.roomId;
+                            // Сохраняем имя контакта в кэш
+                            geEngine.state.contactNames[targetEmail] = displayName;
+                            localStorage.setItem('ge_contact_names', JSON.stringify(geEngine.state.contactNames));
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                             alert(`${displayName} добавлен! Диалог появится у обоих.`);
