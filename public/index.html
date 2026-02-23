@@ -2388,7 +2388,15 @@
         };
 
         document.getElementById('ge-main-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') geEngine.chat.broadcast();
+            if (e.key === 'Enter') {
+                // Если идёт зафиксированная запись — отправляем её
+                const btn = document.getElementById('ge-media-toggle-btn');
+                if (btn && btn._lockedHandler) {
+                    btn._lockedHandler();
+                } else {
+                    geEngine.chat.broadcast();
+                }
+            }
         });
         document.getElementById('prof-name').addEventListener('input', () => geEngine.profile.updatePreview());
     </script>
