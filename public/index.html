@@ -1098,21 +1098,16 @@
                 </div>
 
             <footer class="ge-footer">
-                <!-- Голосовое сообщение -->
-                <button class="ge-media-btn" id="ge-voice-btn" title="Голосовое сообщение" onmousedown="geEngine.media.startVoice()" onmouseup="geEngine.media.stopVoice()" ontouchstart="geEngine.media.startVoice()" ontouchend="geEngine.media.stopVoice()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                        <line x1="12" y1="19" x2="12" y2="23"/>
-                        <line x1="8" y1="23" x2="16" y2="23"/>
-                    </svg>
-                </button>
-                <!-- Видео кружочек -->
-                <button class="ge-media-btn" id="ge-circle-btn" title="Видео-кружочек" onmousedown="geEngine.media.startCircle()" onmouseup="geEngine.media.stopCircle()" ontouchstart="geEngine.media.startCircle()" ontouchend="geEngine.media.stopCircle()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"/>
-                        <polygon points="10 8 16 12 10 16 10 8"/>
-                    </svg>
+                <!-- Единая кнопка: клик = смена режима, долгое нажатие = запись -->
+                <button class="ge-media-btn" id="ge-media-toggle-btn" title="Удерживай для записи • Нажми чтобы сменить режим">
+                    <span id="ge-media-btn-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            <line x1="12" y1="19" x2="12" y2="23"/>
+                            <line x1="8" y1="23" x2="16" y2="23"/>
+                        </svg>
+                    </span>
                 </button>
                 <input type="text" id="ge-main-input" class="ge-composer-input" placeholder="Напишите ваше сообщение здесь...">
                 <button class="ge-send-btn" onclick="geEngine.chat.broadcast()">
@@ -1980,79 +1975,134 @@
 
 
             media: {
-                _voiceRecorder: null,
-                _circleRecorder: null,
-                _voiceChunks: [],
-                _circleChunks: [],
-                _circleStream: null,
-                _voiceTimer: null,
-                _circleTimer: null,
-                _voiceStart: 0,
-                _circleStart: 0,
+                _mode: 'voice',          // 'voice' | 'circle'
+                _recorder: null,
+                _chunks: [],
+                _stream: null,
+                _pressTimer: null,
+                _pressStart: 0,
+                _isRecording: false,
+                _LONG_PRESS_MS: 400,     // порог долгого нажатия
 
-                async startVoice() {
-                    if (!geEngine.state.activeRoom) return;
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                        this._voiceChunks = [];
-                        this._voiceRecorder = new MediaRecorder(stream);
-                        this._voiceRecorder.ondataavailable = e => this._voiceChunks.push(e.data);
-                        this._voiceRecorder.start();
-                        this._voiceStart = Date.now();
-                        document.getElementById('ge-voice-btn').classList.add('recording');
-                    } catch { alert("Нет доступа к микрофону."); }
-                },
+                _micSVG: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/>
+                    <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>`,
 
-                stopVoice() {
-                    const btn = document.getElementById('ge-voice-btn');
-                    btn.classList.remove('recording');
-                    if (!this._voiceRecorder || this._voiceRecorder.state === 'inactive') return;
-                    const duration = Math.round((Date.now() - this._voiceStart) / 1000);
-                    if (duration < 1) { this._voiceRecorder.stream.getTracks().forEach(t => t.stop()); return; }
-                    this._voiceRecorder.onstop = () => {
-                        const blob = new Blob(this._voiceChunks, { type: 'audio/webm' });
-                        this._sendMediaMessage(blob, 'voice', duration);
-                        this._voiceRecorder.stream.getTracks().forEach(t => t.stop());
+                _circleSVG: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polygon points="10 8 16 12 10 16 10 8"/>
+                </svg>`,
+
+                init() {
+                    const btn = document.getElementById('ge-media-toggle-btn');
+                    if (!btn) return;
+
+                    // Mousedown / touchstart — запускаем таймер долгого нажатия
+                    const onDown = (e) => {
+                        e.preventDefault();
+                        this._pressStart = Date.now();
+                        this._pressTimer = setTimeout(() => {
+                            this._isRecording = true;
+                            this._startRecording();
+                        }, this._LONG_PRESS_MS);
                     };
-                    this._voiceRecorder.stop();
-                },
 
-                async startCircle() {
-                    if (!geEngine.state.activeRoom) return;
-                    try {
-                        this._circleStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 400, height: 400 }, audio: true });
-                        this._circleChunks = [];
-                        this._circleRecorder = new MediaRecorder(this._circleStream);
-                        this._circleRecorder.ondataavailable = e => this._circleChunks.push(e.data);
-                        this._circleRecorder.start();
-                        this._circleStart = Date.now();
-                        document.getElementById('ge-circle-btn').classList.add('recording');
-                    } catch { alert("Нет доступа к камере/микрофону."); }
-                },
+                    // Mouseup / touchend — смотрим сколько держали
+                    const onUp = (e) => {
+                        e.preventDefault();
+                        clearTimeout(this._pressTimer);
+                        const held = Date.now() - this._pressStart;
 
-                stopCircle() {
-                    const btn = document.getElementById('ge-circle-btn');
-                    btn.classList.remove('recording');
-                    if (!this._circleRecorder || this._circleRecorder.state === 'inactive') return;
-                    const duration = Math.round((Date.now() - this._circleStart) / 1000);
-                    if (duration < 1) { this._circleStream.getTracks().forEach(t => t.stop()); return; }
-                    this._circleRecorder.onstop = () => {
-                        const blob = new Blob(this._circleChunks, { type: 'video/webm' });
-                        this._sendMediaMessage(blob, 'circle', duration);
-                        this._circleStream.getTracks().forEach(t => t.stop());
+                        if (this._isRecording) {
+                            // Долгое — останавливаем запись
+                            this._stopRecording();
+                            this._isRecording = false;
+                        } else if (held < this._LONG_PRESS_MS) {
+                            // Короткое — переключаем режим
+                            this._toggleMode();
+                        }
                     };
-                    this._circleRecorder.stop();
+
+                    btn.addEventListener('mousedown', onDown);
+                    btn.addEventListener('mouseup', onUp);
+                    btn.addEventListener('mouseleave', (e) => {
+                        clearTimeout(this._pressTimer);
+                        if (this._isRecording) { this._stopRecording(); this._isRecording = false; }
+                    });
+                    btn.addEventListener('touchstart', onDown, { passive: false });
+                    btn.addEventListener('touchend', onUp, { passive: false });
+                },
+
+                _toggleMode() {
+                    this._mode = this._mode === 'voice' ? 'circle' : 'voice';
+                    const iconEl = document.getElementById('ge-media-btn-icon');
+                    const btn = document.getElementById('ge-media-toggle-btn');
+                    if (this._mode === 'voice') {
+                        iconEl.innerHTML = this._micSVG;
+                        btn.title = 'Удерживай для голосового • Нажми для смены режима';
+                        btn.style.borderRadius = '50%';
+                    } else {
+                        iconEl.innerHTML = this._circleSVG;
+                        btn.title = 'Удерживай для видео-кружочка • Нажми для смены режима';
+                        // Слегка другой стиль для режима кружочка
+                        btn.style.background = 'var(--ge-primary-soft)';
+                        setTimeout(() => { btn.style.background = ''; }, 300);
+                    }
+                },
+
+                async _startRecording() {
+                    if (!geEngine.state.activeRoom) return;
+                    const btn = document.getElementById('ge-media-toggle-btn');
+                    btn.classList.add('recording');
+
+                    try {
+                        const constraints = this._mode === 'voice'
+                            ? { audio: true }
+                            : { video: { facingMode: 'user', width: 400, height: 400 }, audio: true };
+
+                        this._stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        this._chunks = [];
+                        const mimeType = this._mode === 'voice' ? 'audio/webm' : 'video/webm';
+                        this._recorder = new MediaRecorder(this._stream, { mimeType });
+                        this._recorder.ondataavailable = e => this._chunks.push(e.data);
+                        this._recorder.start();
+                        this._pressStart = Date.now(); // сбрасываем для подсчёта длительности
+                    } catch {
+                        btn.classList.remove('recording');
+                        this._isRecording = false;
+                        alert(this._mode === 'voice' ? 'Нет доступа к микрофону.' : 'Нет доступа к камере/микрофону.');
+                    }
+                },
+
+                _stopRecording() {
+                    const btn = document.getElementById('ge-media-toggle-btn');
+                    btn.classList.remove('recording');
+                    if (!this._recorder || this._recorder.state === 'inactive') return;
+
+                    const duration = Math.max(1, Math.round((Date.now() - this._pressStart) / 1000));
+                    const mode = this._mode;
+
+                    this._recorder.onstop = () => {
+                        const mimeType = mode === 'voice' ? 'audio/webm' : 'video/webm';
+                        const blob = new Blob(this._chunks, { type: mimeType });
+                        this._sendMediaMessage(blob, mode === 'voice' ? 'voice' : 'circle', duration);
+                        if (this._stream) { this._stream.getTracks().forEach(t => t.stop()); this._stream = null; }
+                    };
+                    this._recorder.stop();
                 },
 
                 _sendMediaMessage(blob, mediaType, duration) {
                     const reader = new FileReader();
                     reader.onload = async () => {
-                        const base64 = reader.result; // data:audio/webm;base64,...
+                        const base64 = reader.result;
                         const payload = JSON.stringify({
                             username: geEngine.state.session.name,
                             email: geEngine.state.session.email,
                             text: '',
-                            mediaType,   // 'voice' | 'circle'
+                            mediaType,
                             mediaData: base64,
                             mediaDuration: duration,
                             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -2066,7 +2116,6 @@
                     reader.readAsDataURL(blob);
                 },
 
-                // Воспроизведение голосового
                 toggleVoice(btn, audioId) {
                     const audio = document.getElementById(audioId);
                     const fill = btn.parentElement.parentElement.querySelector('.ge-voice-progress-fill');
@@ -2075,30 +2124,21 @@
                     const pauseIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
 
                     if (audio.paused) {
-                        // Пауза всех других аудио
                         document.querySelectorAll('audio.ge-voice-audio').forEach(a => { if (a !== audio) a.pause(); });
                         audio.play();
                         btn.innerHTML = pauseIcon;
                         audio.ontimeupdate = () => {
                             const pct = (audio.currentTime / audio.duration) * 100 || 0;
                             if (fill) fill.style.width = pct + '%';
-                            if (dur) {
-                                const s = Math.floor(audio.currentTime);
-                                dur.innerText = `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
-                            }
+                            if (dur) { const s = Math.floor(audio.currentTime); dur.innerText = `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
                         };
-                        audio.onended = () => {
-                            btn.innerHTML = playIcon;
-                            if (fill) fill.style.width = '0%';
-                            if (dur) dur.innerText = geEngine.media._fmtDur(audio.duration);
-                        };
+                        audio.onended = () => { btn.innerHTML = playIcon; if (fill) fill.style.width = '0%'; if (dur) dur.innerText = geEngine.media._fmtDur(audio.duration); };
                     } else {
                         audio.pause();
                         btn.innerHTML = playIcon;
                     }
                 },
 
-                // Воспроизведение кружочка
                 toggleCircle(wrapper, videoId) {
                     const video = document.getElementById(videoId);
                     const overlay = wrapper.querySelector('.ge-circle-play-overlay');
@@ -2118,6 +2158,7 @@
                 }
             },
 
+
             init() {
                 document.getElementById('ge-auth-layer').classList.add('ge-hidden');
                 document.getElementById('ge-main-app').classList.add('ge-flex');
@@ -2129,6 +2170,8 @@
                 setInterval(() => geEngine.chat.refresh(), 4000);
                 // Глобальный polling входящих звонков
                 setInterval(() => geEngine.calls._pollSignals(), 2000);
+                // Инициализируем кнопку записи
+                geEngine.media.init();
             }
         };
 
