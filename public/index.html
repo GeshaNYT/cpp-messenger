@@ -1013,8 +1013,17 @@
                 </div>
 
                 <div class="ge-call-controls" id="ge-chat-actions">
-                    <button class="ge-call-btn-circle" onclick="geEngine.calls.initiate('audio')">📞</button>
-                    <button class="ge-call-btn-circle" onclick="geEngine.calls.initiate('video')">📹</button>
+                    <button class="ge-call-btn-circle" onclick="geEngine.calls.initiate('audio')" title="Аудио звонок">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.23h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6.29 6.29l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                    </svg>
+                </button>
+                    <button class="ge-call-btn-circle" onclick="geEngine.calls.initiate('video')" title="Видео звонок">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="23 7 16 12 23 17 23 7"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                </button>
                 </div>
             </header>
 
@@ -1522,7 +1531,7 @@
                         this._callType = sig.callType || 'audio';
                         document.getElementById('ge-inc-av').innerText = (this._targetName[0] || '?').toUpperCase();
                         document.getElementById('ge-inc-name').innerText = this._targetName;
-                        document.getElementById('ge-inc-type').innerText = this._callType === 'video' ? '📹 Видео звонок' : '📞 Аудио звонок';
+                        document.getElementById('ge-inc-type').innerHTML = this._callType === 'video' ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> Видео звонок' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.23h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6.29 6.29l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Аудио звонок';
                         document.getElementById('ge-incoming-call').style.display = 'block';
                         return;
                     }
