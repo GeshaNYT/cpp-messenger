@@ -2137,37 +2137,48 @@
                         this._pressTimer = setTimeout(() => {
                             this._isRecording = true;
                             this._startRecording();
-                            // Показываем замочек
                             document.getElementById('ge-lock-hint').classList.add('visible');
+                            // Слушаем движение и отпускание по всему документу
+                            document.addEventListener('mousemove', onMoveGlobal);
+                            document.addEventListener('mouseup', onUpGlobal);
+                            document.addEventListener('touchmove', onMoveGlobal, { passive: false });
+                            document.addEventListener('touchend', onUpGlobal);
                         }, this._LONG_PRESS_MS);
                     };
 
-                    const onMove = (e) => {
+                    // Глобальный mousemove — работает даже когда мышь ушла с кнопки
+                    const onMoveGlobal = (e) => {
                         if (!this._isRecording || this._isLocked) return;
                         const curY = (e.touches ? e.touches[0].clientY : e.clientY);
                         const dy = startY - curY; // положительное = вверх
                         const lockIcon = document.getElementById('ge-lock-icon');
+                        const hint = document.getElementById('ge-lock-hint');
                         if (dy > this._lockThreshold) {
-                            // Заблокировано!
-                            this._isLocked = true;
-                            lockIcon.classList.add('locked');
-                            lockIcon.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
-                            document.getElementById('ge-lock-hint').querySelector('span').innerText = '🔒';
+                            if (!this._isLocked) {
+                                this._isLocked = true;
+                                lockIcon.classList.add('locked');
+                                lockIcon.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`;
+                                hint.querySelector('span').innerText = 'Зафиксировано';
+                            }
                         } else {
                             lockIcon.classList.remove('locked');
+                            lockIcon.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+                            hint.querySelector('span').innerText = 'Вверх';
                         }
                     };
 
-                    const onUp = (e) => {
-                        e.preventDefault();
-                        clearTimeout(this._pressTimer);
+                    // Глобальный mouseup
+                    const onUpGlobal = (e) => {
+                        document.removeEventListener('mousemove', onMoveGlobal);
+                        document.removeEventListener('mouseup', onUpGlobal);
+                        document.removeEventListener('touchmove', onMoveGlobal);
+                        document.removeEventListener('touchend', onUpGlobal);
                         document.getElementById('ge-lock-hint').classList.remove('visible');
 
                         if (this._isLocked) {
-                            // Зафиксировано — не останавливаем, ждём кнопки отправки
+                            // Зафиксировано — переключаем в режим ожидания отправки
                             this._isLocked = false;
                             document.getElementById('ge-lock-icon').classList.remove('locked');
-                            // Меняем кнопку на «Отправить»
                             this._showLockedUI();
                             return;
                         }
@@ -2175,24 +2186,21 @@
                         if (this._isRecording) {
                             this._stopRecording();
                             this._isRecording = false;
-                        } else if (Date.now() - this._pressStart < this._LONG_PRESS_MS) {
+                        }
+                    };
+
+                    // Короткое нажатие — смена режима (mouseup на самой кнопке без глобального)
+                    const onUp = (e) => {
+                        if (this._isRecording) return; // уже обрабатывается глобально
+                        clearTimeout(this._pressTimer);
+                        if (Date.now() - this._pressStart < this._LONG_PRESS_MS) {
                             this._toggleMode();
                         }
                     };
 
                     btn.addEventListener('mousedown', onDown);
-                    btn.addEventListener('mousemove', onMove);
                     btn.addEventListener('mouseup', onUp);
-                    btn.addEventListener('mouseleave', (e) => {
-                        if (this._isRecording && !this._isLocked) {
-                            clearTimeout(this._pressTimer);
-                            document.getElementById('ge-lock-hint').classList.remove('visible');
-                            this._stopRecording();
-                            this._isRecording = false;
-                        }
-                    });
                     btn.addEventListener('touchstart', onDown, { passive: false });
-                    btn.addEventListener('touchmove', onMove, { passive: false });
                     btn.addEventListener('touchend', onUp, { passive: false });
                 },
 
