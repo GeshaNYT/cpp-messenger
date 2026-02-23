@@ -810,6 +810,73 @@
 
         .ge-color-dot.active { border-color: var(--text-primary); transform: scale(1.2); }
 
+
+        /* --- ГОЛОСОВЫЕ И КРУЖОЧКИ --- */
+        .ge-media-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--bg-input);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--ge-primary);
+            transition: 0.25s;
+            flex-shrink: 0;
+        }
+        .ge-media-btn:hover { background: var(--ge-primary-soft); transform: scale(1.08); }
+        .ge-media-btn.recording {
+            background: var(--ge-error) !important;
+            color: white !important;
+            animation: ge-rec-pulse 1s infinite;
+        }
+        @keyframes ge-rec-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(250,62,62,0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(250,62,62,0); }
+        }
+        .ge-voice-player {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 220px;
+        }
+        .ge-voice-play-btn {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: rgba(255,255,255,0.25);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; transition: 0.2s;
+        }
+        .them .ge-voice-play-btn { background: var(--ge-primary-soft); }
+        .ge-voice-play-btn:hover { transform: scale(1.1); }
+        .ge-voice-progress {
+            flex: 1; height: 4px; border-radius: 4px;
+            background: rgba(255,255,255,0.3); cursor: pointer; position: relative;
+        }
+        .them .ge-voice-progress { background: var(--border-base); }
+        .ge-voice-progress-fill {
+            height: 100%; border-radius: 4px;
+            background: white; width: 0%; transition: width 0.1s linear;
+            pointer-events: none;
+        }
+        .them .ge-voice-progress-fill { background: var(--ge-primary); }
+        .ge-voice-duration { font-size: 11px; opacity: 0.75; white-space: nowrap; }
+
+        .ge-circle-video {
+            width: 200px; height: 200px; border-radius: 50%;
+            overflow: hidden; position: relative;
+            border: 3px solid rgba(255,255,255,0.3);
+            background: #000;
+            cursor: pointer;
+        }
+        .them .ge-circle-video { border-color: var(--ge-primary); }
+        .ge-circle-video video { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .ge-circle-play-overlay {
+            position: absolute; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.35);
+            opacity: 1; transition: 0.2s;
+        }
+        .ge-circle-play-overlay.hidden { opacity: 0; pointer-events: none; }
         .ge-hidden { display: none !important; }
         .ge-flex { display: flex !important; }
         .ge-error-text { color: var(--ge-error); font-size: 12px; margin-top: 5px; font-weight: 600; }
@@ -1031,8 +1098,29 @@
                 </div>
 
             <footer class="ge-footer">
+                <!-- Голосовое сообщение -->
+                <button class="ge-media-btn" id="ge-voice-btn" title="Голосовое сообщение" onmousedown="geEngine.media.startVoice()" onmouseup="geEngine.media.stopVoice()" ontouchstart="geEngine.media.startVoice()" ontouchend="geEngine.media.stopVoice()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" y1="19" x2="12" y2="23"/>
+                        <line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                </button>
+                <!-- Видео кружочек -->
+                <button class="ge-media-btn" id="ge-circle-btn" title="Видео-кружочек" onmousedown="geEngine.media.startCircle()" onmouseup="geEngine.media.stopCircle()" ontouchstart="geEngine.media.startCircle()" ontouchend="geEngine.media.stopCircle()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polygon points="10 8 16 12 10 16 10 8"/>
+                    </svg>
+                </button>
                 <input type="text" id="ge-main-input" class="ge-composer-input" placeholder="Напишите ваше сообщение здесь...">
-                <button class="ge-send-btn" onclick="geEngine.chat.broadcast()">➤</button>
+                <button class="ge-send-btn" onclick="geEngine.chat.broadcast()">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"/>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                    </svg>
+                </button>
             </footer>
         </section>
     </main>
@@ -1412,12 +1500,55 @@
                         return;
                     }
 
+                    let msgIdCounter = Date.now();
                     container.innerHTML = validMessages.map(raw => {
                         let m;
                         try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } catch(e) { return ''; }
                         const isMe = m.email === geEngine.state.session.email;
-                        let statusIcon = m.status === 'read' ? '✓✓' : (m.status === 'sent' ? '✓' : '🕒');
+                        const statusIcon = m.status === 'read' ? '✓✓' : (m.status === 'sent' ? '✓' : '○');
                         const timeStr = m.time || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        const uid = msgIdCounter++;
+
+                        // ГОЛОСОВОЕ СООБЩЕНИЕ
+                        if (m.mediaType === 'voice') {
+                            const dur = geEngine.media._fmtDur(m.mediaDuration || 0);
+                            const playIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+                            return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}">
+                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
+                                <div class="ge-voice-player">
+                                    <audio id="va-${uid}" class="ge-voice-audio" src="${m.mediaData}" preload="metadata"></audio>
+                                    <button class="ge-voice-play-btn" onclick="geEngine.media.toggleVoice(this,'va-${uid}')">${playIcon}</button>
+                                    <div style="flex:1">
+                                        <div class="ge-voice-progress" onclick="(function(el,id){const a=document.getElementById(id);const r=el.getBoundingClientRect();a.currentTime=((event.clientX-r.left)/r.width)*a.duration;})(this,'va-${uid}')">
+                                            <div class="ge-voice-progress-fill"></div>
+                                        </div>
+                                    </div>
+                                    <span class="ge-voice-duration">${dur}</span>
+                                </div>
+                                <div class="ge-msg-status-line">
+                                    <span>${timeStr}</span>
+                                    ${isMe ? `<span>${statusIcon}</span>` : ''}
+                                </div>
+                            </div>`;
+                        }
+
+                        // ВИДЕО КРУЖОЧЕК
+                        if (m.mediaType === 'circle') {
+                            const playOverlayIcon = `<svg width="30" height="30" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+                            return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}" style="background:transparent;box-shadow:none;padding:4px;">
+                                <span class="ge-msg-meta-top" style="color:var(--text-secondary)">${isMe ? 'Вы' : m.username}</span>
+                                <div class="ge-circle-video" onclick="geEngine.media.toggleCircle(this,'cv-${uid}')">
+                                    <video id="cv-${uid}" src="${m.mediaData}" preload="metadata" playsinline loop></video>
+                                    <div class="ge-circle-play-overlay">${playOverlayIcon}</div>
+                                </div>
+                                <div class="ge-msg-status-line" style="${isMe ? '' : 'color:var(--text-secondary)'}">
+                                    <span>${timeStr}</span>
+                                    ${isMe ? `<span>${statusIcon}</span>` : ''}
+                                </div>
+                            </div>`;
+                        }
+
+                        // ОБЫЧНОЕ СООБЩЕНИЕ
                         return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}">
                                 <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
                                 <div class="ge-msg-text">${m.text}</div>
@@ -1844,6 +1975,146 @@
                         localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
                         geEngine.chat.open(name, name);
                     }
+                }
+            },
+
+
+            media: {
+                _voiceRecorder: null,
+                _circleRecorder: null,
+                _voiceChunks: [],
+                _circleChunks: [],
+                _circleStream: null,
+                _voiceTimer: null,
+                _circleTimer: null,
+                _voiceStart: 0,
+                _circleStart: 0,
+
+                async startVoice() {
+                    if (!geEngine.state.activeRoom) return;
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        this._voiceChunks = [];
+                        this._voiceRecorder = new MediaRecorder(stream);
+                        this._voiceRecorder.ondataavailable = e => this._voiceChunks.push(e.data);
+                        this._voiceRecorder.start();
+                        this._voiceStart = Date.now();
+                        document.getElementById('ge-voice-btn').classList.add('recording');
+                    } catch { alert("Нет доступа к микрофону."); }
+                },
+
+                stopVoice() {
+                    const btn = document.getElementById('ge-voice-btn');
+                    btn.classList.remove('recording');
+                    if (!this._voiceRecorder || this._voiceRecorder.state === 'inactive') return;
+                    const duration = Math.round((Date.now() - this._voiceStart) / 1000);
+                    if (duration < 1) { this._voiceRecorder.stream.getTracks().forEach(t => t.stop()); return; }
+                    this._voiceRecorder.onstop = () => {
+                        const blob = new Blob(this._voiceChunks, { type: 'audio/webm' });
+                        this._sendMediaMessage(blob, 'voice', duration);
+                        this._voiceRecorder.stream.getTracks().forEach(t => t.stop());
+                    };
+                    this._voiceRecorder.stop();
+                },
+
+                async startCircle() {
+                    if (!geEngine.state.activeRoom) return;
+                    try {
+                        this._circleStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 400, height: 400 }, audio: true });
+                        this._circleChunks = [];
+                        this._circleRecorder = new MediaRecorder(this._circleStream);
+                        this._circleRecorder.ondataavailable = e => this._circleChunks.push(e.data);
+                        this._circleRecorder.start();
+                        this._circleStart = Date.now();
+                        document.getElementById('ge-circle-btn').classList.add('recording');
+                    } catch { alert("Нет доступа к камере/микрофону."); }
+                },
+
+                stopCircle() {
+                    const btn = document.getElementById('ge-circle-btn');
+                    btn.classList.remove('recording');
+                    if (!this._circleRecorder || this._circleRecorder.state === 'inactive') return;
+                    const duration = Math.round((Date.now() - this._circleStart) / 1000);
+                    if (duration < 1) { this._circleStream.getTracks().forEach(t => t.stop()); return; }
+                    this._circleRecorder.onstop = () => {
+                        const blob = new Blob(this._circleChunks, { type: 'video/webm' });
+                        this._sendMediaMessage(blob, 'circle', duration);
+                        this._circleStream.getTracks().forEach(t => t.stop());
+                    };
+                    this._circleRecorder.stop();
+                },
+
+                _sendMediaMessage(blob, mediaType, duration) {
+                    const reader = new FileReader();
+                    reader.onload = async () => {
+                        const base64 = reader.result; // data:audio/webm;base64,...
+                        const payload = JSON.stringify({
+                            username: geEngine.state.session.name,
+                            email: geEngine.state.session.email,
+                            text: '',
+                            mediaType,   // 'voice' | 'circle'
+                            mediaData: base64,
+                            mediaDuration: duration,
+                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            status: 'sent'
+                        });
+                        await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, {
+                            method: 'POST', body: payload
+                        });
+                        geEngine.chat.refresh();
+                    };
+                    reader.readAsDataURL(blob);
+                },
+
+                // Воспроизведение голосового
+                toggleVoice(btn, audioId) {
+                    const audio = document.getElementById(audioId);
+                    const fill = btn.parentElement.parentElement.querySelector('.ge-voice-progress-fill');
+                    const dur = btn.parentElement.parentElement.querySelector('.ge-voice-duration');
+                    const playIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+                    const pauseIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+
+                    if (audio.paused) {
+                        // Пауза всех других аудио
+                        document.querySelectorAll('audio.ge-voice-audio').forEach(a => { if (a !== audio) a.pause(); });
+                        audio.play();
+                        btn.innerHTML = pauseIcon;
+                        audio.ontimeupdate = () => {
+                            const pct = (audio.currentTime / audio.duration) * 100 || 0;
+                            if (fill) fill.style.width = pct + '%';
+                            if (dur) {
+                                const s = Math.floor(audio.currentTime);
+                                dur.innerText = `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+                            }
+                        };
+                        audio.onended = () => {
+                            btn.innerHTML = playIcon;
+                            if (fill) fill.style.width = '0%';
+                            if (dur) dur.innerText = geEngine.media._fmtDur(audio.duration);
+                        };
+                    } else {
+                        audio.pause();
+                        btn.innerHTML = playIcon;
+                    }
+                },
+
+                // Воспроизведение кружочка
+                toggleCircle(wrapper, videoId) {
+                    const video = document.getElementById(videoId);
+                    const overlay = wrapper.querySelector('.ge-circle-play-overlay');
+                    if (video.paused) {
+                        video.play();
+                        overlay.classList.add('hidden');
+                        video.onended = () => { video.currentTime = 0; overlay.classList.remove('hidden'); };
+                    } else {
+                        video.pause();
+                        overlay.classList.remove('hidden');
+                    }
+                },
+
+                _fmtDur(sec) {
+                    const s = Math.round(sec) || 0;
+                    return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
                 }
             },
 
