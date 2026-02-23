@@ -819,7 +819,23 @@
 
     <div id="ge-snow-container"></div>
 
-    <div id="ge-call-ui" class="ge-call-overlay">
+    
+    <!-- ВХОДЯЩИЙ ЗВОНОК -->
+    <div id="ge-incoming-call" style="display:none; position:fixed; bottom:40px; right:40px; z-index:300000; background:var(--bg-panel); border:1px solid var(--border-base); border-radius:var(--radius-xl); box-shadow:var(--shadow-xl); padding:30px 35px; min-width:320px; animation:ge-slide-up 0.3s ease;">
+        <div style="display:flex; align-items:center; gap:18px; margin-bottom:22px;">
+            <div id="ge-inc-av" style="width:60px;height:60px;border-radius:20px;background:var(--ge-accent-gradient);color:white;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;">?</div>
+            <div>
+                <b id="ge-inc-name" style="font-size:18px;display:block;">Входящий звонок</b>
+                <span id="ge-inc-type" style="font-size:13px;color:var(--text-secondary);">Аудио звонок</span>
+            </div>
+        </div>
+        <div style="display:flex;gap:15px;">
+            <button onclick="geEngine.calls.accept()" style="flex:1;padding:16px;background:var(--ge-success);color:white;border-radius:var(--radius-md);font-weight:800;font-size:15px;">✓ Принять</button>
+            <button onclick="geEngine.calls.decline()" style="flex:1;padding:16px;background:var(--ge-error);color:white;border-radius:var(--radius-md);font-weight:800;font-size:15px;">✕ Отклонить</button>
+        </div>
+    </div>
+
+<div id="ge-call-ui" class="ge-call-overlay">
         <video id="remoteVideo" class="ge-video-container" autoplay playsinline></video>
         <video id="localVideo" class="ge-local-video" autoplay muted playsinline></video>
 
@@ -1406,30 +1422,246 @@
             },
 
             calls: {
-                async initiate(type) {
-                    const overlay = document.getElementById('ge-call-ui');
-                    const targetName = document.getElementById('ge-active-name').innerText;
-                    if (geEngine.state.activeRoom === 'general' || !geEngine.state.activeRoom) return alert("Выберите пользователя.");
-                    document.getElementById('ge-call-name').innerText = targetName;
-                    document.getElementById('ge-call-av').innerText = targetName[0].toUpperCase();
-                    document.getElementById('ge-call-status').innerText = "ЗАПРОС РАЗРЕШЕНИЙ...";
-                    overlay.style.display = 'flex';
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true });
-                        geEngine.state.localStream = stream;
-                        const localVid = document.getElementById('localVideo');
-                        localVid.srcObject = stream;
-                        if (type === 'video') { localVid.style.display = 'block'; document.getElementById('ge-call-av').style.display = 'none'; }
-                        document.getElementById('ge-call-status').innerText = "ВЫЗОВ...";
-                    } catch (err) { this.hangup(); }
+                _pc: null,          // RTCPeerConnection
+                _callType: null,    // 'audio' | 'video'
+                _targetEmail: null, // email собеседника
+                _targetName: null,  // имя собеседника
+                _signalInterval: null,
+                _incomingOffer: null, // сохранённый offer для входящего
+
+                // ── Вспомогательные ──────────────────────────────────────────
+                _getTargetEmail() {
+                    const room = geEngine.state.activeRoom;
+                    if (!room || !room.startsWith('private-')) return null;
+                    const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                    const parts = room.replace('private-', '').split('-');
+                    const otherSafe = parts.find(p => p !== myMailSafe) || parts.find(p => !myMailSafe.includes(p));
+                    // Ищем email в локальной БД по safe-версии
+                    const found = geEngine.state.usersDB.find(u =>
+                        u.email.replace(/[@.]/g, '').toLowerCase() === otherSafe
+                    );
+                    return found ? found.email : null;
                 },
-                hangup() {
-                    const overlay = document.getElementById('ge-call-ui');
-                    if (geEngine.state.localStream) { geEngine.state.localStream.getTracks().forEach(track => track.stop()); geEngine.state.localStream = null; }
-                    document.getElementById('localVideo').srcObject = null;
-                    document.getElementById('localVideo').style.display = 'none';
+
+                async _send(obj) {
+                    await fetch('/api/index?action=signal', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(obj)
+                    });
+                },
+
+                _createPC() {
+                    const pc = new RTCPeerConnection({
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' }
+                        ]
+                    });
+
+                    pc.onicecandidate = ({ candidate }) => {
+                        if (candidate) {
+                            this._send({
+                                type: 'ice',
+                                from: geEngine.state.session.email,
+                                to: this._targetEmail,
+                                payload: candidate
+                            });
+                        }
+                    };
+
+                    pc.ontrack = (e) => {
+                        const remoteVid = document.getElementById('remoteVideo');
+                        remoteVid.srcObject = e.streams[0];
+                        remoteVid.style.display = 'block';
+                        document.getElementById('ge-call-av').style.display = 'none';
+                        document.getElementById('ge-call-status').innerText = 'СОЕДИНЕНО ✓';
+                    };
+
+                    pc.onconnectionstatechange = () => {
+                        if (['disconnected','failed','closed'].includes(pc.connectionState)) {
+                            this.hangup();
+                        }
+                    };
+
+                    return pc;
+                },
+
+                _showCallUI(name, status) {
+                    document.getElementById('ge-call-name').innerText = name;
+                    document.getElementById('ge-call-av').innerText = (name[0] || '?').toUpperCase();
+                    document.getElementById('ge-call-status').innerText = status;
+                    document.getElementById('ge-call-ui').style.display = 'flex';
+                },
+
+                _startSignalPolling() {
+                    this._stopSignalPolling();
+                    this._signalInterval = setInterval(() => this._pollSignals(), 1500);
+                },
+
+                _stopSignalPolling() {
+                    if (this._signalInterval) { clearInterval(this._signalInterval); this._signalInterval = null; }
+                },
+
+                async _pollSignals() {
+                    try {
+                        const res = await fetch(`/api/index?action=getSignals&user_email=${encodeURIComponent(geEngine.state.session.email)}`);
+                        const data = await res.json();
+                        for (const sig of (data.signals || [])) {
+                            await this._handleSignal(sig);
+                        }
+                    } catch {}
+                },
+
+                async _handleSignal(sig) {
+                    if (sig.type === 'call-request') {
+                        // Входящий звонок
+                        this._incomingOffer = sig;
+                        this._targetEmail = sig.from;
+                        this._targetName = sig.fromName || sig.from;
+                        this._callType = sig.callType || 'audio';
+                        document.getElementById('ge-inc-av').innerText = (this._targetName[0] || '?').toUpperCase();
+                        document.getElementById('ge-inc-name').innerText = this._targetName;
+                        document.getElementById('ge-inc-type').innerText = this._callType === 'video' ? '📹 Видео звонок' : '📞 Аудио звонок';
+                        document.getElementById('ge-incoming-call').style.display = 'block';
+                        return;
+                    }
+                    if (sig.type === 'call-end') {
+                        this._cleanupCall();
+                        document.getElementById('ge-incoming-call').style.display = 'none';
+                        return;
+                    }
+                    if (!this._pc) return;
+
+                    if (sig.type === 'answer') {
+                        if (this._pc.signalingState === 'have-local-offer') {
+                            await this._pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+                        }
+                    } else if (sig.type === 'ice') {
+                        try { await this._pc.addIceCandidate(new RTCIceCandidate(sig.payload)); } catch {}
+                    }
+                },
+
+                // ── Исходящий звонок ─────────────────────────────────────────
+                async initiate(type) {
+                    const room = geEngine.state.activeRoom;
+                    if (!room || !room.startsWith('private-')) return alert("Выберите личный диалог для звонка.");
+
+                    const targetEmail = this._getTargetEmail();
+                    if (!targetEmail) return alert("Не удалось определить собеседника. Убедитесь что контакт добавлен через сервер.");
+
+                    this._targetEmail = targetEmail;
+                    this._callType = type;
+                    const targetName = document.getElementById('ge-active-name').innerText;
+                    this._targetName = targetName;
+
+                    this._showCallUI(targetName, 'ЗАПРОС РАЗРЕШЕНИЙ...');
+
+                    let stream;
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true });
+                    } catch {
+                        this.hangup();
+                        return alert("Нет доступа к микрофону/камере.");
+                    }
+
+                    geEngine.state.localStream = stream;
+                    const localVid = document.getElementById('localVideo');
+                    localVid.srcObject = stream;
+                    if (type === 'video') localVid.style.display = 'block';
+
+                    this._pc = this._createPC();
+                    stream.getTracks().forEach(track => this._pc.addTrack(track, stream));
+
+                    const offer = await this._pc.createOffer();
+                    await this._pc.setLocalDescription(offer);
+
+                    // Отправляем запрос на звонок
+                    await this._send({
+                        type: 'call-request',
+                        from: geEngine.state.session.email,
+                        fromName: geEngine.state.session.name,
+                        to: targetEmail,
+                        callType: type,
+                        payload: offer
+                    });
+
+                    document.getElementById('ge-call-status').innerText = 'ВЫЗОВ...';
+                    this._startSignalPolling();
+                },
+
+                // ── Принять входящий ─────────────────────────────────────────
+                async accept() {
+                    document.getElementById('ge-incoming-call').style.display = 'none';
+                    const sig = this._incomingOffer;
+                    if (!sig) return;
+
+                    this._showCallUI(this._targetName, 'СОЕДИНЕНИЕ...');
+
+                    let stream;
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({ video: this._callType === 'video', audio: true });
+                    } catch {
+                        this.hangup();
+                        return alert("Нет доступа к микрофону/камере.");
+                    }
+
+                    geEngine.state.localStream = stream;
+                    const localVid = document.getElementById('localVideo');
+                    localVid.srcObject = stream;
+                    if (this._callType === 'video') localVid.style.display = 'block';
+
+                    this._pc = this._createPC();
+                    stream.getTracks().forEach(track => this._pc.addTrack(track, stream));
+
+                    await this._pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+                    const answer = await this._pc.createAnswer();
+                    await this._pc.setLocalDescription(answer);
+
+                    await this._send({
+                        type: 'answer',
+                        from: geEngine.state.session.email,
+                        to: this._targetEmail,
+                        payload: answer
+                    });
+
+                    this._startSignalPolling();
+                    this._incomingOffer = null;
+                },
+
+                // ── Отклонить входящий ───────────────────────────────────────
+                async decline() {
+                    document.getElementById('ge-incoming-call').style.display = 'none';
+                    if (this._targetEmail) {
+                        await this._send({ type: 'call-end', from: geEngine.state.session.email, to: this._targetEmail });
+                    }
+                    this._targetEmail = null;
+                    this._incomingOffer = null;
+                },
+
+                // ── Завершить звонок ─────────────────────────────────────────
+                async hangup() {
+                    if (this._targetEmail) {
+                        await this._send({ type: 'call-end', from: geEngine.state.session.email, to: this._targetEmail }).catch(() => {});
+                    }
+                    this._cleanupCall();
+                },
+
+                _cleanupCall() {
+                    this._stopSignalPolling();
+                    if (this._pc) { this._pc.close(); this._pc = null; }
+                    if (geEngine.state.localStream) {
+                        geEngine.state.localStream.getTracks().forEach(t => t.stop());
+                        geEngine.state.localStream = null;
+                    }
+                    const localVid = document.getElementById('localVideo');
+                    if (localVid) { localVid.srcObject = null; localVid.style.display = 'none'; }
+                    const remoteVid = document.getElementById('remoteVideo');
+                    if (remoteVid) { remoteVid.srcObject = null; remoteVid.style.display = 'none'; }
                     document.getElementById('ge-call-av').style.display = 'flex';
-                    overlay.style.display = 'none';
+                    document.getElementById('ge-call-ui').style.display = 'none';
+                    this._targetEmail = null;
+                    this._incomingOffer = null;
                 }
             },
 
@@ -1615,6 +1847,8 @@
                 document.getElementById('ge-my-av').style.background = session.avColor || 'var(--ge-accent-gradient)';
                 geEngine.chat.refresh();
                 setInterval(() => geEngine.chat.refresh(), 4000);
+                // Глобальный polling входящих звонков
+                setInterval(() => geEngine.calls._pollSignals(), 2000);
             }
         };
 
