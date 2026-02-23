@@ -4,7 +4,7 @@ export default async function handler(request, response) {
     
     const { room = 'general', user_email, action, target_email } = request.query;
 
-    // ДОБАВЛЕНИЕ В КОНТАКТЫ С ПРОВЕРКОЙ
+    // ДОБАВЛЕНИЕ В КОНТАКТЫ — ДВУСТОРОННЕЕ
     if (action === 'addContact' && user_email && target_email) {
         // 1. Проверяем, есть ли такой пользователь в системе
         const checkRes = await fetch(`${url}/sismember/all_users/${target_email}`, {
@@ -13,42 +13,73 @@ export default async function handler(request, response) {
         const isExist = await checkRes.json();
 
         if (isExist.result === 1) {
-            // 2. Если существует — добавляем в список контактов
+            // 2. Формируем ID приватной комнаты (одинаковый для обоих)
+            const myMailSafe = user_email.replace(/[@.]/g, '').toLowerCase();
+            const otherMailSafe = target_email.replace(/[@.]/g, '').toLowerCase();
+            const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
+
+            // 3. Добавляем контакт и комнату ИНИЦИАТОРУ
             await fetch(`${url}/sadd/contacts:${user_email}/${target_email}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            return response.status(200).json({ status: 'success', message: 'Contact added' });
+            await fetch(`${url}/sadd/user_rooms:${user_email}/${roomId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            // 4. Добавляем контакт и комнату ВТОРОМУ ПОЛЬЗОВАТЕЛЮ (двустороннее!)
+            await fetch(`${url}/sadd/contacts:${target_email}/${user_email}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            await fetch(`${url}/sadd/user_rooms:${target_email}/${roomId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            return response.status(200).json({ status: 'success', message: 'Contact added', roomId });
         } else {
-            // 3. Если не существует — возвращаем ошибку
             return response.status(404).json({ status: 'error', message: 'User not found' });
         }
     }
 
+    // УДАЛЕНИЕ КОНТАКТА — ОДНОСТОРОННЕЕ (убираем только у себя)
+    if (action === 'removeContact' && user_email && target_email) {
+        const myMailSafe = user_email.replace(/[@.]/g, '').toLowerCase();
+        const otherMailSafe = target_email.replace(/[@.]/g, '').toLowerCase();
+        const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
+
+        await fetch(`${url}/srem/contacts:${user_email}/${target_email}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        await fetch(`${url}/srem/user_rooms:${user_email}/${roomId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        return response.status(200).json({ status: 'success', message: 'Contact removed' });
+    }
+
     if (request.method === 'POST') {
         const body = request.body;
-        
-        // --- ЛОГИКА РЕГИСТРАЦИИ (Добавьте это в ваш код регистрации на сервере!) ---
-        // При создании аккаунта нужно делать: sadd/all_users/email
-        // Чтобы проверка выше могла найти этот email.
         
         await fetch(`${url}/lpush/room:${room}/${encodeURIComponent(body)}`, {
             headers: { Authorization: `Bearer ${token}` }
         });
 
         if (user_email) {
-            // Также добавляем пользователя в общий список при активности (для надежности)
+            // Регистрируем пользователя в общем списке
             await fetch(`${url}/sadd/all_users/${user_email}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             
-            await fetch(`${url}/sadd/user_rooms:${user_email}/${room}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            // Добавляем комнату только если это НЕ приватная (приватные добавляются через addContact)
+            if (!room.startsWith('private-')) {
+                await fetch(`${url}/sadd/user_rooms:${user_email}/${room}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            }
         }
         return response.status(200).json({ status: 'ok' });
     }
 
-    // ЗАГРУЗКА СООБЩЕНИЙ И КОНТАКТОВ
+    // ЗАГРУЗКА СООБЩЕНИЙ, КОМНАТ И КОНТАКТОВ
     const res = await fetch(`${url}/lrange/room:${room}/0/50`, {
         headers: { Authorization: `Bearer ${token}` }
     });
@@ -58,6 +89,11 @@ export default async function handler(request, response) {
     let contacts = { result: [] };
 
     if (user_email) {
+        // Регистрируем пользователя в all_users при каждом запросе (для надёжности)
+        await fetch(`${url}/sadd/all_users/${user_email}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
         const rRes = await fetch(`${url}/smembers/user_rooms:${user_email}`, {
             headers: { Authorization: `Bearer ${token}` }
         });
