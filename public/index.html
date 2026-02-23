@@ -1147,7 +1147,14 @@
                         
                         geEngine.state.currentOTP = null;
                         geEngine.state.pendingUser = null;
-                        
+
+                        // Сохраняем профиль на сервере (для поиска по нику и email)
+                        fetch(`/api/index?action=saveProfile&user_email=${encodeURIComponent(user.email)}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: user.name, nickname: user.nickname })
+                        }).catch(() => {});
+
                         geEngine.init();
                     } else {
                         alert("Неверный код подтверждения!");
@@ -1523,33 +1530,65 @@
                     geEngine.chat.open('general', 'general');
                 },
                 async addFriend() {
-                    const input = prompt("Введите Email пользователя:");
+                    const input = prompt("Введите Email или @никнейм пользователя:");
                     if (!input) return;
 
-                    let targetEmail = input.trim().toLowerCase();
+                    let query = input.trim().toLowerCase();
+                    // Убираем @ в начале если есть
+                    if (query.startsWith('@')) query = query.substring(1);
 
-                    if (targetEmail === geEngine.state.session.email) {
+                    if (query === geEngine.state.session.email || query === geEngine.state.session.nickname) {
                         return alert("Нельзя добавить самого себя.");
                     }
 
                     try {
-                        const res = await fetch(`/api/index?action=addContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(targetEmail)}`);
-                        const data = await res.json();
+                        // Шаг 1: Ищем пользователя по email или нику на сервере
+                        const findRes = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(query)}`);
+                        const findData = await findRes.json();
 
-                        if (data.status === 'success') {
-                            // Убираем из удалённых если был там
-                            const roomId = data.roomId;
+                        if (findData.status !== 'found') {
+                            // Запасной вариант: ищем в локальной БД (для пользователей с того же браузера)
+                            const localUser = geEngine.state.usersDB.find(u =>
+                                u.email.toLowerCase() === query ||
+                                (u.nickname && u.nickname.toLowerCase() === query)
+                            );
+                            if (!localUser) {
+                                return alert("Пользователь не найден. Убедитесь что он зарегистрирован в GeLink.");
+                            }
+                            // Если нашли локально — используем локальные данные
+                            const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                            const otherMailSafe = localUser.email.replace(/[@.]/g, '').toLowerCase();
+                            const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                            geEngine.chat.open(roomId, localUser.name);
+                            return;
+                        }
 
-                            // Ищем имя пользователя в локальной БД для красивого отображения
-                            const targetUser = geEngine.state.usersDB.find(u => u.email.toLowerCase() === targetEmail);
-                            const displayName = targetUser ? targetUser.name : targetEmail;
+                        const targetEmail = findData.email;
+                        const profile = findData.profile || {};
+                        // Имя: из профиля на сервере или из локальной БД
+                        const localUser = geEngine.state.usersDB.find(u => u.email.toLowerCase() === targetEmail);
+                        const displayName = (profile.name ? decodeURIComponent(profile.name) : null)
+                            || (localUser ? localUser.name : null)
+                            || targetEmail;
 
-                            alert(`Пользователь ${displayName} добавлен! Диалог появится у обоих.`);
+                        if (targetEmail === geEngine.state.session.email) {
+                            return alert("Нельзя добавить самого себя.");
+                        }
+
+                        // Шаг 2: Добавляем контакт
+                        const addRes = await fetch(`/api/index?action=addContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(targetEmail)}`);
+                        const addData = await addRes.json();
+
+                        if (addData.status === 'success') {
+                            const roomId = addData.roomId;
+                            geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
+                            localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                            alert(`${displayName} добавлен! Диалог появится у обоих.`);
                             geEngine.chat.open(roomId, displayName);
                         } else {
-                            alert("Пользователь не найден. Убедитесь, что он зарегистрирован в GeLink и хотя бы раз отправил сообщение.");
+                            alert("Не удалось добавить контакт. Попробуйте позже.");
                         }
                     } catch(e) {
                         alert("Ошибка соединения с сервером.");
