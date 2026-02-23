@@ -1069,6 +1069,59 @@
         </div>
     </div>
 
+
+    <!-- МОДАЛ ПОЛИТИКИ КОНФИДЕНЦИАЛЬНОСТИ -->
+    <div id="ge-modal-privacy" class="ge-modal-overlay" onclick="if(event.target===this)geEngine.ui.closePrivacy()">
+        <div class="ge-modal-content" style="max-width:600px; max-height:85vh; display:flex; flex-direction:column;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-shrink:0;">
+                <h2 style="font-size:20px;">🛡️ Политика конфиденциальности</h2>
+                <button onclick="geEngine.ui.closePrivacy()" style="width:36px;height:36px;border-radius:50%;background:var(--bg-input);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text-secondary);">✕</button>
+            </div>
+            <div style="overflow-y:auto; flex:1; padding-right:8px; line-height:1.7; font-size:14px; color:var(--text-primary);">
+                <p style="font-size:11px; color:var(--text-tertiary); margin-bottom:20px;">Дата вступления в силу: 23.01.2026 &nbsp;|&nbsp; Последнее обновление: 23.01.2026</p>
+                <p style="margin-bottom:16px; color:var(--text-secondary);">В GeLink мы верим, что приватность — это не привилегия, а базовое право каждого пользователя.</p>
+
+                <h3 style="font-size:14px; font-weight:800; margin-bottom:10px; color:var(--ge-primary);">👤 1. Информация, которую мы собираем</h3>
+                <p style="margin-bottom:8px;">Мы минимизируем сбор данных, ограничиваясь только тем, что необходимо для стабильной и безопасной работы мессенджера:</p>
+                <ul style="margin-left:20px; margin-bottom:16px; display:flex; flex-direction:column; gap:6px;">
+                    <li><b>Данные профиля:</b> Имя пользователя (никнейм), адрес электронной почты для верификации и аватар.</li>
+                    <li><b>Контент и сообщения:</b> Все ваши переписки защищены. Мы храним сообщения в зашифрованном виде.</li>
+                    <li><b>Технические метрики:</b> IP-адрес, модель устройства и версия ОС для оптимизации работы.</li>
+                </ul>
+
+                <h3 style="font-size:14px; font-weight:800; margin-bottom:10px; color:var(--ge-primary);">⚙️ 2. Использование информации</h3>
+                <p style="margin-bottom:8px;">Ваша информация используется исключительно для:</p>
+                <ul style="margin-left:20px; margin-bottom:16px; display:flex; flex-direction:column; gap:6px;">
+                    <li>Обеспечения бесперебойной работы сервиса.</li>
+                    <li>Идентификации владельца аккаунта при входе.</li>
+                    <li>Защиты сообщества от спама, ботов и несанкционированного доступа.</li>
+                </ul>
+
+                <h3 style="font-size:14px; font-weight:800; margin-bottom:10px; color:var(--ge-primary);">🍪 3. Файлы Cookie</h3>
+                <ul style="margin-left:20px; margin-bottom:16px; display:flex; flex-direction:column; gap:6px;">
+                    <li><b>Авторизация:</b> Чтобы не вводить логин и пароль при каждом запуске.</li>
+                    <li><b>Персонализация:</b> Сохранение темы оформления и языковых настроек.</li>
+                    <li><b>Безопасность:</b> Обнаружение подозрительных попыток входа.</li>
+                </ul>
+                <p style="margin-bottom:16px;">Вы можете отключить Cookie в настройках браузера, но это может ограничить функциональность сервиса.</p>
+
+                <h3 style="font-size:14px; font-weight:800; margin-bottom:10px; color:var(--ge-primary);">🤝 4. Передача данных третьим лицам</h3>
+                <p style="margin-bottom:16px;">Мы не продаём, не обмениваем и не передаём ваши личные данные рекламным компаниям. Раскрытие возможно только при наличии официального юридического основания.</p>
+
+                <h3 style="font-size:14px; font-weight:800; margin-bottom:10px; color:var(--ge-primary);">🔐 5. Защита и хранение данных</h3>
+                <ul style="margin-left:20px; margin-bottom:16px; display:flex; flex-direction:column; gap:6px;">
+                    <li><b>Безопасность:</b> Современные протоколы шифрования для защиты вашей информации.</li>
+                    <li><b>Право на удаление:</b> Вы можете удалить аккаунт и все данные в любое время через настройки профиля.</li>
+                </ul>
+
+                <h3 style="font-size:14px; font-weight:800; margin-bottom:10px; color:var(--ge-primary);">✉️ 6. Контактная информация</h3>
+                <p>По вопросам политики конфиденциальности пишите нам: <a href="mailto:geshancorporation@gmail.com" style="color:var(--ge-primary); font-weight:700;">geshancorporation@gmail.com</a></p>
+            </div>
+            <div style="margin-top:20px; flex-shrink:0;">
+                <button class="ge-btn-submit" onclick="geEngine.ui.closePrivacy()" style="margin-top:0;">ПОНЯТНО</button>
+            </div>
+        </div>
+    </div>
     <section id="ge-auth-layer" class="ge-auth-overlay">
         <div class="ge-auth-container">
             <div class="ge-brand-logo">GeLink</div>
@@ -1123,6 +1176,21 @@
                         <label class="ge-label">Подтвердите пароль</label>
                         <input type="password" id="up-confirm" class="ge-input-core" placeholder="Повторите ввод">
                         <span id="up-error" class="ge-error-text ge-hidden">Пароли не совпадают!</span>
+                    </div>
+                    <div class="ge-field" style="margin-top:10px;">
+                        <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer; user-select:none;">
+                            <div style="position:relative; flex-shrink:0; margin-top:2px;">
+                                <input type="checkbox" id="up-privacy" style="opacity:0; position:absolute; width:0; height:0;">
+                                <div id="up-privacy-box" onclick="geEngine.auth.togglePrivacy()" style="width:22px;height:22px;border-radius:6px;border:2px solid var(--border-base);background:var(--bg-input);display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0;">
+                                    <svg id="up-privacy-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><polyline points="20 6 9 17 4 12"/></svg>
+                                </div>
+                            </div>
+                            <span style="font-size:13px; color:var(--text-secondary); line-height:1.5;">
+                                Я прочитал(а) и соглашаюсь с 
+                                <button type="button" onclick="geEngine.ui.openPrivacy()" style="color:var(--ge-primary);font-weight:800;font-size:13px;text-decoration:underline;background:none;border:none;cursor:pointer;padding:0;">Политикой конфиденциальности</button> GeLink
+                            </span>
+                        </label>
+                        <span id="up-privacy-error" class="ge-error-text ge-hidden" style="margin-top:4px;">Необходимо принять политику конфиденциальности</span>
                     </div>
                     <button class="ge-btn-submit" onclick="geEngine.auth.handle('reg')">ОТПРАВИТЬ КОД</button>
                 </div>
@@ -1259,7 +1327,6 @@
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 serverContacts: [],   // email-адреса контактов с сервера
-                contactNames: JSON.parse(localStorage.getItem('ge_contact_names') || '{}'), // {email: {name, avColor}}
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
@@ -1278,6 +1345,15 @@
                     document.getElementById('login-fields-main').classList.remove('ge-hidden');
                     document.getElementById('reg-otp-section').classList.add('ge-hidden');
                     document.getElementById('reg-fields-main').classList.remove('ge-hidden');
+                    // Сбрасываем чекбокс при переключении вкладок
+                    const cb = document.getElementById('up-privacy');
+                    if (cb) {
+                        cb.checked = false;
+                        const box = document.getElementById('up-privacy-box');
+                        const chk = document.getElementById('up-privacy-check');
+                        if (box) { box.style.background = 'var(--bg-input)'; box.style.borderColor = 'var(--border-base)'; }
+                        if (chk) chk.style.display = 'none';
+                    }
                 },
 
                 async sendOTPEmail(email, name) {
@@ -1321,6 +1397,10 @@
 
                         if (!n || !e || !p) return alert("Заполните данные!");
                         if (p !== pc) { document.getElementById('up-error').classList.remove('ge-hidden'); return; }
+                        if (!document.getElementById('up-privacy').checked) {
+                            document.getElementById('up-privacy-error').classList.remove('ge-hidden');
+                            return;
+                        }
                         if (p.length < 8) return alert("Пароль слишком короткий!");
 
                         const userExists = geEngine.state.usersDB.find(u => u.email === e);
@@ -1396,6 +1476,22 @@
                     }
                 },
 
+                togglePrivacy() {
+                    const box = document.getElementById('up-privacy-box');
+                    const check = document.getElementById('up-privacy-check');
+                    const cb = document.getElementById('up-privacy');
+                    cb.checked = !cb.checked;
+                    if (cb.checked) {
+                        box.style.background = 'var(--ge-primary)';
+                        box.style.borderColor = 'var(--ge-primary)';
+                        check.style.display = 'block';
+                        document.getElementById('up-privacy-error').classList.add('ge-hidden');
+                    } else {
+                        box.style.background = 'var(--bg-input)';
+                        box.style.borderColor = 'var(--border-base)';
+                        check.style.display = 'none';
+                    }
+                },
                 exit() {
                     if (confirm("Выйти?")) { 
                         localStorage.removeItem('ge_v9_token'); 
@@ -1492,6 +1588,12 @@
             },
 
             ui: {
+                openPrivacy() {
+                    document.getElementById('ge-modal-privacy').style.display = 'flex';
+                },
+                closePrivacy() {
+                    document.getElementById('ge-modal-privacy').style.display = 'none';
+                },
                 toggleSettingsMenu(e) {
                     e.stopPropagation();
                     const popup = document.getElementById('ge-settings-popup');
@@ -1568,18 +1670,8 @@
                             if (user) {
                                 displayName = user.name;
                                 avColor = user.avColor;
-                            } else {
-                                // Ищем в кэше имён контактов (для пользователей с других устройств)
-                                const cachedContact = Object.entries(geEngine.state.contactNames).find(([email]) => 
-                                    email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart
-                                );
-                                if (cachedContact) {
-                                    displayName = cachedContact[1].name;
-                                    avColor = cachedContact[1].avColor || avColor;
-                                } else if (otherMailSafePart) {
-                                    // В крайнем случае — красиво форматируем safeMail
-                                    displayName = otherMailSafePart.replace(/(\w+?)(\d{4,})$/, '$1').replace(/([a-z])([A-Z])/g, '$1 $2') || otherMailSafePart;
-                                }
+                            } else if (otherMailSafePart) {
+                                displayName = otherMailSafePart.split('gmailcom')[0] || otherMailSafePart;
                             }
                         }
 
@@ -1987,22 +2079,7 @@
                         const data = await res.json();
 
                         // Сохраняем серверные контакты для звонков
-                        const freshContacts = data.contacts?.result || [];
-                        geEngine.state.serverContacts = freshContacts;
-                        // Загружаем имена неизвестных контактов с сервера
-                        for (const email of freshContacts) {
-                            if (!geEngine.state.contactNames[email]) {
-                                fetch(`/api/index?action=findUser&query=${encodeURIComponent(email)}`)
-                                    .then(r => r.json())
-                                    .then(d => {
-                                        if (d.status === 'found' && d.profile) {
-                                            const name = d.profile.name ? decodeURIComponent(d.profile.name) : email;
-                                            geEngine.state.contactNames[email] = { name, avColor: 'var(--ge-accent-gradient)' };
-                                            localStorage.setItem('ge_contact_names', JSON.stringify(geEngine.state.contactNames));
-                                        }
-                                    }).catch(() => {});
-                            }
-                        }
+                        geEngine.state.serverContacts = data.contacts?.result || [];
 
                         // Объединяем серверные комнаты с локальными (группы)
                         const serverRooms = data.rooms?.result || [];
@@ -2095,8 +2172,6 @@
                             const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                            geEngine.state.contactNames[localUser.email] = { name: localUser.name, avColor: localUser.avColor || 'var(--ge-accent-gradient)' };
-                            localStorage.setItem('ge_contact_names', JSON.stringify(geEngine.state.contactNames));
                             geEngine.chat.open(roomId, localUser.name);
                             return;
                         }
@@ -2121,9 +2196,6 @@
                             const roomId = addData.roomId;
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                            // Сохраняем имя контакта в кэш чтобы отображалось у обоих
-                            geEngine.state.contactNames[targetEmail] = { name: displayName, avColor: 'var(--ge-accent-gradient)' };
-                            localStorage.setItem('ge_contact_names', JSON.stringify(geEngine.state.contactNames));
                             alert(`${displayName} добавлен! Диалог появится у обоих.`);
                             geEngine.chat.open(roomId, displayName);
                         } else {
