@@ -1137,7 +1137,7 @@
                 </ul>
 
                 <h3 style="font-size:14px; font-weight:800; margin-bottom:10px; color:var(--ge-primary);">✉️ 6. Контактная информация</h3>
-                <p>По вопросам политики конфиденциальности пишите нам: <a href="/cdn-cgi/l/email-protection#137476607b727d707c61637c6172677a7c7d53747e727a7f3d707c7e" style="color:var(--ge-primary); font-weight:700;"><span class="__cf_email__" data-cfemail="1f787a6c777e717c706d6f706d7e6b7670715f78727e7673317c7072">[email&#160;protected]</span></a></p>
+                <p>По вопросам политики конфиденциальности пишите нам: <a href="mailto:geshancorporation@gmail.com" style="color:var(--ge-primary); font-weight:700;">geshancorporation@gmail.com</a></p>
             </div>
             <div style="margin-top:20px; flex-shrink:0;">
                 <button class="ge-btn-submit" onclick="geEngine.ui.closePrivacy()" style="margin-top:0;">ПОНЯТНО</button>
@@ -1342,7 +1342,7 @@
         </section>
     </main>
 
-    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+    <script>
         const geEngine = {
             state: {
                 session: null,
@@ -1355,8 +1355,7 @@
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
-                serverContacts: [],
-                contactNames: JSON.parse(localStorage.getItem('ge_contact_names') || '{}'),
+                serverContacts: [],   // email-адреса контактов с сервера
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
@@ -1739,16 +1738,8 @@
                             if (user) {
                                 displayName = user.name;
                                 avColor = user.avColor;
-                            } else {
-                                // Ищем в кэше имён (серверные контакты с других устройств)
-                                const _cached = Object.entries(geEngine.state.contactNames).find(
-                                    ([em]) => em.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart
-                                );
-                                if (_cached) {
-                                    displayName = _cached[1].name;
-                                } else if (otherMailSafePart) {
-                                    displayName = otherMailSafePart;
-                                }
+                            } else if (otherMailSafePart) {
+                                displayName = otherMailSafePart.split('gmailcom')[0] || otherMailSafePart;
                             }
                         }
 
@@ -1792,7 +1783,7 @@
                     const validMessages = (messages || []).filter(raw => {
                         try {
                             const m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw;
-                            return m.username !== 'System' && (m.mediaType || (m.text && !m.text.includes('EmailJS')));
+                            return m.username !== 'System' && m.text && !m.text.includes('EmailJS');
                         } catch(e) { return false; }
                     });
 
@@ -2156,22 +2147,7 @@
                         const data = await res.json();
 
                         // Сохраняем серверные контакты для звонков
-                        const _freshContacts = data.contacts?.result || [];
-                        geEngine.state.serverContacts = _freshContacts;
-                        // Подтягиваем имена контактов которых нет в кэше
-                        _freshContacts.forEach(email => {
-                            if (!geEngine.state.contactNames[email]) {
-                                fetch('/api/index?action=findUser&query=' + encodeURIComponent(email))
-                                    .then(r => r.json())
-                                    .then(d => {
-                                        if (d.status === 'found' && d.profile) {
-                                            const n = d.profile.name ? decodeURIComponent(d.profile.name) : email.split('@')[0];
-                                            geEngine.state.contactNames[email] = { name: n };
-                                            localStorage.setItem('ge_contact_names', JSON.stringify(geEngine.state.contactNames));
-                                        }
-                                    }).catch(() => {});
-                            }
-                        });
+                        geEngine.state.serverContacts = data.contacts?.result || [];
 
                         // Объединяем серверные комнаты с локальными (группы)
                         const serverRooms = data.rooms?.result || [];
@@ -2288,9 +2264,6 @@
                             const roomId = addData.roomId;
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                            // Кэшируем имя сразу — не ждём следующего refresh
-                            geEngine.state.contactNames[targetEmail] = { name: displayName };
-                            localStorage.setItem('ge_contact_names', JSON.stringify(geEngine.state.contactNames));
                             alert(`${displayName} добавлен! Диалог появится у обоих.`);
                             geEngine.chat.open(roomId, displayName);
                         } else {
@@ -2450,7 +2423,6 @@
                             text: '',
                             mediaType,
                             mediaKey,
-                            mediaData: base64,
                             mediaDuration: duration,
                             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             status: 'sent'
@@ -2537,3 +2509,12 @@
                 // Если идёт запись — останавливаем и отправляем
                 if (geEngine.media._recording) {
                     geEngine.media._stopAndSend();
+                } else {
+                    geEngine.chat.broadcast();
+                }
+            }
+        });
+        document.getElementById('prof-name').addEventListener('input', () => geEngine.profile.updatePreview());
+    </script>
+</body>
+</html>
