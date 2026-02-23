@@ -1249,7 +1249,7 @@
         const geEngine = {
             state: {
                 session: null,
-                activeRoom: "",
+                activeRoom: "general",
                 activeTab: "chats",
                 isSnowing: false,
                 snowInterval: null,
@@ -1259,6 +1259,7 @@
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 serverContacts: [],   // email-адреса контактов с сервера
+                contactNames: JSON.parse(localStorage.getItem('ge_contact_names') || '{}'), // {email: {name, avColor}}
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
@@ -1485,17 +1486,6 @@
                     document.getElementById('ge-my-av').innerText = newName[0].toUpperCase();
                     document.getElementById('ge-my-av').style.background = this.tempColor;
 
-                    // Обновляем профиль на сервере
-                    fetch(`/api/index?action=saveProfile&user_email=${encodeURIComponent(email)}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: newName, nickname: newNick })
-                    }).catch(() => {});
-                    fetch(`/api/index?action=saveProfile&user_email=${encodeURIComponent(email)}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: newName, nickname: newNick })
-                    }).catch(() => {});
                     alert("Профиль обновлен!");
                     this.close();
                 }
@@ -1578,13 +1568,23 @@
                             if (user) {
                                 displayName = user.name;
                                 avColor = user.avColor;
-                            } else if (otherMailSafePart) {
-                                displayName = otherMailSafePart.split('gmailcom')[0] || otherMailSafePart;
+                            } else {
+                                // Ищем в кэше имён контактов (для пользователей с других устройств)
+                                const cachedContact = Object.entries(geEngine.state.contactNames).find(([email]) => 
+                                    email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart
+                                );
+                                if (cachedContact) {
+                                    displayName = cachedContact[1].name;
+                                    avColor = cachedContact[1].avColor || avColor;
+                                } else if (otherMailSafePart) {
+                                    // В крайнем случае — красиво форматируем safeMail
+                                    displayName = otherMailSafePart.replace(/(\w+?)(\d{4,})$/, '$1').replace(/([a-z])([A-Z])/g, '$1 $2') || otherMailSafePart;
+                                }
                             }
                         }
 
                         return `
-                            <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open(this.dataset.rid, this.dataset.name)" data-rid="${rid.replace(/"/g,'&quot;')}" data-name="${displayName.replace(/"/g,'&quot;')}">
+                            <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}', '${displayName}')">
                                 <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:${avColor};">${displayName[0].toUpperCase()}</div>
                                 <div class="ge-item-content">
                                     <b>${displayName}</b>
@@ -1623,7 +1623,7 @@
                     const validMessages = (messages || []).filter(raw => {
                         try {
                             const m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw;
-                            return m.username !== 'System' && (m.mediaType || (m.text && !m.text.includes('EmailJS')));
+                            return m.username !== 'System' && m.text && !m.text.includes('EmailJS');
                         } catch(e) { return false; }
                     });
 
@@ -1632,7 +1632,7 @@
                         return;
                     }
 
-                    let msgIdCounter = (geEngine.ui._msgIdSeed = (geEngine.ui._msgIdSeed || 0) + 1000);
+                    let msgIdCounter = Date.now();
                     container.innerHTML = validMessages.map(raw => {
                         let m;
                         try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } catch(e) { return ''; }
@@ -1685,11 +1685,9 @@
                         }
 
                         // ОБЫЧНОЕ СООБЩЕНИЕ
-                        const safeText = String(m.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                        const safeUser = String(m.username||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
                         return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}">
-                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : safeUser}</span>
-                                <div class="ge-msg-text">${safeText}</div>
+                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
+                                <div class="ge-msg-text">${m.text}</div>
                                 <div class="ge-msg-status-line">
                                     <span>${timeStr}</span>
                                     ${isMe ? `<span>${statusIcon}</span>` : ''}
@@ -1959,7 +1957,7 @@
                     if (geEngine.state.isSnowing) {
                         container.style.display = 'block';
                         btn.innerText = "❄️ Снег: Вкл";
-                        geEngine.state.snowInterval = setInterval(() => geEngine.effects.createSnowflake(), 150);
+                        geEngine.state.snowInterval = setInterval(this.createSnowflake, 150);
                     } else {
                         container.style.display = 'none'; container.innerHTML = ""; btn.innerText = "❄️ Снег: Выкл";
                         clearInterval(geEngine.state.snowInterval);
@@ -1984,12 +1982,27 @@
             chat: {
                 async refresh() {
                     try {
-                        const url = `/api/index?room=${encodeURIComponent(geEngine.state.activeRoom || 'general')}&user_email=${encodeURIComponent(geEngine.state.session.email)}`;
+                        const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`;
                         const res = await fetch(url);
                         const data = await res.json();
 
                         // Сохраняем серверные контакты для звонков
-                        geEngine.state.serverContacts = data.contacts?.result || [];
+                        const freshContacts = data.contacts?.result || [];
+                        geEngine.state.serverContacts = freshContacts;
+                        // Загружаем имена неизвестных контактов с сервера
+                        for (const email of freshContacts) {
+                            if (!geEngine.state.contactNames[email]) {
+                                fetch(`/api/index?action=findUser&query=${encodeURIComponent(email)}`)
+                                    .then(r => r.json())
+                                    .then(d => {
+                                        if (d.status === 'found' && d.profile) {
+                                            const name = d.profile.name ? decodeURIComponent(d.profile.name) : email;
+                                            geEngine.state.contactNames[email] = { name, avColor: 'var(--ge-accent-gradient)' };
+                                            localStorage.setItem('ge_contact_names', JSON.stringify(geEngine.state.contactNames));
+                                        }
+                                    }).catch(() => {});
+                            }
+                        }
 
                         // Объединяем серверные комнаты с локальными (группы)
                         const serverRooms = data.rooms?.result || [];
@@ -2010,7 +2023,7 @@
                         time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), status: 'sent' 
                     });
                     input.value = '';
-                    await fetch(`/api/index?room=${encodeURIComponent(geEngine.state.activeRoom)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, { method: 'POST', body: payload });
+                    await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${geEngine.state.session.email}`, { method: 'POST', body: payload });
                     geEngine.chat.refresh();
                 },
                 open(id, prettyName) {
@@ -2031,15 +2044,7 @@
                             const parts = rid.replace('private-', '').split('-');
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             // Найдём контакт по roomId через сервер
-                            // Find actual target email from room id
-                            const contactEmail = geEngine.state.serverContacts.find(email => {
-                                const myS = geEngine.state.session.email.replace(/[@.]/g,'').toLowerCase();
-                                const otherS = email.replace(/[@.]/g,'').toLowerCase();
-                                return `private-${[myS,otherS].sort().join('-')}` === rid;
-                            });
-                            if (contactEmail) {
-                                fetch(`/api/index?action=removeContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(contactEmail)}`).catch(() => {});
-                            }
+                            fetch(`/api/index?action=removeContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(rid)}&rid=${encodeURIComponent(rid)}`).catch(() => {});
                         }
 
                         geEngine.chat.refresh();
@@ -2090,6 +2095,8 @@
                             const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                            geEngine.state.contactNames[localUser.email] = { name: localUser.name, avColor: localUser.avColor || 'var(--ge-accent-gradient)' };
+                            localStorage.setItem('ge_contact_names', JSON.stringify(geEngine.state.contactNames));
                             geEngine.chat.open(roomId, localUser.name);
                             return;
                         }
@@ -2114,6 +2121,9 @@
                             const roomId = addData.roomId;
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                            // Сохраняем имя контакта в кэш чтобы отображалось у обоих
+                            geEngine.state.contactNames[targetEmail] = { name: displayName, avColor: 'var(--ge-accent-gradient)' };
+                            localStorage.setItem('ge_contact_names', JSON.stringify(geEngine.state.contactNames));
                             alert(`${displayName} добавлен! Диалог появится у обоих.`);
                             geEngine.chat.open(roomId, displayName);
                         } else {
@@ -2277,7 +2287,7 @@
                             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             status: 'sent'
                         });
-                        await fetch(`/api/index?room=${encodeURIComponent(geEngine.state.activeRoom)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, {
+                        await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, {
                             method: 'POST', body: payload
                         });
                         geEngine.chat.refresh();
@@ -2340,27 +2350,14 @@
                 document.getElementById('ge-my-name').innerText = session.name;
                 document.getElementById('ge-my-av').innerText = session.name[0].toUpperCase();
                 document.getElementById('ge-my-av').style.background = session.avColor || 'var(--ge-accent-gradient)';
-                // При первом входе открываем вкладку с группами и чат general
-                geEngine.ui.setTab('people');
-                geEngine.chat.open('general', 'General');
+                geEngine.chat.refresh();
                 setInterval(() => geEngine.chat.refresh(), 4000);
-                // Глобальный polling входящих звонков (каждые 3с)
-                setInterval(() => { if (!geEngine.calls._signalInterval) geEngine.calls._pollSignals(); }, 3000);
+                // Глобальный polling входящих звонков
+                setInterval(() => geEngine.calls._pollSignals(), 2000);
                 // Инициализируем кнопку записи
                 geEngine.media.init();
             }
         };
-
-        window.addEventListener('click', () => {
-            document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
-            document.getElementById('ge-settings-popup')?.classList.remove('active');
-        });
-
-        window.addEventListener('click', () => {
-            document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
-            const sp = document.getElementById('ge-settings-popup');
-            if (sp) sp.classList.remove('active');
-        });
 
         window.onload = () => {
             const saved = localStorage.getItem('ge_v9_token');
