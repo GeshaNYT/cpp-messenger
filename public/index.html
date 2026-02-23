@@ -635,6 +635,7 @@
             display: flex;
             align-items: center;
             gap: 25px;
+            position: relative;
         }
 
         .ge-composer-input {
@@ -811,6 +812,34 @@
         .ge-color-dot.active { border-color: var(--text-primary); transform: scale(1.2); }
 
 
+
+        /* --- СЧЁТЧИК ЗАПИСИ --- */
+        .ge-rec-indicator {
+            position: absolute;
+            bottom: calc(100% + 12px);
+            left: 20px;
+            transform: none;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-base);
+            border-radius: var(--radius-full);
+            padding: 8px 18px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            box-shadow: var(--shadow-md);
+            white-space: nowrap;
+            z-index: 50;
+            animation: ge-slide-up 0.2s ease;
+        }
+        .ge-rec-indicator.active { display: flex; }
+        .ge-rec-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--ge-error);
+            animation: ge-rec-pulse 1s infinite;
+            flex-shrink: 0;
+        }
+        .ge-rec-label { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+        .ge-rec-timer { font-size: 13px; font-weight: 800; color: var(--ge-error); min-width: 32px; }
         /* --- ГОЛОСОВЫЕ И КРУЖОЧКИ --- */
         .ge-media-btn {
             width: 50px;
@@ -1116,6 +1145,12 @@
                         <polygon points="22 2 15 22 11 13 2 9 22 2"/>
                     </svg>
                 </button>
+                <!-- Индикатор записи -->
+                <div class="ge-rec-indicator" id="ge-rec-indicator">
+                    <div class="ge-rec-dot"></div>
+                    <span class="ge-rec-label" id="ge-rec-label">Голосовое</span>
+                    <span class="ge-rec-timer" id="ge-rec-timer">0:00</span>
+                </div>
             </footer>
         </section>
     </main>
@@ -2053,6 +2088,8 @@
                     }
                 },
 
+                _timerInterval: null,
+
                 async _startRecording() {
                     if (!geEngine.state.activeRoom) return;
                     const btn = document.getElementById('ge-media-toggle-btn');
@@ -2069,7 +2106,23 @@
                         this._recorder = new MediaRecorder(this._stream, { mimeType });
                         this._recorder.ondataavailable = e => this._chunks.push(e.data);
                         this._recorder.start();
-                        this._pressStart = Date.now(); // сбрасываем для подсчёта длительности
+                        this._pressStart = Date.now();
+
+                        // Показываем индикатор с таймером
+                        const indicator = document.getElementById('ge-rec-indicator');
+                        const label = document.getElementById('ge-rec-label');
+                        const timer = document.getElementById('ge-rec-timer');
+                        label.innerHTML = this._mode === 'voice'
+                            ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> Голосовое'
+                            : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg> Кружочек';
+                        timer.innerText = '0:00';
+                        indicator.classList.add('active');
+
+                        this._timerInterval = setInterval(() => {
+                            const elapsed = Math.floor((Date.now() - this._pressStart) / 1000);
+                            timer.innerText = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
+                        }, 500);
+
                     } catch {
                         btn.classList.remove('recording');
                         this._isRecording = false;
@@ -2080,6 +2133,13 @@
                 _stopRecording() {
                     const btn = document.getElementById('ge-media-toggle-btn');
                     btn.classList.remove('recording');
+
+                    // Скрываем индикатор и останавливаем таймер
+                    clearInterval(this._timerInterval);
+                    this._timerInterval = null;
+                    const indicator = document.getElementById('ge-rec-indicator');
+                    if (indicator) indicator.classList.remove('active');
+
                     if (!this._recorder || this._recorder.state === 'inactive') return;
 
                     const duration = Math.max(1, Math.round((Date.now() - this._pressStart) / 1000));
