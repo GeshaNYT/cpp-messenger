@@ -60,7 +60,17 @@ export default async function handler(request, response) {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const profile = await profileRes.json();
-            return response.status(200).json({ status: 'found', email: query, profile: profile.result || {} });
+            // hgetall returns flat array ["key","val","key","val"] - convert to object
+            const rawProfile = profile.result || [];
+            const profileObj = {};
+            if (Array.isArray(rawProfile)) {
+                for (let i = 0; i < rawProfile.length; i += 2) {
+                    profileObj[rawProfile[i]] = rawProfile[i+1];
+                }
+            } else if (typeof rawProfile === 'object') {
+                Object.assign(profileObj, rawProfile);
+            }
+            return response.status(200).json({ status: 'found', email: query, profile: profileObj });
         }
 
         const byNickRes = await fetch(`${url}/get/nick:${query}`, {
@@ -74,7 +84,17 @@ export default async function handler(request, response) {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const profile = await profileRes.json();
-            return response.status(200).json({ status: 'found', email: foundEmail, profile: profile.result || {} });
+            // hgetall returns flat array ["key","val","key","val"] - convert to object
+            const rawProfile2 = profile.result || [];
+            const profileObj2 = {};
+            if (Array.isArray(rawProfile2)) {
+                for (let i = 0; i < rawProfile2.length; i += 2) {
+                    profileObj2[rawProfile2[i]] = rawProfile2[i+1];
+                }
+            } else if (typeof rawProfile2 === 'object') {
+                Object.assign(profileObj2, rawProfile2);
+            }
+            return response.status(200).json({ status: 'found', email: foundEmail, profile: profileObj2 });
         }
 
         return response.status(404).json({ status: 'error', message: 'User not found' });
