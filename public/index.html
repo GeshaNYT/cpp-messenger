@@ -1137,7 +1137,7 @@
                 </ul>
 
                 <h3 style="font-size:14px; font-weight:800; margin-bottom:10px; color:var(--ge-primary);">✉️ 6. Контактная информация</h3>
-                <p>По вопросам политики конфиденциальности пишите нам: <a href="mailto:geshancorporation@gmail.com" style="color:var(--ge-primary); font-weight:700;">geshancorporation@gmail.com</a></p>
+                <p>По вопросам политики конфиденциальности пишите нам: <a href="/cdn-cgi/l/email-protection#137476607b727d707c61637c6172677a7c7d53747e727a7f3d707c7e" style="color:var(--ge-primary); font-weight:700;"><span class="__cf_email__" data-cfemail="1f787a6c777e717c706d6f706d7e6b7670715f78727e7673317c7072">[email&#160;protected]</span></a></p>
             </div>
             <div style="margin-top:20px; flex-shrink:0;">
                 <button class="ge-btn-submit" onclick="geEngine.ui.closePrivacy()" style="margin-top:0;">ПОНЯТНО</button>
@@ -1342,7 +1342,7 @@
         </section>
     </main>
 
-    <script>
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
         const geEngine = {
             state: {
                 session: null,
@@ -1356,6 +1356,7 @@
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 serverContacts: [],   // email-адреса контактов с сервера
+                contactNames: JSON.parse(localStorage.getItem('ge_contact_names') || '{}'), // {email: {name, avColor}}
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
@@ -1633,9 +1634,9 @@
                             u.nickname = newNick;
                             u.avColor = this.tempColor;
                             if (newPass) {
-                            if (/[^a-zA-Z0-9!@#$%^&*()_+\-=\[\]{}|;':",.<>?/`~\\]/.test(newPass)) return alert("Пароль: только латинские буквы, цифры и спецсимволы. Пробелы запрещены!");
-                            u.password = newPass;
-                        }
+                                if (/[^a-zA-Z0-9!@#$%^&*()_+\-=\[\]{}|;':",.<>?/`~\\]/.test(newPass)) return alert("Пароль: только латинские буквы, цифры и спецсимволы. Пробелы запрещены!");
+                                u.password = newPass;
+                            }
                         }
                         return u;
                     });
@@ -1649,6 +1650,13 @@
                     document.getElementById('ge-my-name').innerText = newName;
                     document.getElementById('ge-my-av').innerText = newName[0].toUpperCase();
                     document.getElementById('ge-my-av').style.background = this.tempColor;
+
+                    // Синхронизируем профиль на сервере (для корректного отображения у контактов)
+                    fetch(`/api/index?action=saveProfile&user_email=${encodeURIComponent(email)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: newName, nickname: newNick })
+                    }).catch(() => {});
 
                     alert("Профиль обновлен!");
                     this.close();
@@ -1732,31 +1740,45 @@
                             const parts = rid.replace('private-', '').split('-');
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherMailSafePart = parts.find(p => p !== myMailSafe);
-                            
-                            // Пытаемся найти пользователя в базе для получения реального имени и цвета
-                            const user = geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
-                            if (user) {
-                                displayName = user.name;
-                                avColor = user.avColor;
-                            } else if (otherMailSafePart) {
-                                displayName = otherMailSafePart.split('gmailcom')[0] || otherMailSafePart;
+
+                            // 1. Ищем в usersDB (тот же браузер)
+                            const localUser = geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
+                            if (localUser) {
+                                displayName = localUser.name;
+                                avColor = localUser.avColor || avColor;
+                            } else {
+                                // 2. Ищем в contactNames кэше (серверные контакты)
+                                const cachedEntry = Object.entries(geEngine.state.contactNames).find(([email]) =>
+                                    email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart
+                                );
+                                if (cachedEntry) {
+                                    displayName = cachedEntry[1].name;
+                                    avColor = cachedEntry[1].avColor || avColor;
+                                } else if (otherMailSafePart) {
+                                    // 3. Временный fallback — пока кэш не загрузился
+                                    displayName = otherMailSafePart;
+                                }
                             }
                         }
 
+                        const safeRid = rid.replace(/'/g, "\'");
+                        const safeName = displayName.replace(/'/g, "\'").replace(/"/g, '&quot;');
                         return `
-                            <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}', '${displayName}')">
+                            <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" 
+                                 data-rid="${safeRid}" data-name="${safeName}"
+                                 onclick="geEngine.chat.open(this.dataset.rid, this.dataset.name)">
                                 <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:${avColor};">${displayName[0].toUpperCase()}</div>
                                 <div class="ge-item-content">
-                                    <b>${displayName}</b>
+                                    <b>${safeName}</b>
                                     <span>${isGroup ? 'Групповой канал' : 'Активный зашифрованный канал'}</span>
                                 </div>
-                                <div class="ge-item-dots" onclick="geEngine.ui.toggleMenu(event, '${rid}')">⋮</div>
-                                <div id="menu-${rid}" class="ge-context-menu">
-                                    <button class="ge-menu-btn" onclick="geEngine.chat.removeRoom(event, '${rid}')">
+                                <div class="ge-item-dots" data-rid="${safeRid}" onclick="geEngine.ui.toggleMenu(event, this.dataset.rid)">⋮</div>
+                                <div id="menu-${safeRid}" class="ge-context-menu">
+                                    <button class="ge-menu-btn" data-rid="${safeRid}" onclick="geEngine.chat.removeRoom(event, this.dataset.rid)">
                                         ${isGroup ? 'Покинуть группу' : 'Удалить контакт'}
                                     </button>
                                     ${isCreator && isGroup && rid !== 'general' ? `
-                                        <button class="ge-menu-btn danger" onclick="geEngine.chat.deleteRoomPermanently(event, '${rid}')">
+                                        <button class="ge-menu-btn danger" data-rid="${safeRid}" onclick="geEngine.chat.deleteRoomPermanently(event, this.dataset.rid)">
                                             Удалить группу
                                         </button>
                                     ` : ''}
@@ -1783,7 +1805,7 @@
                     const validMessages = (messages || []).filter(raw => {
                         try {
                             const m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw;
-                            return m.username !== 'System' && m.text && !m.text.includes('EmailJS');
+                            return m.username !== 'System' && (m.mediaType || (m.text && !m.text.includes('EmailJS')));
                         } catch(e) { return false; }
                     });
 
@@ -1792,7 +1814,7 @@
                         return;
                     }
 
-                    let msgIdCounter = Date.now();
+                    let msgIdCounter = geEngine.state._msgSeed = (geEngine.state._msgSeed || 0) + 1000;
                     container.innerHTML = validMessages.map(raw => {
                         let m;
                         try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } catch(e) { return ''; }
@@ -2117,7 +2139,7 @@
                     if (geEngine.state.isSnowing) {
                         container.style.display = 'block';
                         btn.innerText = "❄️ Снег: Вкл";
-                        geEngine.state.snowInterval = setInterval(this.createSnowflake, 150);
+                        geEngine.state.snowInterval = setInterval(() => geEngine.effects.createSnowflake(), 150);
                     } else {
                         container.style.display = 'none'; container.innerHTML = ""; btn.innerText = "❄️ Снег: Выкл";
                         clearInterval(geEngine.state.snowInterval);
@@ -2147,7 +2169,22 @@
                         const data = await res.json();
 
                         // Сохраняем серверные контакты для звонков
-                        geEngine.state.serverContacts = data.contacts?.result || [];
+                        const freshContacts = data.contacts?.result || [];
+                        geEngine.state.serverContacts = freshContacts;
+                        // Подтягиваем имена контактов которых ещё нет в кэше
+                        for (const email of freshContacts) {
+                            if (!geEngine.state.contactNames[email]) {
+                                fetch(`/api/index?action=findUser&query=${encodeURIComponent(email)}`)
+                                    .then(r => r.json())
+                                    .then(d => {
+                                        if (d.status === 'found' && d.profile) {
+                                            const n = d.profile.name ? decodeURIComponent(d.profile.name) : email.split('@')[0];
+                                            geEngine.state.contactNames[email] = { name: n, avColor: 'var(--ge-accent-gradient)' };
+                                            localStorage.setItem('ge_contact_names', JSON.stringify(geEngine.state.contactNames));
+                                        }
+                                    }).catch(() => {});
+                            }
+                        }
 
                         // Объединяем серверные комнаты с локальными (группы)
                         const serverRooms = data.rooms?.result || [];
@@ -2240,6 +2277,8 @@
                             const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                            geEngine.state.contactNames[localUser.email] = { name: localUser.name, avColor: localUser.avColor || 'var(--ge-accent-gradient)' };
+                            localStorage.setItem('ge_contact_names', JSON.stringify(geEngine.state.contactNames));
                             geEngine.chat.open(roomId, localUser.name);
                             return;
                         }
@@ -2264,6 +2303,9 @@
                             const roomId = addData.roomId;
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                            // Кэшируем имя сразу — не ждём следующего refresh
+                            geEngine.state.contactNames[targetEmail] = { name: displayName, avColor: 'var(--ge-accent-gradient)' };
+                            localStorage.setItem('ge_contact_names', JSON.stringify(geEngine.state.contactNames));
                             alert(`${displayName} добавлен! Диалог появится у обоих.`);
                             geEngine.chat.open(roomId, displayName);
                         } else {
@@ -2423,6 +2465,7 @@
                             text: '',
                             mediaType,
                             mediaKey,
+                            mediaData: base64,   // base64 для получателей с других устройств
                             mediaDuration: duration,
                             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             status: 'sent'
@@ -2509,12 +2552,3 @@
                 // Если идёт запись — останавливаем и отправляем
                 if (geEngine.media._recording) {
                     geEngine.media._stopAndSend();
-                } else {
-                    geEngine.chat.broadcast();
-                }
-            }
-        });
-        document.getElementById('prof-name').addEventListener('input', () => geEngine.profile.updatePreview());
-    </script>
-</body>
-</html>
