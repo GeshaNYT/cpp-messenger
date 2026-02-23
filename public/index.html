@@ -1462,7 +1462,12 @@
                         const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`;
                         const res = await fetch(url);
                         const data = await res.json();
-                        geEngine.ui.renderChatList(data.rooms?.result);
+
+                        // Объединяем серверные комнаты с локальными (группы)
+                        const serverRooms = data.rooms?.result || [];
+                        const allRooms = Array.from(new Set([...serverRooms, ...geEngine.state.localRooms]));
+
+                        geEngine.ui.renderChatList(allRooms);
                         if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
                             if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(data.messages?.result);
                         }
@@ -1491,6 +1496,16 @@
                     if(confirm("Удалить?")) {
                         geEngine.state.deletedRooms.push(rid);
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+
+                        // Если приватная комната — удаляем с сервера (только у себя)
+                        if (rid.startsWith('private-')) {
+                            // Вычисляем email собеседника из roomId
+                            const parts = rid.replace('private-', '').split('-');
+                            const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                            // Найдём контакт по roomId через сервер
+                            fetch(`/api/index?action=removeContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(rid)}&rid=${encodeURIComponent(rid)}`).catch(() => {});
+                        }
+
                         geEngine.chat.refresh();
                     }
                 },
@@ -1508,43 +1523,36 @@
                     geEngine.chat.open('general', 'general');
                 },
                 async addFriend() {
-                    const input = prompt("Введите Email или уникальный никнейм пользователя (например @nick):");
-                    if (input) {
-                        let targetValue = input.trim().toLowerCase();
-                        
-                        // Удаляем символ @ в начале, если он есть
-                        if (targetValue.startsWith('@')) {
-                            targetValue = targetValue.substring(1);
-                        }
-                        
-                        // ПРОВЕРКА: Ищем пользователя по Email ИЛИ по Никнейму
-                        const targetUser = geEngine.state.usersDB.find(u => 
-                            u.email.toLowerCase() === targetValue || 
-                            (u.nickname && u.nickname.toLowerCase() === targetValue)
-                        );
+                    const input = prompt("Введите Email пользователя:");
+                    if (!input) return;
 
-                        if (!targetUser) {
-                            return alert("Пользователь с такими данными не найден в базе GeLink.");
-                        }
+                    let targetEmail = input.trim().toLowerCase();
 
-                        if (targetUser.email === geEngine.state.session.email) {
-                            return alert("Нельзя добавить самого себя.");
-                        }
+                    if (targetEmail === geEngine.state.session.email) {
+                        return alert("Нельзя добавить самого себя.");
+                    }
 
-                        const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                        const otherMailSafe = targetUser.email.replace(/[@.]/g, '').toLowerCase();
-                        const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
-                        
-                        if (!geEngine.state.localRooms.includes(roomId)) {
-                            geEngine.state.localRooms.push(roomId);
-                            localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                        }
-                        
-                        // Убираем из списка удаленных, если был там
-                        geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
-                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                    try {
+                        const res = await fetch(`/api/index?action=addContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(targetEmail)}`);
+                        const data = await res.json();
 
-                        geEngine.chat.open(roomId, targetUser.name);
+                        if (data.status === 'success') {
+                            // Убираем из удалённых если был там
+                            const roomId = data.roomId;
+                            geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
+                            localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+
+                            // Ищем имя пользователя в локальной БД для красивого отображения
+                            const targetUser = geEngine.state.usersDB.find(u => u.email.toLowerCase() === targetEmail);
+                            const displayName = targetUser ? targetUser.name : targetEmail;
+
+                            alert(`Пользователь ${displayName} добавлен! Диалог появится у обоих.`);
+                            geEngine.chat.open(roomId, displayName);
+                        } else {
+                            alert("Пользователь не найден. Убедитесь, что он зарегистрирован в GeLink и хотя бы раз отправил сообщение.");
+                        }
+                    } catch(e) {
+                        alert("Ошибка соединения с сервером.");
                     }
                 },
                 createGroup() {
