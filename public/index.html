@@ -1267,6 +1267,7 @@
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
+                serverContacts: [],   // email-адреса контактов с сервера
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
@@ -1641,7 +1642,8 @@
                         // ГОЛОСОВОЕ СООБЩЕНИЕ
                         if (m.mediaType === 'voice') {
                             const dur = geEngine.media._fmtDur(m.mediaDuration || 0);
-                            // Генерируем псевдо-волны (30 баров разной высоты, seed из uid)
+                            const mediaSrc = m.mediaData || (m.mediaKey ? localStorage.getItem(m.mediaKey) : null) || '';
+                            if (!mediaSrc) return ''; // медиа не найдено на этом устройстве
                             const bars = Array.from({length: 30}, (_, i) => {
                                 const h = 6 + Math.abs(Math.sin(i * 0.8 + uid * 0.01)) * 22;
                                 return `<div class="ge-wave-bar" style="height:${h.toFixed(0)}px"></div>`;
@@ -1649,7 +1651,7 @@
                             const playIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
                             return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}">
                                 <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
-                                <audio id="va-${uid}" class="ge-voice-audio" src="${m.mediaData}" preload="metadata"></audio>
+                                <audio id="va-${uid}" class="ge-voice-audio" src="${mediaSrc}" preload="metadata"></audio>
                                 <div class="ge-voice-msg">
                                     <button class="ge-play-btn" onclick="geEngine.media.toggleVoice(this,'va-${uid}')">${playIcon}</button>
                                     <div class="ge-waveform">${bars}</div>
@@ -1664,11 +1666,13 @@
 
                         // ВИДЕО КРУЖОЧЕК
                         if (m.mediaType === 'circle') {
+                            const mediaSrc = m.mediaData || (m.mediaKey ? localStorage.getItem(m.mediaKey) : null) || '';
+                            if (!mediaSrc) return ''; // медиа не найдено на этом устройстве
                             const playIcon = `<svg width="36" height="36" viewBox="0 0 24 24" fill="white" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4))"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
                             return `<div class="ge-msg-bubble ge-bubble-circle ${isMe ? 'me' : 'them'}">
                                 <span class="ge-msg-meta-top" style="color:var(--text-secondary);padding-left:4px">${isMe ? 'Вы' : m.username}</span>
                                 <div class="ge-circle-wrap" onclick="geEngine.media.toggleCircle(this,'cv-${uid}')">
-                                    <video id="cv-${uid}" src="${m.mediaData}" preload="metadata" playsinline></video>
+                                    <video id="cv-${uid}" src="${mediaSrc}" preload="metadata" playsinline></video>
                                     <div class="ge-circle-overlay">${playIcon}</div>
                                 </div>
                                 <div class="ge-msg-status-line" style="${isMe ? '' : 'color:var(--text-secondary);padding-left:4px'}">
@@ -1703,14 +1707,22 @@
                 _getTargetEmail() {
                     const room = geEngine.state.activeRoom;
                     if (!room || !room.startsWith('private-')) return null;
-                    const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                    const parts = room.replace('private-', '').split('-');
-                    const otherSafe = parts.find(p => p !== myMailSafe) || parts.find(p => !myMailSafe.includes(p));
-                    // Ищем email в локальной БД по safe-версии
-                    const found = geEngine.state.usersDB.find(u =>
-                        u.email.replace(/[@.]/g, '').toLowerCase() === otherSafe
-                    );
-                    return found ? found.email : null;
+                    const myEmail = geEngine.state.session.email;
+                    const myMailSafe = myEmail.replace(/[@.]/g, '').toLowerCase();
+
+                    // Ищем среди серверных контактов тот, чей safe совпадает с частью roomId
+                    const allCandidates = [
+                        ...geEngine.state.serverContacts,
+                        ...geEngine.state.usersDB.map(u => u.email)
+                    ];
+
+                    for (const email of allCandidates) {
+                        if (email === myEmail) continue;
+                        const safe = email.replace(/[@.]/g, '').toLowerCase();
+                        const expectedRoom = `private-${[myMailSafe, safe].sort().join('-')}`;
+                        if (expectedRoom === room) return email;
+                    }
+                    return null;
                 },
 
                 async _send(obj) {
@@ -1971,6 +1983,9 @@
                         const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`;
                         const res = await fetch(url);
                         const data = await res.json();
+
+                        // Сохраняем серверные контакты для звонков
+                        geEngine.state.serverContacts = data.contacts?.result || [];
 
                         // Объединяем серверные комнаты с локальными (группы)
                         const serverRooms = data.rooms?.result || [];
@@ -2298,12 +2313,20 @@
                     const reader = new FileReader();
                     reader.onload = async () => {
                         const base64 = reader.result;
+                        // Сохраняем медиа локально по уникальному ключу
+                        const mediaKey = `ge_media_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+                        try { localStorage.setItem(mediaKey, base64); } catch(e) {
+                            // localStorage переполнен — очищаем старые медиа
+                            Object.keys(localStorage).filter(k => k.startsWith('ge_media_')).slice(0, 10)
+                                .forEach(k => localStorage.removeItem(k));
+                            try { localStorage.setItem(mediaKey, base64); } catch {}
+                        }
                         const payload = JSON.stringify({
                             username: geEngine.state.session.name,
                             email: geEngine.state.session.email,
                             text: '',
                             mediaType,
-                            mediaData: base64,
+                            mediaKey,   // только ключ, не сам base64
                             mediaDuration: duration,
                             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             status: 'sent'
