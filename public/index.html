@@ -1137,7 +1137,7 @@
                 </ul>
 
                 <h3 style="font-size:14px; font-weight:800; margin-bottom:10px; color:var(--ge-primary);">✉️ 6. Контактная информация</h3>
-                <p>По вопросам политики конфиденциальности пишите нам: <a href="mailto:geshancorporation@gmail.com" style="color:var(--ge-primary); font-weight:700;">geshancorporation@gmail.com</a></p>
+                <p>По вопросам политики конфиденциальности пишите нам: <a href="/cdn-cgi/l/email-protection#98fffdebf0f9f6fbf7eae8f7eaf9ecf1f7f6d8fff5f9f1f4b6fbf7f5" style="color:var(--ge-primary); font-weight:700;"><span class="__cf_email__" data-cfemail="147371677c757a777b66647b6675607d7b7a547379757d783a777b79">[email&#160;protected]</span></a></p>
             </div>
             <div style="margin-top:20px; flex-shrink:0;">
                 <button class="ge-btn-submit" onclick="geEngine.ui.closePrivacy()" style="margin-top:0;">ПОНЯТНО</button>
@@ -1342,7 +1342,7 @@
         </section>
     </main>
 
-    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
         const geEngine = {
             state: {
                 session: null,
@@ -1403,7 +1403,7 @@
                     }
                 },
 
-                handle(type) {
+                async handle(type) {
                     let n, e, p, pc, nick;
                     if (type === 'reg') {
                         nick = document.getElementById('up-nick').value.trim().toLowerCase();
@@ -1415,10 +1415,6 @@
                         // ВАЛИДАЦИЯ НИКНЕЙМА
                         const nickRegex = /^[a-zA-Z0-9_]{3,20}$/;
                         if (!nickRegex.test(nick)) return alert("Никнейм должен быть от 3 до 20 символов и содержать только латиницу (a-z, A-Z), цифры, подчёркивание.");
-                        
-                        // ПРОВЕРКА УНИКАЛЬНОСТИ
-                        const nickTaken = geEngine.state.usersDB.find(u => u.nickname === nick);
-                        if (nickTaken) return alert("Этот никнейм уже занят другим пользователем.");
 
                         if (!n || !e || !p) return alert("Заполните данные!");
                         if (p !== pc) { document.getElementById('up-error').classList.remove('ge-hidden'); return; }
@@ -1429,8 +1425,18 @@
                         if (p.length < 8) return alert("Пароль слишком короткий!");
                         if (/[^a-zA-Z0-9!@#$%^&*()_+\-=\[\]{}|;':",.<>?/`~\\]/.test(p)) return alert("Пароль: только латинские буквы, цифры и спецсимволы. Пробелы запрещены!");
 
-                        const userExists = geEngine.state.usersDB.find(u => u.email === e);
-                        if (userExists) return alert("Этот Email уже занят!");
+                        // Проверка на сервере (глобальная)
+                        try {
+                            const checkRes = await fetch('/api/index?action=register', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ email: e, password: p, name: n, nickname: nick, avColor: 'var(--ge-accent-gradient)' })
+                            });
+                            const checkData = await checkRes.json();
+                            if (checkData.status === 'error') return alert(checkData.message);
+                        } catch(err) {
+                            return alert("Ошибка соединения с сервером. Попробуйте снова.");
+                        }
 
                         geEngine.state.pendingUser = { 
                             nickname: nick, 
@@ -1452,12 +1458,24 @@
                         p = document.getElementById('in-pass').value.trim();
                         if (!e || !p) return alert("Введите логин и пароль!");
 
-                        const user = geEngine.state.usersDB.find(u => u.email === e && u.password === p);
-                        if (!user) return alert("Неверный email или пароль!");
+                        // Проверка на сервере (глобальная)
+                        let serverUser = null;
+                        try {
+                            const loginRes = await fetch('/api/index?action=login', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ email: e, password: p })
+                            });
+                            const loginData = await loginRes.json();
+                            if (loginData.status === 'error') return alert(loginData.message);
+                            serverUser = loginData.user;
+                        } catch(err) {
+                            return alert("Ошибка соединения с сервером. Попробуйте снова.");
+                        }
                         
-                        geEngine.state.pendingUser = user;
+                        geEngine.state.pendingUser = serverUser;
                         
-                        this.sendOTPEmail(e, user.name).then(success => {
+                        this.sendOTPEmail(e, serverUser.name).then(success => {
                             if(success) {
                                 document.getElementById('login-fields-main').classList.add('ge-hidden');
                                 document.getElementById('login-otp-section').classList.remove('ge-hidden');
@@ -1473,10 +1491,7 @@
                     if (enteredCode === geEngine.state.currentOTP) {
                         const user = geEngine.state.pendingUser;
                         
-                        if (type === 'reg') {
-                            geEngine.state.usersDB.push(user);
-                            localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
-                        }
+                        // При регистрации данные уже сохранены на сервере через /api/index?action=register
 
                         geEngine.state.session = { 
                             name: user.name, 
@@ -1572,8 +1587,6 @@
                         const c2 = confirm("Это действие сотрет ваши данные из системы GeLink навсегда. Вы уверены?");
                         if(c2) {
                             const currentEmail = geEngine.state.session.email;
-                            geEngine.state.usersDB = geEngine.state.usersDB.filter(u => u.email !== currentEmail);
-                            localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
                             localStorage.removeItem('ge_v9_token');
                             alert("Ваш аккаунт был полностью удален.");
                             location.reload();
@@ -1609,7 +1622,7 @@
                     preview.innerText = (name[0] || '?').toUpperCase();
                     preview.style.background = this.tempColor;
                 },
-                save() {
+                async save() {
                     const newName = document.getElementById('prof-name').value.trim();
                     const newNick = document.getElementById('prof-nick').value.trim().toLowerCase();
                     const newPass = document.getElementById('prof-pass').value.trim();
@@ -1621,28 +1634,26 @@
                     const nickRegex = /^[a-zA-Z0-9_]{3,20}$/;
                     if (!nickRegex.test(newNick)) return alert("Никнейм должен быть от 3 до 20 символов (латиница, цифры, подчёркивание)");
 
-                    // Проверка на уникальность (если ник изменился)
-                    if (newNick !== geEngine.state.session.nickname) {
-                        const nickTaken = geEngine.state.usersDB.find(u => u.nickname === newNick && u.email !== email);
-                        if (nickTaken) return alert("Этот никнейм уже занят!");
-                    }
-
                     // Валидация нового пароля ДО изменений
                     if (newPass) {
                         if (newPass.length < 8) return alert("Пароль слишком короткий!");
                         if (/[^a-zA-Z0-9!@#$%^&*()_+\-=\[\]{}|;':",.<>?/`~\\]/.test(newPass)) return alert("Пароль: только латинские буквы, цифры и спецсимволы. Пробелы запрещены!");
                     }
 
-                    geEngine.state.usersDB = geEngine.state.usersDB.map(u => {
-                        if (u.email === email) {
-                            u.name = newName;
-                            u.nickname = newNick;
-                            u.avColor = this.tempColor;
-                            if (newPass) u.password = newPass;
-                        }
-                        return u;
-                    });
-                    localStorage.setItem('ge_users_db', JSON.stringify(geEngine.state.usersDB));
+                    // Обновляем на сервере
+                    try {
+                        const body = { name: newName, nickname: newNick, avColor: this.tempColor };
+                        if (newPass) body.password = newPass;
+                        const res = await fetch(`/api/index?action=updateProfile&user_email=${encodeURIComponent(email)}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                        const data = await res.json();
+                        if (data.status === 'error') return alert(data.message);
+                    } catch(err) {
+                        return alert("Ошибка соединения с сервером.");
+                    }
 
                     geEngine.state.session.name = newName;
                     geEngine.state.session.nickname = newNick;
@@ -2520,13 +2531,4 @@
 
             document.getElementById('ge-main-input').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
-                    if (geEngine.media._recording) {
-                        geEngine.media._stopAndSend();                    } else {
-                        geEngine.chat.broadcast();
-                    }
-                }
-            });
-        };
-    </script>
-</body>
-</html>
+                    if (g
