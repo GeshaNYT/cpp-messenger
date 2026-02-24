@@ -4,6 +4,125 @@ export default async function handler(request, response) {
     
     const { room = 'general', user_email, action, target_email } = request.query;
 
+    // ==================== РЕГИСТРАЦИЯ ====================
+    if (action === 'register' && request.method === 'POST') {
+        const { email, password, name, nickname, avColor } = request.body;
+        if (!email || !password || !name || !nickname) {
+            return response.status(400).json({ status: 'error', message: 'Заполните все поля' });
+        }
+        const emailLower = email.trim().toLowerCase();
+        const nickLower = nickname.trim().toLowerCase();
+
+        // Проверяем — email уже занят?
+        const existsRes = await fetch(`${url}/sismember/all_users/${emailLower}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        const existsData = await existsRes.json();
+        if (existsData.result === 1) {
+            return response.status(400).json({ status: 'error', message: 'Этот email уже зарегистрирован' });
+        }
+
+        // Проверяем — ник уже занят?
+        const nickCheckRes = await fetch(`${url}/get/nick:${nickLower}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        const nickCheckData = await nickCheckRes.json();
+        if (nickCheckData.result) {
+            return response.status(400).json({ status: 'error', message: 'Этот никнейм уже занят' });
+        }
+
+        // Сохраняем пользователя
+        await fetch(`${url}/sadd/all_users/${emailLower}`, { headers: { Authorization: `Bearer ${token}` } });
+        await fetch(`${url}/hset/profile:${emailLower}/name/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${token}` } });
+        await fetch(`${url}/hset/profile:${emailLower}/nickname/${encodeURIComponent(nickLower)}`, { headers: { Authorization: `Bearer ${token}` } });
+        await fetch(`${url}/hset/profile:${emailLower}/avColor/${encodeURIComponent(avColor || 'var(--ge-accent-gradient)')}`, { headers: { Authorization: `Bearer ${token}` } });
+        // Хешируем пароль простым способом (base64 — не продакшн, но работает без crypto в edge)
+        const passEncoded = Buffer.from(password).toString('base64');
+        await fetch(`${url}/hset/profile:${emailLower}/password/${encodeURIComponent(passEncoded)}`, { headers: { Authorization: `Bearer ${token}` } });
+        await fetch(`${url}/set/nick:${nickLower}/${emailLower}`, { headers: { Authorization: `Bearer ${token}` } });
+
+        return response.status(200).json({ status: 'ok' });
+    }
+
+    // ==================== ВХОД ====================
+    if (action === 'login' && request.method === 'POST') {
+        const { email, password } = request.body;
+        if (!email || !password) {
+            return response.status(400).json({ status: 'error', message: 'Введите email и пароль' });
+        }
+        const emailLower = email.trim().toLowerCase();
+
+        // Проверяем существование пользователя
+        const existsRes = await fetch(`${url}/sismember/all_users/${emailLower}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        const existsData = await existsRes.json();
+        if (existsData.result !== 1) {
+            return response.status(401).json({ status: 'error', message: 'Неверный email или пароль' });
+        }
+
+        // Получаем профиль
+        const profileRes = await fetch(`${url}/hgetall/profile:${emailLower}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        const profileData = await profileRes.json();
+        const rawProfile = profileData.result || [];
+        const profile = {};
+        if (Array.isArray(rawProfile)) {
+            for (let i = 0; i < rawProfile.length; i += 2) {
+                profile[rawProfile[i]] = rawProfile[i + 1];
+            }
+        }
+
+        // Проверяем пароль
+        const passEncoded = Buffer.from(password).toString('base64');
+        const storedPass = profile.password ? decodeURIComponent(profile.password) : null;
+        if (!storedPass || storedPass !== passEncoded) {
+            return response.status(401).json({ status: 'error', message: 'Неверный email или пароль' });
+        }
+
+        return response.status(200).json({
+            status: 'ok',
+            user: {
+                email: emailLower,
+                name: profile.name ? decodeURIComponent(profile.name) : emailLower,
+                nickname: profile.nickname ? decodeURIComponent(profile.nickname) : '',
+                avColor: profile.avColor ? decodeURIComponent(profile.avColor) : 'var(--ge-accent-gradient)'
+            }
+        });
+    }
+
+    // ==================== ОБНОВЛЕНИЕ ПРОФИЛЯ ====================
+    if (action === 'updateProfile' && user_email && request.method === 'POST') {
+        const { name, nickname, avColor, password } = request.body;
+        const emailLower = user_email.trim().toLowerCase();
+
+        if (name) {
+            await fetch(`${url}/hset/profile:${emailLower}/name/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${token}` } });
+        }
+        if (nickname) {
+            const nickLower = nickname.toLowerCase();
+            // Удаляем старый ник
+            const oldProfileRes = await fetch(`${url}/hget/profile:${emailLower}/nickname`, { headers: { Authorization: `Bearer ${token}` } });
+            const oldProfileData = await oldProfileRes.json();
+            if (oldProfileData.result) {
+                const oldNick = decodeURIComponent(oldProfileData.result);
+                await fetch(`${url}/del/nick:${oldNick}`, { headers: { Authorization: `Bearer ${token}` } });
+            }
+            await fetch(`${url}/hset/profile:${emailLower}/nickname/${encodeURIComponent(nickLower)}`, { headers: { Authorization: `Bearer ${token}` } });
+            await fetch(`${url}/set/nick:${nickLower}/${emailLower}`, { headers: { Authorization: `Bearer ${token}` } });
+        }
+        if (avColor) {
+            await fetch(`${url}/hset/profile:${emailLower}/avColor/${encodeURIComponent(avColor)}`, { headers: { Authorization: `Bearer ${token}` } });
+        }
+        if (password) {
+            const passEncoded = Buffer.from(password).toString('base64');
+            await fetch(`${url}/hset/profile:${emailLower}/password/${encodeURIComponent(passEncoded)}`, { headers: { Authorization: `Bearer ${token}` } });
+        }
+
+        return response.status(200).json({ status: 'ok' });
+    }
+
     // ==================== СИГНАЛИЗАЦИЯ ДЛЯ WebRTC ====================
 
     // Отправить сигнал (offer / answer / ice / call-request / call-end)
@@ -44,126 +163,6 @@ export default async function handler(request, response) {
         }).filter(Boolean);
 
         return response.status(200).json({ status: 'ok', signals });
-    }
-
-    // ==================== ОБНОВЛЕНИЕ ПРОФИЛЯ (пароль, имя, ник) ====================
-    if (action === 'updateProfile' && user_email && request.method === 'POST') {
-        const body = request.body;
-        const { name, nickname, password, avColor } = body;
-        const emailLower = user_email.trim().toLowerCase();
-
-        if (nickname) {
-            const nickLower = nickname.toLowerCase();
-            // Проверяем не занят ли новый ник кем-то другим
-            const nickCheckRes = await fetch(`${url}/get/nick:${nickLower}`, { headers: { Authorization: `Bearer ${token}` } });
-            const nickCheck = await nickCheckRes.json();
-            if (nickCheck.result && nickCheck.result !== emailLower) {
-                return response.status(409).json({ status: 'error', message: 'Этот никнейм уже занят!' });
-            }
-            // Удаляем старый ник
-            const oldProfileRes = await fetch(`${url}/hget/profile:${emailLower}/nickname`, { headers: { Authorization: `Bearer ${token}` } });
-            const oldProfileData = await oldProfileRes.json();
-            if (oldProfileData.result) {
-                const oldNick = decodeURIComponent(oldProfileData.result);
-                await fetch(`${url}/del/nick:${oldNick}`, { headers: { Authorization: `Bearer ${token}` } });
-            }
-            await fetch(`${url}/hset/profile:${emailLower}/nickname/${encodeURIComponent(nickLower)}`, { headers: { Authorization: `Bearer ${token}` } });
-            await fetch(`${url}/set/nick:${nickLower}/${emailLower}`, { headers: { Authorization: `Bearer ${token}` } });
-        }
-        if (name) {
-            await fetch(`${url}/hset/profile:${emailLower}/name/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${token}` } });
-        }
-        if (password) {
-            await fetch(`${url}/hset/profile:${emailLower}/password/${encodeURIComponent(password)}`, { headers: { Authorization: `Bearer ${token}` } });
-        }
-        if (avColor) {
-            await fetch(`${url}/hset/profile:${emailLower}/avColor/${encodeURIComponent(avColor)}`, { headers: { Authorization: `Bearer ${token}` } });
-        }
-        return response.status(200).json({ status: 'ok' });
-    }
-
-    // ==================== РЕГИСТРАЦИЯ ====================
-    if (action === 'register' && request.method === 'POST') {
-        const body = request.body;
-        const { email, password, name, nickname, avColor } = body;
-        if (!email || !password || !name || !nickname) {
-            return response.status(400).json({ status: 'error', message: 'Не все поля заполнены' });
-        }
-        const emailLower = email.trim().toLowerCase();
-        const nickLower = nickname.trim().toLowerCase();
-
-        // Проверяем, не занят ли email
-        const emailCheckRes = await fetch(`${url}/sismember/all_users/${emailLower}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        const emailCheck = await emailCheckRes.json();
-        if (emailCheck.result === 1) {
-            return response.status(409).json({ status: 'error', message: 'Этот Email уже занят!' });
-        }
-
-        // Проверяем, не занят ли никнейм
-        const nickCheckRes = await fetch(`${url}/get/nick:${nickLower}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        const nickCheck = await nickCheckRes.json();
-        if (nickCheck.result) {
-            return response.status(409).json({ status: 'error', message: 'Этот никнейм уже занят!' });
-        }
-
-        // Сохраняем пользователя
-        await fetch(`${url}/sadd/all_users/${emailLower}`, { headers: { Authorization: `Bearer ${token}` } });
-        await fetch(`${url}/hset/profile:${emailLower}/name/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${token}` } });
-        await fetch(`${url}/hset/profile:${emailLower}/nickname/${encodeURIComponent(nickLower)}`, { headers: { Authorization: `Bearer ${token}` } });
-        await fetch(`${url}/hset/profile:${emailLower}/password/${encodeURIComponent(password)}`, { headers: { Authorization: `Bearer ${token}` } });
-        await fetch(`${url}/hset/profile:${emailLower}/avColor/${encodeURIComponent(avColor || 'var(--ge-accent-gradient)')}`, { headers: { Authorization: `Bearer ${token}` } });
-        await fetch(`${url}/set/nick:${nickLower}/${emailLower}`, { headers: { Authorization: `Bearer ${token}` } });
-
-        return response.status(200).json({ status: 'ok', message: 'Зарегистрирован' });
-    }
-
-    // ==================== ВХОД ====================
-    if (action === 'login' && request.method === 'POST') {
-        const body = request.body;
-        const { email, password } = body;
-        if (!email || !password) {
-            return response.status(400).json({ status: 'error', message: 'Введите email и пароль' });
-        }
-        const emailLower = email.trim().toLowerCase();
-
-        const existsRes = await fetch(`${url}/sismember/all_users/${emailLower}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        const exists = await existsRes.json();
-        if (exists.result !== 1) {
-            return response.status(401).json({ status: 'error', message: 'Неверный email или пароль!' });
-        }
-
-        const profileRes = await fetch(`${url}/hgetall/profile:${emailLower}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        const profileData = await profileRes.json();
-        const rawProfile = profileData.result || [];
-        const profileObj = {};
-        if (Array.isArray(rawProfile)) {
-            for (let i = 0; i < rawProfile.length; i += 2) {
-                profileObj[rawProfile[i]] = rawProfile[i+1];
-            }
-        }
-
-        const storedPassword = decodeURIComponent(profileObj.password || '');
-        if (storedPassword !== password) {
-            return response.status(401).json({ status: 'error', message: 'Неверный email или пароль!' });
-        }
-
-        return response.status(200).json({
-            status: 'ok',
-            user: {
-                email: emailLower,
-                name: decodeURIComponent(profileObj.name || ''),
-                nickname: decodeURIComponent(profileObj.nickname || ''),
-                avColor: decodeURIComponent(profileObj.avColor || 'var(--ge-accent-gradient)')
-            }
-        });
     }
 
     // ==================== ПОИСК ПОЛЬЗОВАТЕЛЯ ====================
