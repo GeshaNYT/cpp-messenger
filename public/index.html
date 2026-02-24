@@ -2531,4 +2531,13 @@
 
             document.getElementById('ge-main-input').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
-                    if (g
+                    if (geEngine.media._recording) {
+                        geEngine.media._stopAndSend();                    } else {
+                        geEngine.chat.broadcast();
+                    }
+                }
+            });
+        };
+    </script>
+</body>
+</html>
