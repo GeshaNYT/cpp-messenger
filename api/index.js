@@ -1,6 +1,6 @@
 export default async function handler(request, response) {
-    const url = "https://giving-bass-54270.upstash.io";
-    const token = "AdP-AAIncDE2YmY4MWI5Y2VlZDI0NGI2ODI3ZTlhOTlkZWJhYWNhNHAxNTQyNzA";
+    const url = "https://inspired-chipmunk-107013.upstash.io";
+    const token = "gQAAAAAAAaIFAAIgcDI0Zjk4ZWFlZjM4MzM0ZTYzYTE3Y2RiMzQwNDM0YjJkNw";
     
     const { room = 'general', user_email, action, target_email } = request.query;
 
