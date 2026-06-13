@@ -1719,13 +1719,14 @@
 
                     // Проверяем существует ли аккаунт
                     try {
-                        const res = await fetch(`/api/index?action=getProfile&user_email=${encodeURIComponent(email)}`);
+                        const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(email)}`);
                         const data = await res.json();
-                        if (data.status === 'error' || !data.profile || !data.profile.name) {
+                        if (data.status !== 'found' || !data.profile) {
                             return alert('На эту почту не зарегистрирован аккаунт GeLink.');
                         }
                         geEngine.state.forgotEmail = email;
-                        geEngine.state.forgotName = data.profile.name;
+                        const rawName = data.profile.name;
+                        geEngine.state.forgotName = rawName ? decodeURIComponent(rawName) : email;
                     } catch(err) {
                         return alert('Ошибка соединения с сервером. Попробуйте снова.');
                     }
