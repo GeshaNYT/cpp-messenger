@@ -1201,9 +1201,25 @@
                 </div>
                 <div class="ge-field">
                     <label class="ge-label">Новый пароль (оставьте пустым, если не меняете)</label>
-                    <input type="password" id="prof-pass" class="ge-input-core" placeholder="••••••••" oninput="geEngine.auth.filterLatinPass(this)">
+                    <div style="position:relative;">
+                        <input type="password" id="prof-pass" class="ge-input-core" placeholder="••••••••" style="padding-right:44px;" oninput="geEngine.auth.filterLatinPass(this)">
+                        <button type="button" class="ge-eye-btn" onclick="geEngine.auth.toggleEye('prof-pass', this)" tabindex="-1">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
                 </div>
-                <div style="display: flex; gap: 15px;">
+
+                <!-- OTP подтверждение смены пароля -->
+                <div id="prof-otp-section" class="ge-hidden" style="animation: ge-slide-up 0.3s ease; margin-top:10px;">
+                    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">Код подтверждения отправлен на вашу почту.</p>
+                    <div class="ge-field">
+                        <label class="ge-label" style="color:var(--ge-primary)">Введите код</label>
+                        <input type="text" id="prof-otp" class="ge-input-core" placeholder="000000" maxlength="6" style="text-align:center;font-size:22px;letter-spacing:5px;">
+                    </div>
+                    <button class="ge-btn-submit" onclick="geEngine.profile.confirmPassOTP()">ПОДТВЕРДИТЬ И СОХРАНИТЬ</button>
+                </div>
+
+                <div id="prof-save-btns" style="display: flex; gap: 15px; margin-top:4px;">
                     <button class="ge-btn-submit" style="background: var(--bg-input); color: var(--text-primary); box-shadow: none;" onclick="geEngine.profile.close()">ОТМЕНА</button>
                     <button class="ge-btn-submit" onclick="geEngine.profile.save()">СОХРАНИТЬ</button>
                 </div>
@@ -1541,6 +1557,7 @@
                 currentOTP: null,
                 forgotEmail: null,
                 forgotName: null,
+                profilePending: null,
                 pendingUser: null
             },
 
@@ -1865,6 +1882,11 @@
                 },
                 close() {
                     document.getElementById('ge-modal-profile').style.display = 'none';
+                    document.getElementById('prof-otp-section').classList.add('ge-hidden');
+                    document.getElementById('prof-save-btns').classList.remove('ge-hidden');
+                    document.getElementById('prof-otp').value = '';
+                    document.getElementById('prof-pass').value = '';
+                    geEngine.state.profilePending = null;
                 },
                 setAvColor(color) {
                     this.tempColor = color;
@@ -1883,20 +1905,46 @@
                     const email = geEngine.state.session.email;
 
                     if (!newName) return alert("Имя не может быть пустым!");
-                    
-                    // Валидация ника
+
                     const nickRegex = /^[a-zA-Z0-9_]{3,20}$/;
                     if (!nickRegex.test(newNick)) return alert("Никнейм должен быть от 3 до 20 символов (латиница, цифры, подчёркивание)");
 
-                    // Валидация нового пароля ДО изменений
+                    // Если меняем пароль — сначала OTP
                     if (newPass) {
                         if (newPass.length < 8) return alert("Пароль слишком короткий!");
                         if (/[^a-zA-Z0-9!@#$%^&*()_+\-=\[\]{}|;':",.<>?/`~\\]/.test(newPass)) return alert("Пароль: только латинские буквы, цифры и спецсимволы. Пробелы запрещены!");
+
+                        // Сохраняем pending данные
+                        geEngine.state.profilePending = { newName, newNick, newPass, avColor: this.tempColor };
+
+                        const success = await geEngine.auth.sendOTPEmail(email, geEngine.state.session.name);
+                        if (success) {
+                            document.getElementById('prof-save-btns').classList.add('ge-hidden');
+                            document.getElementById('prof-otp-section').classList.remove('ge-hidden');
+                        }
+                        return;
                     }
 
-                    // Обновляем на сервере
+                    // Без смены пароля — сохраняем сразу
+                    await geEngine.profile._doSave({ newName, newNick, avColor: this.tempColor });
+                },
+                async confirmPassOTP() {
+                    const entered = document.getElementById('prof-otp').value.trim();
+                    if (entered !== geEngine.state.currentOTP) return alert("Неверный код! Попробуйте ещё раз.");
+                    geEngine.state.currentOTP = null;
+
+                    const p = geEngine.state.profilePending;
+                    await geEngine.profile._doSave({ newName: p.newName, newNick: p.newNick, avColor: p.avColor, newPass: p.newPass });
+                    geEngine.state.profilePending = null;
+
+                    document.getElementById('prof-otp-section').classList.add('ge-hidden');
+                    document.getElementById('prof-save-btns').classList.remove('ge-hidden');
+                    document.getElementById('prof-otp').value = '';
+                },
+                async _doSave({ newName, newNick, avColor, newPass }) {
+                    const email = geEngine.state.session.email;
                     try {
-                        const body = { name: newName, nickname: newNick, avColor: this.tempColor };
+                        const body = { name: newName, nickname: newNick, avColor };
                         if (newPass) body.password = newPass;
                         const res = await fetch(`/api/index?action=updateProfile&user_email=${encodeURIComponent(email)}`, {
                             method: 'POST',
@@ -1911,14 +1959,14 @@
 
                     geEngine.state.session.name = newName;
                     geEngine.state.session.nickname = newNick;
-                    geEngine.state.session.avColor = this.tempColor;
+                    geEngine.state.session.avColor = avColor;
                     localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
 
                     document.getElementById('ge-my-name').innerText = newName;
                     document.getElementById('ge-my-av').innerText = newName[0].toUpperCase();
-                    document.getElementById('ge-my-av').style.background = this.tempColor;
+                    document.getElementById('ge-my-av').style.background = avColor;
 
-                    alert("Профиль обновлен!");
+                    alert("Профиль обновлён!");
                     this.close();
                 }
             },
