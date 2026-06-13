@@ -1694,7 +1694,9 @@
                     document.getElementById('ge-settings-popup').classList.remove('active');
 
                     const html = document.documentElement;
-                    html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+                    const newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                    html.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('ge_theme', newTheme);
                 },
                 setTab(tab) {
                     geEngine.state.activeTab = tab;
@@ -2526,6 +2528,10 @@
         };
 
         window.onload = () => {
+            // Восстанавливаем тему
+            const savedTheme = localStorage.getItem('ge_theme');
+            if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+
             const saved = localStorage.getItem('ge_v9_token');
             if (saved) { geEngine.state.session = JSON.parse(saved); geEngine.init(); }
 
