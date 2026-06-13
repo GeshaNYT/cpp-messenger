@@ -366,7 +366,6 @@
         [data-glass="on"] .ge-view-header,
         [data-glass="on"] .ge-footer,
         [data-glass="on"] .ge-settings-popup,
-        [data-glass="on"] .ge-modal-content,
         [data-glass="on"] .ge-context-menu,
         [data-glass="on"] .ge-auth-container,
         [data-glass="on"] #ge-incoming-call {
@@ -406,7 +405,6 @@
         [data-theme="dark"][data-glass="on"] .ge-view-header,
         [data-theme="dark"][data-glass="on"] .ge-footer,
         [data-theme="dark"][data-glass="on"] .ge-settings-popup,
-        [data-theme="dark"][data-glass="on"] .ge-modal-content,
         [data-theme="dark"][data-glass="on"] .ge-context-menu,
         [data-theme="dark"][data-glass="on"] #ge-incoming-call {
             background: rgba(20, 20, 35, 0.35) !important;
@@ -433,10 +431,33 @@
             color: var(--ge-primary) !important;
             background: var(--ge-primary-soft);
         }
-        /* Оверлей остаётся тёмным даже при стекле */
+        /* Оверлей — лёгкое затемнение, само окно (content) — стекло */
         [data-glass="on"] .ge-modal-overlay {
-            background: rgba(0,0,0,0.4) !important;
-            backdrop-filter: blur(8px) !important;
+            background: rgba(0,0,0,0.25) !important;
+            backdrop-filter: none !important;
+        }
+
+        /* Светлая тема: модальное окно — чистое стекло */
+        [data-glass="on"] .ge-modal-content {
+            background: rgba(255, 255, 255, 0.65) !important;
+            backdrop-filter: blur(40px) saturate(200%) !important;
+            -webkit-backdrop-filter: blur(40px) saturate(200%) !important;
+            border: 1px solid rgba(255,255,255,0.6) !important;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.8) !important;
+            color: inherit !important;
+        }
+
+        /* Тёмная тема: модальное окно */
+        [data-theme="dark"][data-glass="on"] .ge-modal-overlay {
+            background: rgba(0,0,0,0.35) !important;
+            backdrop-filter: none !important;
+        }
+        [data-theme="dark"][data-glass="on"] .ge-modal-content {
+            background: rgba(30, 30, 50, 0.55) !important;
+            backdrop-filter: blur(40px) saturate(200%) !important;
+            -webkit-backdrop-filter: blur(40px) saturate(200%) !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07) !important;
         }
 
 
