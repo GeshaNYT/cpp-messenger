@@ -1344,6 +1344,7 @@
                         <div id="ge-settings-popup" class="ge-settings-popup">
                             <button class="ge-popup-item" onclick="geEngine.ui.toggleTheme()">🌓 Сменить тему</button>
                             <button class="ge-popup-item" id="ge-glass-btn" onclick="geEngine.ui.toggleGlass()">🫧 Жидкое стекло</button>
+                            <button class="ge-popup-item" id="btn-snow" onclick="geEngine.effects.toggleSnow()">❄️ Снег: Выкл</button>
                             <button class="ge-popup-item" onclick="geEngine.profile.open()">👤 Профиль</button>
                             <button class="ge-popup-item danger" onclick="geEngine.auth.deleteAccountFull()">🗑️ Удалить аккаунт</button>
                         </div>
@@ -1366,7 +1367,6 @@
                 </div>
 
             <footer class="ge-sidebar-footer">
-                <button class="ge-theme-toggler" onclick="geEngine.effects.toggleSnow()" id="btn-snow">❄️ Снег: Выкл</button>
                 <button class="ge-logout-btn" onclick="geEngine.auth.exit()">ЗАВЕРШИТЬ СЕАНС</button>
             </footer>
         </aside>
