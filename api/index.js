@@ -1,6 +1,18 @@
+async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export default async function handler(request, response) {
-    const url = "https://inspired-chipmunk-107013.upstash.io";
-    const token = "gQAAAAAAAaIFAAIgcDI0Zjk4ZWFlZjM4MzM0ZTYzYTE3Y2RiMzQwNDM0YjJkNw";
+    const url = process.env.UPSTASH_URL;
+    const token = process.env.UPSTASH_TOKEN;
+
+    if (!url || !token) {
+        return response.status(500).json({ status: 'error', message: 'Server misconfigured: missing env vars' });
+    }
     
     const { room = 'general', user_email, action, target_email } = request.query;
 
@@ -36,8 +48,8 @@ export default async function handler(request, response) {
         await fetch(`${url}/hset/profile:${emailLower}/name/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${token}` } });
         await fetch(`${url}/hset/profile:${emailLower}/nickname/${encodeURIComponent(nickLower)}`, { headers: { Authorization: `Bearer ${token}` } });
         await fetch(`${url}/hset/profile:${emailLower}/avColor/${encodeURIComponent(avColor || 'var(--ge-accent-gradient)')}`, { headers: { Authorization: `Bearer ${token}` } });
-        // Хешируем пароль простым способом (base64 — не продакшн, но работает без crypto в edge)
-        const passEncoded = Buffer.from(password).toString('base64');
+        // Хешируем пароль через SHA-256
+        const passEncoded = await hashPassword(password);
         await fetch(`${url}/hset/profile:${emailLower}/password/${encodeURIComponent(passEncoded)}`, { headers: { Authorization: `Bearer ${token}` } });
         await fetch(`${url}/set/nick:${nickLower}/${emailLower}`, { headers: { Authorization: `Bearer ${token}` } });
 
@@ -75,8 +87,8 @@ export default async function handler(request, response) {
         }
 
         // Проверяем пароль
-        const passEncoded = Buffer.from(password).toString('base64');
-        const storedPass = profile.password ? decodeURIComponent(profile.password) : null;
+        const passEncoded = await hashPassword(password);
+        const storedPass = profile.password || null;
         if (!storedPass || storedPass !== passEncoded) {
             return response.status(401).json({ status: 'error', message: 'Неверный email или пароль' });
         }
@@ -116,7 +128,7 @@ export default async function handler(request, response) {
             await fetch(`${url}/hset/profile:${emailLower}/avColor/${encodeURIComponent(avColor)}`, { headers: { Authorization: `Bearer ${token}` } });
         }
         if (password) {
-            const passEncoded = Buffer.from(password).toString('base64');
+            const passEncoded = await hashPassword(password);
             await fetch(`${url}/hset/profile:${emailLower}/password/${encodeURIComponent(passEncoded)}`, { headers: { Authorization: `Bearer ${token}` } });
         }
 
