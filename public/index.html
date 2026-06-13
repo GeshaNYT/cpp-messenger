@@ -175,12 +175,17 @@
             z-index: 90000;
             background: var(--bg-body);
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
             padding: 20px;
+            overflow-y: auto;
             background-image: 
                 radial-gradient(at 0% 0%, var(--ge-primary-soft) 0, transparent 40%),
                 radial-gradient(at 100% 100%, var(--ge-primary-soft) 0, transparent 40%);
+        }
+
+        .ge-auth-container {
+            margin: auto;
         }
 
         .ge-auth-container {
@@ -428,6 +433,12 @@
             color: var(--ge-primary) !important;
             background: var(--ge-primary-soft);
         }
+        /* Оверлей остаётся тёмным даже при стекле */
+        [data-glass="on"] .ge-modal-overlay {
+            background: rgba(0,0,0,0.4) !important;
+            backdrop-filter: blur(8px) !important;
+        }
+
 
         /* --- МАЛЕНЬКАЯ КОШКА (ПОП-АП НАСТРОЕК) --- */
         .ge-settings-popup {
@@ -2234,9 +2245,11 @@
                         container.style.display = 'block';
                         btn.innerText = "❄️ Снег: Вкл";
                         geEngine.state.snowInterval = setInterval(this.createSnowflake, 150);
+                        localStorage.setItem('ge_snow', 'on');
                     } else {
                         container.style.display = 'none'; container.innerHTML = ""; btn.innerText = "❄️ Снег: Выкл";
                         clearInterval(geEngine.state.snowInterval);
+                        localStorage.setItem('ge_snow', 'off');
                     }
                 },
                 createSnowflake() {
@@ -2636,6 +2649,17 @@
                 document.documentElement.setAttribute('data-glass', 'on');
                 const glassBtn = document.getElementById('ge-glass-btn');
                 if (glassBtn) { glassBtn.classList.add('glass-active'); glassBtn.innerHTML = '🫧 Жидкое стекло: Вкл'; }
+            }
+
+            // Восстанавливаем снег
+            const savedSnow = localStorage.getItem('ge_snow');
+            if (savedSnow === 'on') {
+                geEngine.state.isSnowing = true;
+                const container = document.getElementById('ge-snow-container');
+                const snowBtn = document.getElementById('btn-snow');
+                container.style.display = 'block';
+                if (snowBtn) snowBtn.innerText = '❄️ Снег: Вкл';
+                geEngine.state.snowInterval = setInterval(geEngine.effects.createSnowflake, 150);
             }
 
             const saved = localStorage.getItem('ge_v9_token');
