@@ -343,6 +343,43 @@
             transform: rotate(45deg);
         }
 
+        /* --- ЖИДКОЕ СТЕКЛО --- */
+        [data-glass="on"] .ge-sidebar,
+        [data-glass="on"] .ge-view-header,
+        [data-glass="on"] .ge-settings-popup,
+        [data-glass="on"] .ge-input-bar,
+        [data-glass="on"] .ge-auth-container {
+            background: rgba(255, 255, 255, 0.15) !important;
+            backdrop-filter: blur(24px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+            border-color: rgba(255, 255, 255, 0.3) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255,255,255,0.4) !important;
+        }
+
+        [data-theme="dark"][data-glass="on"] .ge-sidebar,
+        [data-theme="dark"][data-glass="on"] .ge-view-header,
+        [data-theme="dark"][data-glass="on"] .ge-settings-popup,
+        [data-theme="dark"][data-glass="on"] .ge-input-bar {
+            background: rgba(30, 30, 40, 0.3) !important;
+            backdrop-filter: blur(24px) saturate(200%) !important;
+            -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+        }
+
+        [data-glass="on"] body {
+            background: linear-gradient(135deg, #a8d8ff 0%, #c9b8ff 40%, #ffd6a5 100%) !important;
+        }
+
+        [data-theme="dark"][data-glass="on"] body {
+            background: linear-gradient(135deg, #0d1b2a 0%, #1a0a2e 50%, #0a1628 100%) !important;
+        }
+
+        .ge-popup-item.glass-active {
+            color: var(--ge-primary) !important;
+            background: var(--ge-primary-soft);
+        }
+
         /* --- МАЛЕНЬКАЯ КОШКА (ПОП-АП НАСТРОЕК) --- */
         .ge-settings-popup {
             position: absolute;
@@ -1257,6 +1294,7 @@
                         
                         <div id="ge-settings-popup" class="ge-settings-popup">
                             <button class="ge-popup-item" onclick="geEngine.ui.toggleTheme()">🌓 Сменить тему</button>
+                            <button class="ge-popup-item" id="ge-glass-btn" onclick="geEngine.ui.toggleGlass()">🟡 Жёлтое стекло: Выкл</button>
                             <button class="ge-popup-item" onclick="geEngine.profile.open()">👤 Профиль</button>
                             <button class="ge-popup-item danger" onclick="geEngine.auth.deleteAccountFull()">🗑️ Удалить аккаунт</button>
                         </div>
@@ -1688,6 +1726,17 @@
                         });
                         popup.dataset.listenerSet = "true";
                     }
+                },
+                toggleGlass() {
+                    document.getElementById('ge-settings-popup').classList.remove('active');
+                    const html = document.documentElement;
+                    const isOn = html.getAttribute('data-glass') === 'on';
+                    const newVal = isOn ? 'off' : 'on';
+                    html.setAttribute('data-glass', newVal);
+                    localStorage.setItem('ge_glass', newVal);
+                    const btn = document.getElementById('ge-glass-btn');
+                    if (newVal === 'on') { btn.classList.add('glass-active'); btn.innerHTML = '🫧 Жидкое стекло: Вкл'; }
+                    else { btn.classList.remove('glass-active'); btn.innerHTML = '🫧 Жидкое стекло'; }
                 },
                 toggleTheme() {
                     // ЗАКРЫВАЕМ МЕНЮ ПРИ НАЖАТИИ
@@ -2531,6 +2580,14 @@
             // Восстанавливаем тему
             const savedTheme = localStorage.getItem('ge_theme');
             if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+
+            // Восстанавливаем жидкое стекло
+            const savedGlass = localStorage.getItem('ge_glass');
+            if (savedGlass === 'on') {
+                document.documentElement.setAttribute('data-glass', 'on');
+                const glassBtn = document.getElementById('ge-glass-btn');
+                if (glassBtn) { glassBtn.classList.add('glass-active'); glassBtn.innerHTML = '🫧 Жидкое стекло: Вкл'; }
+            }
 
             const saved = localStorage.getItem('ge_v9_token');
             if (saved) { geEngine.state.session = JSON.parse(saved); geEngine.init(); }
