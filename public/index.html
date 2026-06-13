@@ -1299,6 +1299,58 @@
                     </div>
                     <button class="ge-btn-submit" onclick="geEngine.auth.verifyOTP('login')">ПОДТВЕРДИТЬ ВХОД</button>
                 </div>
+
+                <!-- ЗАБЫЛИ ПАРОЛЬ -->
+                <div id="login-fields-main-footer" style="text-align:center; margin-top:14px;">
+                    <button type="button" onclick="geEngine.auth.showForgot()" style="background:none;border:none;color:var(--ge-primary);font-size:13px;cursor:pointer;text-decoration:underline;">Забыли пароль?</button>
+                </div>
+
+                <!-- ШАГ 1: ввод почты -->
+                <div id="forgot-email-section" class="ge-hidden" style="animation: ge-slide-up 0.3s ease;">
+                    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Введите почту вашего аккаунта — мы отправим код для сброса пароля.</p>
+                    <div class="ge-field">
+                        <label class="ge-label">Электронная почта</label>
+                        <input type="email" id="forgot-email" class="ge-input-core" placeholder="example@gelink.com">
+                    </div>
+                    <button class="ge-btn-submit" onclick="geEngine.auth.forgotSendOTP()">ОТПРАВИТЬ КОД</button>
+                    <div style="text-align:center;margin-top:12px;">
+                        <button type="button" onclick="geEngine.auth.hideForgot()" style="background:none;border:none;color:var(--text-secondary);font-size:13px;cursor:pointer;text-decoration:underline;">← Назад ко входу</button>
+                    </div>
+                </div>
+
+                <!-- ШАГ 2: ввод OTP -->
+                <div id="forgot-otp-section" class="ge-hidden" style="animation: ge-slide-up 0.3s ease;">
+                    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Код отправлен на вашу почту. Введите его ниже.</p>
+                    <div class="ge-field">
+                        <label class="ge-label" style="color:var(--ge-primary)">Код подтверждения</label>
+                        <input type="text" id="forgot-otp" class="ge-input-core" placeholder="000000" maxlength="6" style="text-align:center;font-size:24px;letter-spacing:5px;">
+                    </div>
+                    <button class="ge-btn-submit" onclick="geEngine.auth.forgotVerifyOTP()">ПОДТВЕРДИТЬ КОД</button>
+                </div>
+
+                <!-- ШАГ 3: новый пароль -->
+                <div id="forgot-newpass-section" class="ge-hidden" style="animation: ge-slide-up 0.3s ease;">
+                    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Придумайте новый пароль.</p>
+                    <div class="ge-field">
+                        <label class="ge-label">Новый пароль</label>
+                        <div style="position:relative;">
+                            <input type="password" id="forgot-newpass" class="ge-input-core" placeholder="Мин. 8 символов" style="padding-right:44px;" oninput="geEngine.auth.filterLatinPass(this)">
+                            <button type="button" class="ge-eye-btn" onclick="geEngine.auth.toggleEye('forgot-newpass', this)" tabindex="-1">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="ge-field" style="margin-top:14px;">
+                        <label class="ge-label">Повторите пароль</label>
+                        <div style="position:relative;">
+                            <input type="password" id="forgot-confirm" class="ge-input-core" placeholder="Повторите ввод" style="padding-right:44px;" oninput="geEngine.auth.filterLatinPass(this)">
+                            <button type="button" class="ge-eye-btn" onclick="geEngine.auth.toggleEye('forgot-confirm', this)" tabindex="-1">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <button class="ge-btn-submit" onclick="geEngine.auth.forgotResetPass()">СОХРАНИТЬ ПАРОЛЬ</button>
+                </div>
             </div>
 
             <div id="ge-form-reg" class="ge-form-group ge-hidden">
@@ -1487,6 +1539,8 @@
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
                 ],
                 currentOTP: null,
+                forgotEmail: null,
+                forgotName: null,
                 pendingUser: null
             },
 
@@ -1642,6 +1696,79 @@
                         alert("Неверный код подтверждения!");
                     }
                 },
+
+                // ===== ВОССТАНОВЛЕНИЕ ПАРОЛЯ =====
+                showForgot() {
+                    document.getElementById('login-fields-main').classList.add('ge-hidden');
+                    document.getElementById('login-fields-main-footer').classList.add('ge-hidden');
+                    document.getElementById('login-otp-section').classList.add('ge-hidden');
+                    document.getElementById('forgot-email-section').classList.remove('ge-hidden');
+                    document.getElementById('forgot-otp-section').classList.add('ge-hidden');
+                    document.getElementById('forgot-newpass-section').classList.add('ge-hidden');
+                },
+                hideForgot() {
+                    document.getElementById('forgot-email-section').classList.add('ge-hidden');
+                    document.getElementById('forgot-otp-section').classList.add('ge-hidden');
+                    document.getElementById('forgot-newpass-section').classList.add('ge-hidden');
+                    document.getElementById('login-fields-main').classList.remove('ge-hidden');
+                    document.getElementById('login-fields-main-footer').classList.remove('ge-hidden');
+                },
+                async forgotSendOTP() {
+                    const email = document.getElementById('forgot-email').value.trim().toLowerCase();
+                    if (!email) return alert('Введите электронную почту!');
+
+                    // Проверяем существует ли аккаунт
+                    try {
+                        const res = await fetch(`/api/index?action=getProfile&user_email=${encodeURIComponent(email)}`);
+                        const data = await res.json();
+                        if (data.status === 'error' || !data.profile || !data.profile.name) {
+                            return alert('На эту почту не зарегистрирован аккаунт GeLink.');
+                        }
+                        geEngine.state.forgotEmail = email;
+                        geEngine.state.forgotName = data.profile.name;
+                    } catch(err) {
+                        return alert('Ошибка соединения с сервером. Попробуйте снова.');
+                    }
+
+                    // Отправляем OTP
+                    const success = await this.sendOTPEmail(email, geEngine.state.forgotName);
+                    if (success) {
+                        document.getElementById('forgot-email-section').classList.add('ge-hidden');
+                        document.getElementById('forgot-otp-section').classList.remove('ge-hidden');
+                    }
+                },
+                forgotVerifyOTP() {
+                    const entered = document.getElementById('forgot-otp').value.trim();
+                    if (entered !== geEngine.state.currentOTP) return alert('Неверный код! Попробуйте ещё раз.');
+                    geEngine.state.currentOTP = null;
+                    document.getElementById('forgot-otp-section').classList.add('ge-hidden');
+                    document.getElementById('forgot-newpass-section').classList.remove('ge-hidden');
+                },
+                async forgotResetPass() {
+                    const pass = document.getElementById('forgot-newpass').value.trim();
+                    const confirm = document.getElementById('forgot-confirm').value.trim();
+                    if (!pass || !confirm) return alert('Заполните оба поля!');
+                    if (pass.length < 8) return alert('Пароль слишком короткий!');
+                    if (/[^a-zA-Z0-9!@#$%^&*()_+\-=\[\]{}|;':",.<>?/`~\\]/.test(pass)) return alert('Пароль: только латинские буквы, цифры и спецсимволы!');
+                    if (pass !== confirm) return alert('Пароли не совпадают!');
+
+                    try {
+                        const res = await fetch(`/api/index?action=updateProfile&user_email=${encodeURIComponent(geEngine.state.forgotEmail)}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ password: pass })
+                        });
+                        const data = await res.json();
+                        if (data.status === 'error') return alert(data.message);
+                        alert('✅ Пароль успешно изменён! Теперь войдите в аккаунт.');
+                        geEngine.state.forgotEmail = null;
+                        geEngine.state.forgotName = null;
+                        this.hideForgot();
+                    } catch(err) {
+                        alert('Ошибка соединения с сервером.');
+                    }
+                },
+                // ===== /ВОССТАНОВЛЕНИЕ ПАРОЛЯ =====
 
                 toggleEye(inputId, btn) {
                     const input = document.getElementById(inputId);
