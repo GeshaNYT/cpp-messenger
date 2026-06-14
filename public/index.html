@@ -368,7 +368,8 @@
         [data-glass="on"] .ge-settings-popup,
         [data-glass="on"] .ge-context-menu,
         [data-glass="on"] .ge-auth-container,
-        [data-glass="on"] #ge-incoming-call {
+        [data-glass="on"] #ge-incoming-call,
+        [data-glass="on"] .ge-call-overlay {
             background: rgba(255, 255, 255, 0.18) !important;
             backdrop-filter: blur(28px) saturate(180%) !important;
             -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
@@ -406,7 +407,8 @@
         [data-theme="dark"][data-glass="on"] .ge-footer,
         [data-theme="dark"][data-glass="on"] .ge-settings-popup,
         [data-theme="dark"][data-glass="on"] .ge-context-menu,
-        [data-theme="dark"][data-glass="on"] #ge-incoming-call {
+        [data-theme="dark"][data-glass="on"] #ge-incoming-call,
+        [data-theme="dark"][data-glass="on"] .ge-call-overlay {
             background: rgba(20, 20, 35, 0.35) !important;
             backdrop-filter: blur(28px) saturate(200%) !important;
             -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
@@ -1154,6 +1156,17 @@
 <body>
 
     <div id="ge-snow-container"></div>
+
+    <!-- Звуки звонков -->
+    <audio id="snd-ring" loop>
+        <source src="https://cdn.freesound.org/previews/536/536491_6142149-lq.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="snd-ringtone" loop>
+        <source src="https://cdn.freesound.org/previews/218/218714_1676145-lq.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="snd-end">
+        <source src="https://cdn.freesound.org/previews/277/277021_5123851-lq.mp3" type="audio/mpeg">
+    </audio>
 
     
     <!-- ВХОДЯЩИЙ ЗВОНОК -->
@@ -2216,12 +2229,54 @@
             },
 
             calls: {
-                _pc: null,          // RTCPeerConnection
-                _callType: null,    // 'audio' | 'video'
-                _targetEmail: null, // email собеседника
-                _targetName: null,  // имя собеседника
+                _pc: null,
+                _callType: null,
+                _targetEmail: null,
+                _targetName: null,
                 _signalInterval: null,
-                _incomingOffer: null, // сохранённый offer для входящего
+                _incomingOffer: null,
+                _ringCtx: null,
+                _ringNode: null,
+
+                _playRing(type) {
+                    this._stopRing();
+                    try {
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        this._ringCtx = ctx;
+                        // Паттерны: [частота, длительность]
+                        const patterns = {
+                            outgoing: [[440,0.6],[0,0.4],[440,0.6],[0,0.8]],
+                            incoming: [[880,0.2],[660,0.2],[0,0.1],[880,0.2],[660,0.2],[0,1.1]],
+                            end:      [[400,0.08],[300,0.12],[200,0.2]]
+                        };
+                        const pat = patterns[type] || patterns.outgoing;
+                        const totalMs = pat.reduce((a,b)=>a+b[1],0) * 1000;
+
+                        const play = () => {
+                            let t = ctx.currentTime + 0.05;
+                            pat.forEach(([freq, dur]) => {
+                                if (freq > 0) {
+                                    const osc = ctx.createOscillator();
+                                    const gain = ctx.createGain();
+                                    osc.connect(gain); gain.connect(ctx.destination);
+                                    osc.frequency.value = freq; osc.type = 'sine';
+                                    gain.gain.setValueAtTime(0, t);
+                                    gain.gain.linearRampToValueAtTime(0.25, t + 0.02);
+                                    gain.gain.linearRampToValueAtTime(0.25, t + dur - 0.02);
+                                    gain.gain.linearRampToValueAtTime(0, t + dur);
+                                    osc.start(t); osc.stop(t + dur);
+                                }
+                                t += dur;
+                            });
+                        };
+                        play();
+                        if (type !== 'end') this._ringNode = setInterval(play, totalMs);
+                    } catch(e) { console.warn('Ring:', e); }
+                },
+                _stopRing() {
+                    if (this._ringNode) { clearInterval(this._ringNode); this._ringNode = null; }
+                    if (this._ringCtx) { try { this._ringCtx.close(); } catch {} this._ringCtx = null; }
+                },
 
                 // ── Вспомогательные ──────────────────────────────────────────
                 _getTargetEmail() {
@@ -2289,6 +2344,7 @@
                         remoteVid.style.display = 'block';
                         document.getElementById('ge-call-av').style.display = 'none';
                         document.getElementById('ge-call-status').innerText = 'СОЕДИНЕНО ✓';
+                        geEngine.calls._stopRing();
                         // Запускаем таймер
                         this._timerSec = 0;
                         const timerEl = document.getElementById('ge-call-timer');
@@ -2398,6 +2454,7 @@
                         document.getElementById('ge-incoming-call').style.display = 'block';
                         return;
                     }
+                    if (sig.type === 'call-request') { this._playRing('incoming'); }
                     if (sig.type === 'call-end') {
                         this._cleanupCall();
                         document.getElementById('ge-incoming-call').style.display = 'none';
@@ -2427,6 +2484,7 @@
                     const targetName = document.getElementById('ge-active-name').innerText;
                     this._targetName = targetName;
 
+                    this._playRing('outgoing');
                     this._showCallUI(targetName, 'ЗАПРОС РАЗРЕШЕНИЙ...');
 
                     let stream;
@@ -2464,6 +2522,7 @@
 
                 // ── Принять входящий ─────────────────────────────────────────
                 async accept() {
+                    this._stopRing();
                     document.getElementById('ge-incoming-call').style.display = 'none';
                     const sig = this._incomingOffer;
                     if (!sig) return;
@@ -2503,6 +2562,7 @@
 
                 // ── Отклонить входящий ───────────────────────────────────────
                 async decline() {
+                    this._stopRing();
                     document.getElementById('ge-incoming-call').style.display = 'none';
                     if (this._targetEmail) {
                         await this._send({ type: 'call-end', from: geEngine.state.session.email, to: this._targetEmail });
@@ -2513,6 +2573,8 @@
 
                 // ── Завершить звонок ─────────────────────────────────────────
                 async hangup() {
+                    this._stopRing();
+                    this._playRing('end');
                     if (this._targetEmail) {
                         await this._send({ type: 'call-end', from: geEngine.state.session.email, to: this._targetEmail }).catch(() => {});
                     }
