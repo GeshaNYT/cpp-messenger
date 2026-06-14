@@ -1,3 +1,4 @@
+// Хелпер: SHA-256 (работает в Vercel Edge/Node без доп. библиотек)
 async function hashPassword(password) {
     const encoder = new TextEncoder();
     const data = encoder.encode(password);
@@ -13,7 +14,7 @@ export default async function handler(request, response) {
     if (!url || !token) {
         return response.status(500).json({ status: 'error', message: 'Server misconfigured: missing env vars' });
     }
-    
+
     const { room = 'general', user_email, action, target_email } = request.query;
 
     // ==================== РЕГИСТРАЦИЯ ====================
@@ -43,14 +44,15 @@ export default async function handler(request, response) {
             return response.status(400).json({ status: 'error', message: 'Этот никнейм уже занят' });
         }
 
+        // Хешируем пароль SHA-256
+        const passHash = await hashPassword(password);
+
         // Сохраняем пользователя
         await fetch(`${url}/sadd/all_users/${emailLower}`, { headers: { Authorization: `Bearer ${token}` } });
         await fetch(`${url}/hset/profile:${emailLower}/name/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${token}` } });
         await fetch(`${url}/hset/profile:${emailLower}/nickname/${encodeURIComponent(nickLower)}`, { headers: { Authorization: `Bearer ${token}` } });
         await fetch(`${url}/hset/profile:${emailLower}/avColor/${encodeURIComponent(avColor || 'var(--ge-accent-gradient)')}`, { headers: { Authorization: `Bearer ${token}` } });
-        // Хешируем пароль через SHA-256
-        const passEncoded = await hashPassword(password);
-        await fetch(`${url}/hset/profile:${emailLower}/password/${encodeURIComponent(passEncoded)}`, { headers: { Authorization: `Bearer ${token}` } });
+        await fetch(`${url}/hset/profile:${emailLower}/password/${passHash}`, { headers: { Authorization: `Bearer ${token}` } });
         await fetch(`${url}/set/nick:${nickLower}/${emailLower}`, { headers: { Authorization: `Bearer ${token}` } });
 
         return response.status(200).json({ status: 'ok' });
@@ -86,10 +88,40 @@ export default async function handler(request, response) {
             }
         }
 
-        // Проверяем пароль
-        const passEncoded = await hashPassword(password);
+        // Проверяем пароль — поддерживаем SHA-256 и legacy base64
+        const passHash = await hashPassword(password);
         const storedPass = profile.password || null;
-        if (!storedPass || storedPass !== passEncoded) {
+        if (!storedPass) {
+            return response.status(401).json({ status: 'error', message: 'Неверный email или пароль' });
+        }
+
+        // SHA-256 хеш = 64 hex символа; base64 — другой формат
+        const isLegacyBase64 = storedPass.length !== 64 || !/^[0-9a-f]+$/.test(storedPass);
+        let passwordOk = false;
+
+        if (isLegacyBase64) {
+            // Старый пользователь — сравниваем base64
+            let legacyHash;
+            try {
+                // В Node.js Buffer доступен
+                legacyHash = Buffer.from(password).toString('base64');
+            } catch {
+                legacyHash = btoa(unescape(encodeURIComponent(password)));
+            }
+            const decoded = storedPass.startsWith('%') ? decodeURIComponent(storedPass) : storedPass;
+            passwordOk = decoded === legacyHash;
+
+            // Мигрируем на SHA-256 при успешном входе
+            if (passwordOk) {
+                await fetch(`${url}/hset/profile:${emailLower}/password/${passHash}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            }
+        } else {
+            passwordOk = storedPass === passHash;
+        }
+
+        if (!passwordOk) {
             return response.status(401).json({ status: 'error', message: 'Неверный email или пароль' });
         }
 
@@ -114,7 +146,6 @@ export default async function handler(request, response) {
         }
         if (nickname) {
             const nickLower = nickname.toLowerCase();
-            // Удаляем старый ник
             const oldProfileRes = await fetch(`${url}/hget/profile:${emailLower}/nickname`, { headers: { Authorization: `Bearer ${token}` } });
             const oldProfileData = await oldProfileRes.json();
             if (oldProfileData.result) {
@@ -128,47 +159,34 @@ export default async function handler(request, response) {
             await fetch(`${url}/hset/profile:${emailLower}/avColor/${encodeURIComponent(avColor)}`, { headers: { Authorization: `Bearer ${token}` } });
         }
         if (password) {
-            const passEncoded = await hashPassword(password);
-            await fetch(`${url}/hset/profile:${emailLower}/password/${encodeURIComponent(passEncoded)}`, { headers: { Authorization: `Bearer ${token}` } });
+            const passHash = await hashPassword(password);
+            await fetch(`${url}/hset/profile:${emailLower}/password/${passHash}`, { headers: { Authorization: `Bearer ${token}` } });
         }
 
         return response.status(200).json({ status: 'ok' });
     }
 
-    // ==================== СИГНАЛИЗАЦИЯ ДЛЯ WebRTC ====================
-
-    // Отправить сигнал (offer / answer / ice / call-request / call-end)
+    // ==================== СИГНАЛИЗАЦИЯ WebRTC ====================
     if (action === 'signal' && request.method === 'POST') {
-        const body = request.body; // { type, from, to, payload }
+        const body = request.body;
         const { to } = body;
         if (!to) return response.status(400).json({ status: 'error' });
 
         const key = `signal:${to}`;
         const entry = encodeURIComponent(JSON.stringify(body));
 
-        // Кладём сигнал в список (TTL 60 сек чтобы не копились)
-        await fetch(`${url}/lpush/${key}/${entry}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        await fetch(`${url}/expire/${key}/60`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        await fetch(`${url}/lpush/${key}/${entry}`, { headers: { Authorization: `Bearer ${token}` } });
+        await fetch(`${url}/expire/${key}/60`, { headers: { Authorization: `Bearer ${token}` } });
 
         return response.status(200).json({ status: 'ok' });
     }
 
-    // Получить входящие сигналы (polling)
     if (action === 'getSignals' && user_email) {
         const key = `signal:${user_email}`;
-        const res = await fetch(`${url}/lrange/${key}/0/-1`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await fetch(`${url}/lrange/${key}/0/-1`, { headers: { Authorization: `Bearer ${token}` } });
         const data = await res.json();
 
-        // Очищаем после прочтения
-        await fetch(`${url}/del/${key}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        await fetch(`${url}/del/${key}`, { headers: { Authorization: `Bearer ${token}` } });
 
         const signals = (data.result || []).map(s => {
             try { return JSON.parse(decodeURIComponent(s)); } catch { return null; }
@@ -191,16 +209,13 @@ export default async function handler(request, response) {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const profile = await profileRes.json();
-            // hgetall returns flat array ["key","val","key","val"] - convert to object
             const rawProfile = profile.result || [];
             const profileObj = {};
             if (Array.isArray(rawProfile)) {
-                for (let i = 0; i < rawProfile.length; i += 2) {
-                    profileObj[rawProfile[i]] = rawProfile[i+1];
-                }
-            } else if (typeof rawProfile === 'object') {
-                Object.assign(profileObj, rawProfile);
+                for (let i = 0; i < rawProfile.length; i += 2) profileObj[rawProfile[i]] = rawProfile[i + 1];
             }
+            // Не отдаём хеш пароля клиенту
+            delete profileObj.password;
             return response.status(200).json({ status: 'found', email: query, profile: profileObj });
         }
 
@@ -215,16 +230,12 @@ export default async function handler(request, response) {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const profile = await profileRes.json();
-            // hgetall returns flat array ["key","val","key","val"] - convert to object
             const rawProfile2 = profile.result || [];
             const profileObj2 = {};
             if (Array.isArray(rawProfile2)) {
-                for (let i = 0; i < rawProfile2.length; i += 2) {
-                    profileObj2[rawProfile2[i]] = rawProfile2[i+1];
-                }
-            } else if (typeof rawProfile2 === 'object') {
-                Object.assign(profileObj2, rawProfile2);
+                for (let i = 0; i < rawProfile2.length; i += 2) profileObj2[rawProfile2[i]] = rawProfile2[i + 1];
             }
+            delete profileObj2.password;
             return response.status(200).json({ status: 'found', email: foundEmail, profile: profileObj2 });
         }
 
@@ -236,23 +247,15 @@ export default async function handler(request, response) {
         const body = request.body;
         const { nickname, name } = body;
 
-        await fetch(`${url}/sadd/all_users/${user_email}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        await fetch(`${url}/sadd/all_users/${user_email}`, { headers: { Authorization: `Bearer ${token}` } });
 
         if (name) {
-            await fetch(`${url}/hset/profile:${user_email}/name/${encodeURIComponent(name)}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await fetch(`${url}/hset/profile:${user_email}/name/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${token}` } });
         }
         if (nickname) {
             const nickLower = nickname.toLowerCase();
-            await fetch(`${url}/hset/profile:${user_email}/nickname/${encodeURIComponent(nickLower)}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            await fetch(`${url}/set/nick:${nickLower}/${user_email}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await fetch(`${url}/hset/profile:${user_email}/nickname/${encodeURIComponent(nickLower)}`, { headers: { Authorization: `Bearer ${token}` } });
+            await fetch(`${url}/set/nick:${nickLower}/${user_email}`, { headers: { Authorization: `Bearer ${token}` } });
         }
 
         return response.status(200).json({ status: 'ok' });
@@ -313,7 +316,7 @@ export default async function handler(request, response) {
         headers: { Authorization: `Bearer ${token}` }
     });
     const messages = await res.json();
-    
+
     let rooms = { result: [] };
     let contacts = { result: [] };
 
