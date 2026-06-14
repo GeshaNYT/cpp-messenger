@@ -838,18 +838,24 @@
         [data-theme="dark"] .ge-call-overlay p {
             color: white !important;
         }
-        /* Светлая тема — иконки тёмные */
-        .ge-call-ctrl-btn svg {
-            stroke: var(--text-primary) !important;
+        /* Светлая тема — кнопки с чёткими иконками */
+        .ge-call-ctrl-btn {
+            background: rgba(0,0,0,0.07);
+            border: 1.5px solid rgba(0,0,0,0.15);
         }
+        .ge-call-ctrl-btn svg {
+            stroke: #333 !important;
+            filter: none;
+        }
+        /* Тёмная тема — светлые кнопки */
         [data-theme="dark"] .ge-call-ctrl-btn {
             background: rgba(255,255,255,0.15);
             border-color: rgba(255,255,255,0.2);
         }
-        .ge-call-ctrl-btn {
-            background: rgba(0,0,0,0.08);
-            border: 1.5px solid rgba(0,0,0,0.12);
+        [data-theme="dark"] .ge-call-ctrl-btn svg {
+            stroke: white !important;
         }
+        .ge-call-ctrl-btn.off svg { stroke: white !important; }
 
         .ge-call-avatar-big {
             width: 180px;
@@ -858,6 +864,7 @@
             background: var(--ge-accent-gradient);
             font-size: 70px;
             font-weight: 900;
+            color: white !important;
             display: flex;
             align-items: center;
             justify-content: center;
