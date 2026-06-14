@@ -370,11 +370,9 @@
         [data-glass="on"] .ge-auth-container,
         [data-glass="on"] #ge-incoming-call,
         [data-glass="on"] .ge-call-overlay {
-            background: rgba(255, 255, 255, 0.18) !important;
+            background: linear-gradient(135deg, rgba(13,26,46,0.95) 0%, rgba(26,13,46,0.95) 50%, rgba(13,32,24,0.95) 100%) !important;
             backdrop-filter: blur(28px) saturate(180%) !important;
             -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
-            border-color: rgba(255, 255, 255, 0.35) !important;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.5) !important;
         }
 
         /* Чат-пузыри собеседника */
@@ -815,13 +813,19 @@
             position: fixed;
             inset: 0;
             z-index: 200000;
-            background: rgba(0,0,0,0.9);
+            background: linear-gradient(135deg, #0d1a2e 0%, #1a0d2e 50%, #0d2018 100%) !important;
             backdrop-filter: blur(25px);
             display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: white;
+            color: white !important;
+        }
+        /* Кнопки управления звонком — всегда видимы на тёмном фоне */
+        .ge-call-ctrl-btn svg,
+        .ge-call-overlay h2,
+        .ge-call-overlay p {
+            color: white !important;
         }
 
         .ge-call-avatar-big {
@@ -873,13 +877,16 @@
         .btn-hangup:hover { transform: scale(1.1); background: #d63030; }
         .ge-call-ctrl-btn {
             width: 60px; height: 60px; border-radius: 50%;
-            background: rgba(255,255,255,0.15);
-            border: none; color: white; cursor: pointer;
+            background: rgba(255,255,255,0.18);
+            border: 1.5px solid rgba(255,255,255,0.25);
+            color: white; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
             transition: 0.2s; backdrop-filter: blur(8px);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.35);
         }
-        .ge-call-ctrl-btn:hover { background: rgba(255,255,255,0.28); transform: scale(1.08); }
-        .ge-call-ctrl-btn.off { background: rgba(250,62,62,0.7); }
+        .ge-call-ctrl-btn svg { stroke: white !important; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
+        .ge-call-ctrl-btn:hover { background: rgba(255,255,255,0.32); transform: scale(1.08); }
+        .ge-call-ctrl-btn.off { background: rgba(250,62,62,0.75); border-color: rgba(255,80,80,0.4); }
 
         .ge-modal-overlay {
             position: fixed;
@@ -1205,8 +1212,8 @@
             <!-- Hangup -->
             <button class="btn-hangup" onclick="geEngine.calls.hangup()">✕</button>
             <!-- Speaker -->
-            <button id="btn-spk" class="ge-call-ctrl-btn" onclick="geEngine.calls.toggleSpeaker()" title="Громкость">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            <button id="btn-spk" class="ge-call-ctrl-btn" onclick="geEngine.calls.toggleSpeaker()" title="Звук собеседника">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
             </button>
             <!-- Flip (mobile) -->
             <button id="btn-flip" class="ge-call-ctrl-btn" onclick="geEngine.calls.flipCamera()" title="Перевернуть камеру">
@@ -1323,7 +1330,7 @@
     <section id="ge-auth-layer" class="ge-auth-overlay">
         <div class="ge-auth-container">
             <div class="ge-brand-logo">GeLink</div>
-            <p class="ge-auth-tagline">Профессиональный мессенджер v2.6.1</p>
+            <p class="ge-auth-tagline">Профессиональный мессенджер v2.5</p>
             
             <div class="ge-auth-tabs">
                 <button id="tab-login" class="ge-auth-tab active" onclick="geEngine.auth.switch('login')">Вход</button>
@@ -2397,9 +2404,10 @@
                     const btn = document.getElementById('btn-spk');
                     btn.classList.toggle('off', remoteVid.muted);
                     btn.title = remoteVid.muted ? 'Включить звук' : 'Выключить звук';
+                    // Наушники: включены / перечёркнуты
                     btn.innerHTML = remoteVid.muted
-                        ? `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>`
-                        : `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
+                        ? `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/><line x1="2" y1="2" x2="22" y2="22" stroke="currentColor"/></svg>`
+                        : `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>`;
                 },
 
                 async flipCamera() {
