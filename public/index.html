@@ -376,12 +376,8 @@
             box-shadow: 0 8px 32px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.5) !important;
         }
 
-        /* Экран звонка — всегда тёмный */
-        .ge-call-overlay {
-            background: linear-gradient(135deg, #0d1a2e 0%, #1a0d2e 50%, #0d2018 100%) !important;
-        }
+        /* Экран звонка при стекле */
         [data-glass="on"] .ge-call-overlay {
-            background: linear-gradient(135deg, rgba(13,26,46,0.97) 0%, rgba(26,13,46,0.97) 50%, rgba(13,32,24,0.97) 100%) !important;
             backdrop-filter: blur(28px) saturate(180%) !important;
             -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
         }
@@ -824,19 +820,35 @@
             position: fixed;
             inset: 0;
             z-index: 200000;
-            background: linear-gradient(135deg, #0d1a2e 0%, #1a0d2e 50%, #0d2018 100%) !important;
+            background: var(--bg-body);
             backdrop-filter: blur(25px);
             display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            color: var(--text-primary);
+        }
+        /* Тёмная тема — тёмный фон */
+        [data-theme="dark"] .ge-call-overlay {
+            background: linear-gradient(135deg, #0d1a2e 0%, #1a0d2e 50%, #0d2018 100%);
+            color: white;
+        }
+        [data-theme="dark"] .ge-call-ctrl-btn svg,
+        [data-theme="dark"] .ge-call-overlay h2,
+        [data-theme="dark"] .ge-call-overlay p {
             color: white !important;
         }
-        /* Кнопки управления звонком — всегда видимы на тёмном фоне */
-        .ge-call-ctrl-btn svg,
-        .ge-call-overlay h2,
-        .ge-call-overlay p {
-            color: white !important;
+        /* Светлая тема — иконки тёмные */
+        .ge-call-ctrl-btn svg {
+            stroke: var(--text-primary) !important;
+        }
+        [data-theme="dark"] .ge-call-ctrl-btn {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.2);
+        }
+        .ge-call-ctrl-btn {
+            background: rgba(0,0,0,0.08);
+            border: 1.5px solid rgba(0,0,0,0.12);
         }
 
         .ge-call-avatar-big {
