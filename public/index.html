@@ -368,9 +368,20 @@
         [data-glass="on"] .ge-settings-popup,
         [data-glass="on"] .ge-context-menu,
         [data-glass="on"] .ge-auth-container,
-        [data-glass="on"] #ge-incoming-call,
+        [data-glass="on"] #ge-incoming-call {
+            background: rgba(255, 255, 255, 0.18) !important;
+            backdrop-filter: blur(28px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+            border-color: rgba(255, 255, 255, 0.35) !important;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.5) !important;
+        }
+
+        /* Экран звонка — всегда тёмный */
+        .ge-call-overlay {
+            background: linear-gradient(135deg, #0d1a2e 0%, #1a0d2e 50%, #0d2018 100%) !important;
+        }
         [data-glass="on"] .ge-call-overlay {
-            background: linear-gradient(135deg, rgba(13,26,46,0.95) 0%, rgba(26,13,46,0.95) 50%, rgba(13,32,24,0.95) 100%) !important;
+            background: linear-gradient(135deg, rgba(13,26,46,0.97) 0%, rgba(26,13,46,0.97) 50%, rgba(13,32,24,0.97) 100%) !important;
             backdrop-filter: blur(28px) saturate(180%) !important;
             -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
         }
