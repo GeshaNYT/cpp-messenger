@@ -840,21 +840,23 @@
         }
         /* Светлая тема — кнопки с чёткими иконками */
         .ge-call-ctrl-btn {
-            background: rgba(0,0,0,0.07);
-            border: 1.5px solid rgba(0,0,0,0.15);
+            background: rgba(0,0,0,0.10);
+            border: 1.5px solid rgba(0,0,0,0.18);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
         }
         .ge-call-ctrl-btn svg {
-            stroke: #333 !important;
-            filter: none;
+            stroke: #222 !important;
         }
         /* Тёмная тема — светлые кнопки */
         [data-theme="dark"] .ge-call-ctrl-btn {
-            background: rgba(255,255,255,0.15);
-            border-color: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.18);
+            border-color: rgba(255,255,255,0.25);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         }
         [data-theme="dark"] .ge-call-ctrl-btn svg {
             stroke: white !important;
         }
+        .ge-call-ctrl-btn.off { background: rgba(220,50,50,0.85) !important; border-color: transparent !important; }
         .ge-call-ctrl-btn.off svg { stroke: white !important; }
 
         .ge-call-avatar-big {
@@ -2417,14 +2419,42 @@
                 },
 
                 toggleCamera() {
-                    if (!geEngine.state.localStream) return;
                     this._camOff = !this._camOff;
-                    geEngine.state.localStream.getVideoTracks().forEach(t => t.enabled = !this._camOff);
                     const btn = document.getElementById('btn-cam');
                     btn.classList.toggle('off', this._camOff);
                     btn.title = this._camOff ? 'Включить камеру' : 'Выключить камеру';
                     const localVid = document.getElementById('localVideo');
-                    localVid.style.opacity = this._camOff ? '0' : '1';
+
+                    if (!this._camOff) {
+                        // Включаем камеру
+                        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+                            .then(camStream => {
+                                const videoTrack = camStream.getVideoTracks()[0];
+                                if (!videoTrack) return;
+                                // Заменяем трек в PeerConnection
+                                const sender = this._pc?.getSenders().find(s => s.track?.kind === 'video');
+                                if (sender) sender.replaceTrack(videoTrack);
+                                // Добавляем в localStream
+                                if (geEngine.state.localStream) {
+                                    geEngine.state.localStream.getVideoTracks().forEach(t => { t.stop(); geEngine.state.localStream.removeTrack(t); });
+                                    geEngine.state.localStream.addTrack(videoTrack);
+                                }
+                                localVid.srcObject = geEngine.state.localStream;
+                                localVid.style.display = 'block';
+                                localVid.style.opacity = '1';
+                            })
+                            .catch(() => {
+                                this._camOff = true;
+                                btn.classList.add('off');
+                                alert('Не удалось получить доступ к камере');
+                            });
+                    } else {
+                        // Выключаем камеру
+                        if (geEngine.state.localStream) {
+                            geEngine.state.localStream.getVideoTracks().forEach(t => t.enabled = false);
+                        }
+                        localVid.style.opacity = '0';
+                    }
                 },
 
                 toggleSpeaker() {
