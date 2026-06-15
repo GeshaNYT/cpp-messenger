@@ -2789,13 +2789,13 @@
                         // Если открыт этот чат — сбрасываем
                         if (geEngine.state.activeRoom === rid) {
                             geEngine.state.activeRoom = null;
-                            // Очищаем шапку и сообщения
-                            document.getElementById('ge-room-title').innerText = '';
+                            document.getElementById('ge-active-name').innerText = '';
                             document.getElementById('ge-msg-container').innerHTML = '';
-                            // Скрываем панель ввода и кнопки
                             const footer = document.querySelector('.ge-footer');
                             if (footer) footer.style.visibility = 'hidden';
                         }
+
+                        geEngine.chat.refresh();
 
                         // Если приватная комната — удаляем с сервера (только у себя)
                         if (rid.startsWith('private-')) {
