@@ -296,9 +296,11 @@ export default async function handler(request, response) {
         if (request.method === 'POST') {
             const body       = request.body;
             const jwtEmail   = await tryAuth(request, env.jwt);
-            const emailLower = jwtEmail ?? user_email ?? body?.email ?? '';
+            const emailLower = jwtEmail ?? user_email ?? (typeof body === 'object' ? body?.email : null) ?? '';
 
-            await db('LPUSH', `room:${room}`, encodeURIComponent(JSON.stringify(body)));
+            // body может прийти как строка (старый фронт) или объект (новый)
+            const bodyStr = typeof body === 'string' ? body : JSON.stringify(body);
+            await db('LPUSH', `room:${room}`, encodeURIComponent(bodyStr));
 
             if (emailLower) {
                 await db('SADD', 'all_users', emailLower);
