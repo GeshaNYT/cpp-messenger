@@ -506,6 +506,48 @@
             width: 100%;
         }
 
+        /* Переключатель авто темы */
+        .ge-auto-theme-row {
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-soft);
+            width: 100%;
+        }
+
+        .ge-auto-theme-row span { display: flex; align-items: center; gap: 12px; }
+
+        .ge-toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .ge-toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .ge-toggle-slider {
+            position: absolute;
+            inset: 0;
+            background: var(--border-base);
+            border-radius: 24px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .ge-toggle-slider:before {
+            content: '';
+            position: absolute;
+            width: 18px; height: 18px;
+            left: 3px; top: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        .ge-toggle-switch input:checked + .ge-toggle-slider { background: var(--ge-primary); }
+        .ge-toggle-switch input:checked + .ge-toggle-slider:before { transform: translateX(20px); }
+
         .ge-popup-item:hover {
             background: var(--bg-input);
         }
@@ -1639,7 +1681,8 @@
                 forgotEmail: null,
                 forgotName: null,
                 profilePending: null,
-                pendingUser: null
+                pendingUser: null,
+                autoThemeInterval: null
             },
 
             auth: {
@@ -2166,6 +2209,22 @@
                     const newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
                     html.setAttribute('data-theme', newTheme);
                     localStorage.setItem('ge_theme', newTheme);
+                },
+                toggleAutoTheme(checkbox) {
+                    if (checkbox.checked) {
+                        localStorage.setItem('ge_auto_theme', 'on');
+                        geEngine.ui._applyAutoTheme();
+                        geEngine.state.autoThemeInterval = setInterval(() => geEngine.ui._applyAutoTheme(), 60000);
+                    } else {
+                        localStorage.setItem('ge_auto_theme', 'off');
+                        clearInterval(geEngine.state.autoThemeInterval);
+                    }
+                },
+                _applyAutoTheme() {
+                    const hour = new Date().getHours();
+                    const theme = (hour >= 7 && hour < 20) ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', theme);
+                    localStorage.setItem('ge_theme', theme);
                 },
                 setTab(tab) {
                     geEngine.state.activeTab = tab;
@@ -3281,6 +3340,15 @@
             const savedTheme = localStorage.getItem('ge_theme');
             if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
 
+            // Восстанавливаем авто тему
+            const savedAutoTheme = localStorage.getItem('ge_auto_theme');
+            if (savedAutoTheme === 'on') {
+                const cb = document.getElementById('ge-auto-theme-cb');
+                if (cb) cb.checked = true;
+                geEngine.ui._applyAutoTheme();
+                geEngine.state.autoThemeInterval = setInterval(() => geEngine.ui._applyAutoTheme(), 60000);
+            }
+
             // Восстанавливаем жидкое стекло
             const savedGlass = localStorage.getItem('ge_glass');
             if (savedGlass === 'on') {
@@ -3316,6 +3384,13 @@
     <!-- ПОПАП НАСТРОЕК — в body чтобы перекрывал всё -->
     <div id="ge-settings-popup" class="ge-settings-popup" style="position:fixed; display:none;">
         <button class="ge-popup-item" onclick="geEngine.ui.toggleTheme()">🌓 Сменить тему</button>
+        <div class="ge-auto-theme-row">
+            <span>🌗 Авто тема (день/ночь)</span>
+            <label class="ge-toggle-switch">
+                <input type="checkbox" id="ge-auto-theme-cb" onchange="geEngine.ui.toggleAutoTheme(this)">
+                <span class="ge-toggle-slider"></span>
+            </label>
+        </div>
         <button class="ge-popup-item" id="ge-glass-btn" onclick="geEngine.ui.toggleGlass()">🫧 Жидкое стекло</button>
         <button class="ge-popup-item" id="btn-snow" onclick="geEngine.effects.toggleSnow()">❄️ Снег: Выкл</button>
         <button class="ge-popup-item" onclick="geEngine.profile.open()">👤 Профиль</button>
