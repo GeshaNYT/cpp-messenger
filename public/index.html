@@ -2775,6 +2775,8 @@
                     geEngine.state.activeRoom = id;
                     document.getElementById('ge-active-name').innerText = prettyName || id;
                     document.getElementById('ge-active-av').innerText = (prettyName || id)[0].toUpperCase();
+                    const footer = document.querySelector('.ge-footer');
+                    if (footer) footer.style.visibility = 'visible';
                     geEngine.chat.refresh();
                 },
                 removeRoom(e, rid) {
@@ -2784,17 +2786,15 @@
                         geEngine.state.deletedRooms.push(rid);
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
 
-                        // Если открыт этот чат — переключаемся
+                        // Если открыт этот чат — сбрасываем
                         if (geEngine.state.activeRoom === rid) {
-                            // Находим первый доступный чат
-                            const otherRoom = Object.keys(geEngine.state.rooms || {}).find(r => r !== rid && !geEngine.state.deletedRooms.includes(r));
-                            if (otherRoom) {
-                                geEngine.chat.open(otherRoom, otherRoom);
-                            } else {
-                                geEngine.state.activeRoom = null;
-                                document.getElementById('ge-chat-placeholder').style.display = 'flex';
-                                document.getElementById('ge-chat-active').style.display = 'none';
-                            }
+                            geEngine.state.activeRoom = null;
+                            // Очищаем шапку и сообщения
+                            document.getElementById('ge-room-title').innerText = '';
+                            document.getElementById('ge-msg-container').innerHTML = '';
+                            // Скрываем панель ввода и кнопки
+                            const footer = document.querySelector('.ge-footer');
+                            if (footer) footer.style.visibility = 'hidden';
                         }
 
                         // Если приватная комната — удаляем с сервера (только у себя)
