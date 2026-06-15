@@ -2597,19 +2597,23 @@
                                     geEngine.state.localStream.addTrack(videoTrack);
                                 }
 
-                                // Передаём собеседнику
                                 if (this._pc) {
                                     const sender = this._pc.getSenders().find(s => s.track?.kind === 'video');
                                     if (sender) {
-                                        // Уже есть видео-sender — заменяем трек
+                                        // Уже есть видео-sender — просто заменяем трек
                                         sender.replaceTrack(videoTrack);
                                     } else {
-                                        // Аудиозвонок — добавляем видео трек
+                                        // Аудиозвонок — добавляем видео трек и пересогласовываем
                                         this._pc.addTrack(videoTrack, geEngine.state.localStream);
-                                        // Пересогласовываем соединение
                                         this._pc.createOffer().then(offer => {
                                             return this._pc.setLocalDescription(offer).then(() => {
-                                                return this._send({ type: 'offer', from: geEngine.state.session.email, to: this._targetEmail, payload: offer, callType: 'video' });
+                                                return this._send({
+                                                    type: 'offer',
+                                                    from: geEngine.state.session.email,
+                                                    to: this._targetEmail,
+                                                    payload: offer,
+                                                    callType: 'video'
+                                                });
                                             });
                                         }).catch(e => console.warn('Renegotiate:', e));
                                     }
@@ -2719,6 +2723,23 @@
                     if (sig.type === 'answer') {
                         if (this._pc.signalingState === 'have-local-offer') {
                             await this._pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+                        }
+                    } else if (sig.type === 'offer') {
+                        // Повторный offer во время звонка (например, собеседник включил камеру)
+                        await this._pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+                        const answer = await this._pc.createAnswer();
+                        await this._pc.setLocalDescription(answer);
+                        await this._send({
+                            type: 'answer',
+                            from: geEngine.state.session.email,
+                            to: sig.from,
+                            payload: answer
+                        });
+                        // Показываем видео собеседника если появилось
+                        const remoteVid = document.getElementById('remoteVideo');
+                        if (remoteVid && remoteVid.srcObject) {
+                            remoteVid.style.display = 'block';
+                            document.getElementById('ge-call-av').style.display = 'none';
                         }
                     } else if (sig.type === 'ice') {
                         try { await this._pc.addIceCandidate(new RTCIceCandidate(sig.payload)); } catch {}
