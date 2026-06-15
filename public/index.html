@@ -1533,7 +1533,6 @@
                             <button class="ge-popup-item" id="ge-glass-btn" onclick="geEngine.ui.toggleGlass()">🫧 Жидкое стекло</button>
                             <button class="ge-popup-item" id="btn-snow" onclick="geEngine.effects.toggleSnow()">❄️ Снег: Выкл</button>
                             <button class="ge-popup-item" onclick="geEngine.profile.open()">👤 Профиль</button>
-                            <button class="ge-popup-item danger" onclick="geEngine.auth.exit()">🚪 Завершить сеанс</button>
                             <button class="ge-popup-item danger" onclick="geEngine.auth.deleteAccountFull()">🗑️ Удалить аккаунт</button>
                         </div>
                     </div>
@@ -1554,7 +1553,9 @@
             <div id="ge-chat-list-scroller" class="ge-chat-list">
                 </div>
 
-
+            <footer class="ge-sidebar-footer">
+                <button class="ge-logout-btn" onclick="geEngine.auth.exit()">ЗАВЕРШИТЬ СЕАНС</button>
+            </footer>
         </aside>
 
         <section class="ge-chat-view">
