@@ -297,6 +297,321 @@
             transform: translateY(-2px);
         }
 
+
+        /* ── ОНЛАЙН СТАТУС ── */
+        .ge-online-dot {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            background: var(--ge-online);
+            border: 2px solid var(--bg-panel);
+            position: absolute;
+            bottom: 2px; right: 2px;
+            display: none;
+        }
+        .ge-user-av-wrap { position: relative; display: inline-block; flex-shrink: 0; }
+        .ge-user-av-wrap.online .ge-online-dot { display: block; }
+
+        /* Онлайн точка в заголовке чата */
+        .ge-active-av-wrap { position: relative; display: inline-block; }
+        .ge-active-online-dot {
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--ge-online);
+            border: 2px solid var(--bg-header);
+            position: absolute;
+            bottom: 2px; right: 2px;
+            display: none;
+        }
+        .ge-active-av-wrap.online .ge-active-online-dot { display: block; }
+        #ge-active-status { font-size: 13px; color: var(--ge-online); font-weight: 600; display: none; }
+        #ge-active-status.visible { display: block; }
+
+        /* ── TYPING INDICATOR ── */
+        .ge-typing-indicator {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-style: italic;
+            height: 28px;
+        }
+        .ge-typing-indicator.visible { display: flex; }
+        .ge-typing-dots { display: flex; gap: 3px; align-items: center; }
+        .ge-typing-dots span {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--text-tertiary);
+            animation: ge-typing-bounce 1.2s infinite;
+        }
+        .ge-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .ge-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes ge-typing-bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-5px); }
+        }
+
+        /* ── БЕЙДЖ НЕПРОЧИТАННЫХ ── */
+        .ge-unread-badge {
+            min-width: 20px; height: 20px;
+            background: var(--ge-primary);
+            color: white;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 800;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 0 5px;
+            margin-left: auto;
+            margin-right: 40px;
+            flex-shrink: 0;
+        }
+        .ge-unread-badge.visible { display: flex; }
+
+        /* ── РЕАКЦИИ ── */
+        .ge-reactions-bar {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px;
+            flex-wrap: wrap;
+        }
+        .ge-reaction {
+            background: var(--bg-input);
+            border: 1px solid var(--border-base);
+            border-radius: 12px;
+            padding: 2px 7px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: 0.15s;
+            user-select: none;
+        }
+        .ge-reaction:hover { background: var(--ge-primary-soft); border-color: var(--ge-primary); }
+        .ge-reaction.mine { background: var(--ge-primary-soft); border-color: var(--ge-primary); }
+        .ge-reaction-picker {
+            position: absolute;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-base);
+            border-radius: 24px;
+            box-shadow: var(--shadow-lg);
+            padding: 6px 10px;
+            display: flex;
+            gap: 6px;
+            z-index: 5000;
+            animation: ge-pop-anim 0.15s var(--ease);
+        }
+        .ge-reaction-picker button {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            transition: transform 0.1s;
+            padding: 2px 4px;
+            border-radius: 8px;
+        }
+        .ge-reaction-picker button:hover { transform: scale(1.3); background: var(--bg-input); }
+
+        /* ── REPLY (ОТВЕТ НА СООБЩЕНИЕ) ── */
+        .ge-reply-preview {
+            display: none;
+            background: var(--bg-input);
+            border-left: 3px solid var(--ge-primary);
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin: 0 50px 8px 50px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            position: relative;
+        }
+        .ge-reply-preview.visible { display: block; }
+        .ge-reply-preview b { color: var(--ge-primary); display: block; font-size: 12px; margin-bottom: 2px; }
+        .ge-reply-preview .ge-reply-close {
+            position: absolute;
+            right: 10px; top: 50%;
+            transform: translateY(-50%);
+            background: none; border: none;
+            color: var(--text-tertiary);
+            cursor: pointer; font-size: 16px;
+        }
+        .ge-reply-quote {
+            border-left: 3px solid rgba(255,255,255,0.5);
+            padding-left: 8px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            opacity: 0.8;
+            border-radius: 2px;
+        }
+        .them .ge-reply-quote { border-color: var(--ge-primary); }
+        .ge-reply-quote b { display: block; font-size: 11px; margin-bottom: 2px; }
+
+        /* ── КОНТЕКСТНОЕ МЕНЮ СООБЩЕНИЯ ── */
+        .ge-msg-context {
+            position: fixed;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-base);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-lg);
+            z-index: 9999;
+            min-width: 160px;
+            overflow: hidden;
+            animation: ge-pop-anim 0.15s var(--ease);
+        }
+        .ge-msg-context button {
+            display: flex; align-items: center; gap: 10px;
+            width: 100%; padding: 11px 16px;
+            background: none; border: none;
+            text-align: left; font-size: 14px;
+            color: var(--text-primary);
+            cursor: pointer; transition: 0.15s;
+        }
+        .ge-msg-context button:hover { background: var(--bg-input); }
+        .ge-msg-context button.danger { color: var(--ge-error); }
+        .ge-msg-context hr { border: none; border-top: 1px solid var(--border-base); margin: 0; }
+
+        /* ── РЕДАКТИРОВАНИЕ СООБЩЕНИЯ ── */
+        .ge-edit-preview {
+            display: none;
+            background: var(--bg-input);
+            border-left: 3px solid var(--ge-warning);
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin: 0 50px 8px 50px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            position: relative;
+        }
+        .ge-edit-preview.visible { display: block; }
+        .ge-edit-preview b { color: var(--ge-warning); display: block; font-size: 12px; margin-bottom: 2px; }
+        .ge-edit-preview .ge-reply-close {
+            position: absolute;
+            right: 10px; top: 50%;
+            transform: translateY(-50%);
+            background: none; border: none;
+            color: var(--text-tertiary);
+            cursor: pointer; font-size: 16px;
+        }
+        .ge-msg-edited { font-size: 10px; opacity: 0.6; margin-left: 4px; }
+
+        /* ── ПОИСК ПО ЧАТУ ── */
+        .ge-search-bar {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border-base);
+        }
+        .ge-search-bar.visible { display: flex; }
+        .ge-search-bar input {
+            flex: 1; padding: 8px 14px;
+            border: 1px solid var(--border-base);
+            border-radius: var(--radius-full);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        .ge-search-bar button {
+            background: none; border: none;
+            color: var(--text-secondary);
+            font-size: 18px; cursor: pointer;
+            padding: 4px 8px; border-radius: 8px;
+        }
+        .ge-search-bar button:hover { background: var(--bg-input); }
+        .ge-msg-highlight { background: rgba(255, 200, 0, 0.35); border-radius: 3px; }
+
+        /* ── ЗАКРЕП СООБЩЕНИЯ ── */
+        .ge-pinned-banner {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 20px;
+            background: var(--ge-primary-soft);
+            border-bottom: 2px solid var(--ge-primary);
+            font-size: 13px;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+        .ge-pinned-banner.visible { display: flex; }
+        .ge-pinned-banner b { color: var(--ge-primary); }
+        .ge-pinned-banner .ge-pin-close {
+            margin-left: auto; background: none; border: none;
+            color: var(--text-tertiary); cursor: pointer;
+            font-size: 16px; padding: 2px 6px;
+        }
+
+        /* ── АВТОТЕМА ── */
+        .ge-autotheme-toggle {
+            display: flex; align-items: center;
+            gap: 10px; padding: 10px 16px;
+            cursor: pointer; font-size: 14px;
+            color: var(--text-primary);
+            transition: 0.15s;
+        }
+        .ge-autotheme-toggle:hover { background: var(--bg-input); }
+        .ge-switch {
+            width: 36px; height: 20px;
+            background: var(--border-base);
+            border-radius: 10px; position: relative;
+            transition: 0.2s; flex-shrink: 0;
+        }
+        .ge-switch.on { background: var(--ge-primary); }
+        .ge-switch::after {
+            content: '';
+            position: absolute;
+            width: 14px; height: 14px;
+            background: white;
+            border-radius: 50%;
+            top: 3px; left: 3px;
+            transition: 0.2s;
+        }
+        .ge-switch.on::after { left: 19px; }
+
+        /* ── ПРЕВЬЮ ИЗОБРАЖЕНИЙ ── */
+        .ge-img-preview-wrap {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 50px;
+            background: var(--bg-panel);
+            border-top: 1px solid var(--border-base);
+        }
+        .ge-img-preview-wrap.visible { display: flex; }
+        .ge-img-thumb {
+            width: 56px; height: 56px;
+            border-radius: 10px;
+            object-fit: cover;
+            border: 2px solid var(--border-base);
+        }
+        .ge-img-in-chat {
+            max-width: 280px; max-height: 220px;
+            border-radius: 12px;
+            object-fit: cover;
+            cursor: pointer;
+            display: block;
+            margin-top: 6px;
+        }
+        .ge-img-in-chat:hover { opacity: 0.9; }
+
+        /* Лайтбокс */
+        .ge-lightbox {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 99999;
+            align-items: center;
+            justify-content: center;
+        }
+        .ge-lightbox.visible { display: flex; }
+        .ge-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+        .ge-lightbox-close {
+            position: absolute;
+            top: 20px; right: 24px;
+            background: none; border: none;
+            color: white; font-size: 32px;
+            cursor: pointer;
+        }
+
         /* --- ГЛАВНАЯ СТРУКТУРА МЕССЕНДЖЕРА --- */
         .ge-messenger-shell {
             display: none;
@@ -1600,6 +1915,10 @@
                     </span>
                 </button>
                 <input type="text" id="ge-main-input" class="ge-composer-input" placeholder="Напишите ваше сообщение здесь...">
+                <label class="ge-send-btn" style="cursor:pointer;" title="Прикрепить изображение">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <input type="file" accept="image/*" style="display:none;" onchange="geEngine.chat.previewImg(this)" />
+                </label>
                 <button class="ge-send-btn" onclick="geEngine.chat.broadcast()">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="22" y1="2" x2="11" y2="13"/>
@@ -2248,8 +2567,8 @@
                         }
 
                         const avHtml = avImg
-                            ? `<div class="ge-user-av" style="width:50px;height:50px;overflow:hidden;padding:0;"><img src="${avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" /></div>`
-                            : `<div class="ge-user-av" style="width:50px;height:50px;font-size:18px;background:${avColor};">${displayName[0].toUpperCase()}</div>`;
+                            ? `<div class="ge-user-av-wrap"><div class="ge-user-av" style="width:50px;height:50px;overflow:hidden;padding:0;"><img src="${avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" /></div><div class="ge-online-dot"></div></div>`
+                            : `<div class="ge-user-av-wrap"><div class="ge-user-av" style="width:50px;height:50px;font-size:18px;background:${avColor};">${displayName[0].toUpperCase()}</div><div class="ge-online-dot"></div></div>`;
 
                         return `
                             <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}', '${displayName.replace(/'/g, "\'")}')">
@@ -2354,14 +2673,49 @@
                             </div>`;
                         }
 
-                        // ОБЫЧНОЕ СООБЩЕНИЕ
-                        return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}">
+                        // КАРТИНКА
+                        if (m.mediaType === 'image' && m.mediaData) {
+                            return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}" data-msgidx="${uid}" oncontextmenu="geEngine.chat.showMsgContext(event,${uid},${isMe})">
                                 <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
-                                <div class="ge-msg-text">${m.text}</div>
+                                <img src="${m.mediaData}" class="ge-img-in-chat" onclick="geEngine.chat.openLightbox('${m.mediaData}')" />
+                                ${m.text ? `<div class="ge-msg-text" style="margin-top:6px;">${m.text}</div>` : ''}
+                                <div class="ge-msg-status-line"><span>${timeStr}</span>${isMe ? `<span>${statusIcon}</span>` : ''}</div>
+                                ${m.reactions && Object.keys(m.reactions).length ? `<div class="ge-reactions-bar">${Object.entries(m.reactions).map(([e,users]) => `<span class="ge-reaction ${users.includes(geEngine.state.session.email) ? 'mine' : ''}" onclick="geEngine.chat.addReaction('${e}',${uid})">${e} ${users.length}</span>`).join('')}</div>` : ''}
+                            </div>`;
+                        }
+
+                        // УДАЛЁННОЕ СООБЩЕНИЕ
+                        if (m.deleted) {
+                            return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}" style="opacity:0.5;font-style:italic;" data-msgidx="${uid}">
+                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
+                                <div class="ge-msg-text">🚫 Сообщение удалено</div>
+                                <div class="ge-msg-status-line"><span>${timeStr}</span></div>
+                            </div>`;
+                        }
+
+                        // ОБЫЧНОЕ СООБЩЕНИЕ
+                        const sq = geEngine.state.searchQuery;
+                        let displayText = m.text || '';
+                        if (sq && displayText.toLowerCase().includes(sq)) {
+                            const safeQ = sq.replace(/[-[\]{}()*+?.,\\^$|#]/g, '\\$&');
+                            const re = new RegExp(safeQ, 'gi');
+                            displayText = displayText.replace(re, match => `<mark class="ge-msg-highlight">${match}</mark>`);
+                        }
+
+                        const replyHtml = m.replyTo ? `<div class="ge-reply-quote"><b>${m.replyTo.username}</b>${(m.replyTo.text || '').slice(0,60)}</div>` : '';
+                        const reactHtml = m.reactions && Object.keys(m.reactions).length
+                            ? `<div class="ge-reactions-bar">${Object.entries(m.reactions).map(([e,users]) => `<span class="ge-reaction ${users.includes(geEngine.state.session.email) ? 'mine' : ''}" onclick="geEngine.chat.addReaction('${e}')">${e} ${users.length}</span>`).join('')}</div>` : '';
+                        const editedMark = m.edited ? `<span class="ge-msg-edited">изменено</span>` : '';
+
+                        return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}" data-msgidx="${uid}" oncontextmenu="geEngine.chat.showMsgContext(event,${uid},${isMe})">
+                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
+                                ${replyHtml}
+                                <div class="ge-msg-text">${displayText}</div>
                                 <div class="ge-msg-status-line">
-                                    <span>${timeStr}</span>
+                                    <span>${timeStr}</span>${editedMark}
                                     ${isMe ? `<span>${statusIcon}</span>` : ''}
                                 </div>
+                                ${reactHtml}
                             </div>`;
                     }).join('');
                 }
@@ -2861,14 +3215,285 @@
                 async broadcast() {
                     const input = document.getElementById('ge-main-input');
                     const text = input.value.trim();
-                    if (!text || !geEngine.state.activeRoom) return;
-                    const payload = JSON.stringify({ 
-                        username: geEngine.state.session.name, email: geEngine.state.session.email, text: text,
-                        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), status: 'sent' 
-                    });
+                    if (!geEngine.state.activeRoom) return;
+
+                    // Отправка картинки
+                    if (geEngine.state.pendingImg) {
+                        const img = geEngine.state.pendingImg;
+                        const payload = JSON.stringify({
+                            username: geEngine.state.session.name,
+                            email: geEngine.state.session.email,
+                            text: text || '',
+                            mediaType: 'image',
+                            mediaData: img.base64,
+                            time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                            status: 'sent'
+                        });
+                        geEngine.chat.cancelImg();
+                        input.value = '';
+                        await fetch(`/api/index?room=${encodeURIComponent(geEngine.state.activeRoom)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, { method: 'POST', body: payload });
+                        geEngine.chat.refresh();
+                        return;
+                    }
+
+                    if (!text) return;
+
+                    // Редактирование
+                    if (geEngine.state.editingIdx !== null) {
+                        await geEngine.chat.applyEdit(text);
+                        input.value = '';
+                        return;
+                    }
+
+                    const msgObj = {
+                        username: geEngine.state.session.name,
+                        email: geEngine.state.session.email,
+                        text,
+                        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                        status: 'sent'
+                    };
+                    if (geEngine.state.replyTo) {
+                        msgObj.replyTo = geEngine.state.replyTo;
+                        geEngine.chat.cancelReply();
+                    }
                     input.value = '';
-                    await fetch(`/api/index?room=${encodeURIComponent(geEngine.state.activeRoom)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, { method: 'POST', body: payload });
+                    // Typing stop
+                    geEngine.chat._sendTyping(false);
+                    await fetch(`/api/index?room=${encodeURIComponent(geEngine.state.activeRoom)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, { method: 'POST', body: JSON.stringify(msgObj) });
                     geEngine.chat.refresh();
+                },
+
+                // Превью картинки перед отправкой
+                previewImg(input) {
+                    const file = input.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        // Сжимаем до 800x600
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const maxW = 800, maxH = 600;
+                            let w = img.width, h = img.height;
+                            if (w > maxW) { h = h * maxW / w; w = maxW; }
+                            if (h > maxH) { w = w * maxH / h; h = maxH; }
+                            canvas.width = w; canvas.height = h;
+                            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                            const base64 = canvas.toDataURL('image/jpeg', 0.85);
+                            geEngine.state.pendingImg = { base64, name: file.name };
+                            document.getElementById('ge-img-thumb').src = base64;
+                            document.getElementById('ge-img-preview-name').innerText = file.name;
+                            document.getElementById('ge-img-preview-wrap').classList.add('visible');
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                    input.value = '';
+                },
+                cancelImg() {
+                    geEngine.state.pendingImg = null;
+                    document.getElementById('ge-img-preview-wrap').classList.remove('visible');
+                },
+
+                // Typing
+                _sendTyping(isTyping) {
+                    const room = geEngine.state.activeRoom;
+                    if (!room) return;
+                    const email = geEngine.state.session.email;
+                    fetch(`/api/index?action=typing&room=${encodeURIComponent(room)}&user_email=${encodeURIComponent(email)}&typing=${isTyping ? 1 : 0}`, { method: 'POST' }).catch(() => {});
+                },
+                _onInputTyping() {
+                    geEngine.chat._sendTyping(true);
+                    clearTimeout(geEngine.state.typingTimeout);
+                    geEngine.state.typingTimeout = setTimeout(() => geEngine.chat._sendTyping(false), 3000);
+                },
+
+                // Поиск
+                toggleSearch() {
+                    const bar = document.getElementById('ge-search-bar');
+                    bar.classList.toggle('visible');
+                    if (bar.classList.contains('visible')) {
+                        document.getElementById('ge-search-input').focus();
+                    } else {
+                        geEngine.state.searchQuery = '';
+                        document.getElementById('ge-search-input').value = '';
+                        geEngine.chat.renderMessages(geEngine.state._lastMessages || []);
+                    }
+                },
+                doSearch(q) {
+                    geEngine.state.searchQuery = q.toLowerCase();
+                    geEngine.chat.renderMessages(geEngine.state._lastMessages || []);
+                },
+
+                // Reply
+                setReply(idx) {
+                    const msgs = geEngine.state._lastMessages || [];
+                    let m;
+                    try { m = typeof msgs[idx] === 'string' ? JSON.parse(decodeURIComponent(msgs[idx])) : msgs[idx]; } catch { return; }
+                    geEngine.state.replyTo = { username: m.username, text: m.text, idx };
+                    document.getElementById('ge-reply-author').innerText = m.username;
+                    document.getElementById('ge-reply-text-preview').innerText = (m.text || '').slice(0, 80);
+                    document.getElementById('ge-reply-preview').classList.add('visible');
+                    document.getElementById('ge-main-input').focus();
+                },
+                cancelReply() {
+                    geEngine.state.replyTo = null;
+                    document.getElementById('ge-reply-preview').classList.remove('visible');
+                },
+
+                // Edit
+                startEdit(idx) {
+                    const msgs = geEngine.state._lastMessages || [];
+                    let m;
+                    try { m = typeof msgs[idx] === 'string' ? JSON.parse(decodeURIComponent(msgs[idx])) : msgs[idx]; } catch { return; }
+                    if (m.email !== geEngine.state.session.email) return;
+                    geEngine.state.editingIdx = idx;
+                    document.getElementById('ge-edit-text-preview').innerText = (m.text || '').slice(0, 80);
+                    document.getElementById('ge-edit-preview').classList.add('visible');
+                    document.getElementById('ge-main-input').value = m.text || '';
+                    document.getElementById('ge-main-input').focus();
+                },
+                cancelEdit() {
+                    geEngine.state.editingIdx = null;
+                    document.getElementById('ge-edit-preview').classList.remove('visible');
+                    document.getElementById('ge-main-input').value = '';
+                },
+                async applyEdit(newText) {
+                    const idx = geEngine.state.editingIdx;
+                    const msgs = geEngine.state._lastMessages || [];
+                    let m;
+                    try { m = typeof msgs[idx] === 'string' ? JSON.parse(decodeURIComponent(msgs[idx])) : msgs[idx]; } catch { return; }
+                    m.text = newText;
+                    m.edited = true;
+                    msgs[idx] = encodeURIComponent(JSON.stringify(m));
+                    geEngine.state._lastMessages = msgs;
+                    // Сохраняем весь массив обратно
+                    await fetch(`/api/index?action=editMsg&room=${encodeURIComponent(geEngine.state.activeRoom)}&idx=${idx}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: newText, edited: true })
+                    }).catch(() => {});
+                    geEngine.state.editingIdx = null;
+                    document.getElementById('ge-edit-preview').classList.remove('visible');
+                    geEngine.chat.renderMessages(msgs);
+                },
+
+                // Delete message
+                async deleteMsg(idx) {
+                    if (!confirm('Удалить сообщение?')) return;
+                    const msgs = geEngine.state._lastMessages || [];
+                    let m;
+                    try { m = typeof msgs[idx] === 'string' ? JSON.parse(decodeURIComponent(msgs[idx])) : msgs[idx]; } catch { return; }
+                    if (m.email !== geEngine.state.session.email) return;
+                    m.deleted = true; m.text = '';
+                    msgs[idx] = encodeURIComponent(JSON.stringify(m));
+                    geEngine.state._lastMessages = msgs;
+                    await fetch(`/api/index?action=editMsg&room=${encodeURIComponent(geEngine.state.activeRoom)}&idx=${idx}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ deleted: true })
+                    }).catch(() => {});
+                    geEngine.chat.renderMessages(msgs);
+                },
+
+                // Pin
+                pinMsg(idx) {
+                    const msgs = geEngine.state._lastMessages || [];
+                    let m;
+                    try { m = typeof msgs[idx] === 'string' ? JSON.parse(decodeURIComponent(msgs[idx])) : msgs[idx]; } catch { return; }
+                    geEngine.state.pinnedMsg = { text: m.text || '[медиа]', idx };
+                    localStorage.setItem('ge_pin_' + geEngine.state.activeRoom, JSON.stringify(geEngine.state.pinnedMsg));
+                    geEngine.chat.showPin();
+                },
+                unpin() {
+                    geEngine.state.pinnedMsg = null;
+                    localStorage.removeItem('ge_pin_' + geEngine.state.activeRoom);
+                    document.getElementById('ge-pinned-banner').classList.remove('visible');
+                },
+                showPin() {
+                    const p = geEngine.state.pinnedMsg;
+                    if (!p) return;
+                    document.getElementById('ge-pinned-text').innerText = (p.text || '').slice(0, 60);
+                    document.getElementById('ge-pinned-banner').classList.add('visible');
+                },
+                scrollToPin() {
+                    const p = geEngine.state.pinnedMsg;
+                    if (!p) return;
+                    const el = document.querySelector(`[data-msgidx="${p.idx}"]`);
+                    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.style.outline = '2px solid var(--ge-primary)'; setTimeout(() => el.style.outline = '', 1500); }
+                },
+
+                // Reactions
+                _reactionTarget: null,
+                showReactionPicker(idx, el) {
+                    geEngine.chat._reactionTarget = idx;
+                    const picker = document.getElementById('ge-reaction-picker');
+                    const rect = el.getBoundingClientRect();
+                    picker.style.display = 'flex';
+                    picker.style.top = (rect.top - 55) + 'px';
+                    picker.style.left = rect.left + 'px';
+                    setTimeout(() => {
+                        document.addEventListener('click', function closePicker(ev) {
+                            if (!picker.contains(ev.target)) {
+                                picker.style.display = 'none';
+                                document.removeEventListener('click', closePicker);
+                            }
+                        });
+                    }, 0);
+                },
+                addReaction(emoji) {
+                    document.getElementById('ge-reaction-picker').style.display = 'none';
+                    const idx = geEngine.chat._reactionTarget;
+                    if (idx === null || idx === undefined) return;
+                    const msgs = geEngine.state._lastMessages || [];
+                    let m;
+                    try { m = typeof msgs[idx] === 'string' ? JSON.parse(decodeURIComponent(msgs[idx])) : msgs[idx]; } catch { return; }
+                    if (!m.reactions) m.reactions = {};
+                    const myEmail = geEngine.state.session.email;
+                    if (!m.reactions[emoji]) m.reactions[emoji] = [];
+                    const i = m.reactions[emoji].indexOf(myEmail);
+                    if (i >= 0) m.reactions[emoji].splice(i, 1);
+                    else m.reactions[emoji].push(myEmail);
+                    if (m.reactions[emoji].length === 0) delete m.reactions[emoji];
+                    msgs[idx] = encodeURIComponent(JSON.stringify(m));
+                    geEngine.state._lastMessages = msgs;
+                    fetch(`/api/index?action=editMsg&room=${encodeURIComponent(geEngine.state.activeRoom)}&idx=${idx}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reactions: m.reactions })
+                    }).catch(() => {});
+                    geEngine.chat.renderMessages(msgs);
+                },
+
+                // Lightbox
+                openLightbox(src) {
+                    document.getElementById('ge-lightbox-img').src = src;
+                    document.getElementById('ge-lightbox').classList.add('visible');
+                },
+                closeLightbox() {
+                    document.getElementById('ge-lightbox').classList.remove('visible');
+                },
+
+                // Context menu for messages
+                showMsgContext(ev, idx, isMe) {
+                    ev.preventDefault();
+                    const menu = document.getElementById('ge-msg-context');
+                    let html = `<button onclick="geEngine.chat.setReply(${idx}); document.getElementById('ge-msg-context').style.display='none'">↩️ Ответить</button>`;
+                    html += `<button onclick="geEngine.chat.showReactionPicker(${idx}, this); document.getElementById('ge-msg-context').style.display='none'">😊 Реакция</button>`;
+                    html += `<button onclick="geEngine.chat.pinMsg(${idx}); document.getElementById('ge-msg-context').style.display='none'">📌 Закрепить</button>`;
+                    if (isMe) {
+                        html += `<hr><button onclick="geEngine.chat.startEdit(${idx}); document.getElementById('ge-msg-context').style.display='none'">✏️ Редактировать</button>`;
+                        html += `<button class="danger" onclick="geEngine.chat.deleteMsg(${idx}); document.getElementById('ge-msg-context').style.display='none'">🗑️ Удалить</button>`;
+                    }
+                    menu.innerHTML = html;
+                    menu.style.display = 'block';
+                    menu.style.top = (ev.clientY - 10) + 'px';
+                    menu.style.left = Math.min(ev.clientX, window.innerWidth - 180) + 'px';
+                    setTimeout(() => {
+                        document.addEventListener('click', function closeCtx() {
+                            menu.style.display = 'none';
+                            document.removeEventListener('click', closeCtx);
+                        });
+                    }, 0);
                 },
                 async open(id, prettyName) {
                     geEngine.state.activeRoom = id;
@@ -3272,6 +3897,15 @@
                 geEngine.chat.refresh();
                 setInterval(() => geEngine.chat.refresh(), 4000);
                 setInterval(() => geEngine.calls._pollSignals(), 2000);
+                setInterval(() => geEngine.chat._pollPresence(), 2500);
+                // Отправляем online heartbeat
+                setInterval(() => {
+                    const room = geEngine.state.activeRoom;
+                    if (room) fetch(`/api/index?action=heartbeat&room=${encodeURIComponent(room)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, { method: 'POST' }).catch(() => {});
+                }, 10000);
+                // Typing listener
+                const inp = document.getElementById('ge-main-input');
+                if (inp) inp.addEventListener('input', () => geEngine.chat._onInputTyping());
                 geEngine.media.init();
             }
         };
@@ -3300,6 +3934,14 @@
                 geEngine.state.snowInterval = setInterval(geEngine.effects.createSnowflake, 150);
             }
 
+            // Восстанавливаем автотему
+            if (localStorage.getItem('ge_autotheme') === 'on') {
+                const sw = document.getElementById('ge-autotheme-switch');
+                if (sw) sw.classList.add('on');
+                geEngine.ui._applyAutoTheme();
+                geEngine.state._autoThemeInterval = setInterval(() => geEngine.ui._applyAutoTheme(), 60000);
+            }
+
             const saved = localStorage.getItem('ge_v9_token');
             if (saved) { geEngine.state.session = JSON.parse(saved); geEngine.init(); }
 
@@ -3313,9 +3955,32 @@
             });
         };
     </script>
+    <!-- КОНТЕКСТНОЕ МЕНЮ СООБЩЕНИЯ -->
+    <div id="ge-msg-context" class="ge-msg-context" style="display:none;"></div>
+
+    <!-- ПИКЕР РЕАКЦИЙ -->
+    <div id="ge-reaction-picker" class="ge-reaction-picker" style="display:none;">
+        <button onclick="geEngine.chat.addReaction('❤️')">❤️</button>
+        <button onclick="geEngine.chat.addReaction('😂')">😂</button>
+        <button onclick="geEngine.chat.addReaction('👍')">👍</button>
+        <button onclick="geEngine.chat.addReaction('😮')">😮</button>
+        <button onclick="geEngine.chat.addReaction('😢')">😢</button>
+        <button onclick="geEngine.chat.addReaction('🔥')">🔥</button>
+    </div>
+
+    <!-- ЛАЙТБОКС -->
+    <div id="ge-lightbox" class="ge-lightbox" onclick="geEngine.chat.closeLightbox()">
+        <button class="ge-lightbox-close" onclick="geEngine.chat.closeLightbox()">✕</button>
+        <img id="ge-lightbox-img" src="" />
+    </div>
+
     <!-- ПОПАП НАСТРОЕК — в body чтобы перекрывал всё -->
     <div id="ge-settings-popup" class="ge-settings-popup" style="position:fixed; display:none;">
         <button class="ge-popup-item" onclick="geEngine.ui.toggleTheme()">🌓 Сменить тему</button>
+        <div class="ge-autotheme-toggle" onclick="geEngine.ui.toggleAutoTheme()">
+            <span>🕐 Авто тема (день/ночь)</span>
+            <div class="ge-switch" id="ge-autotheme-switch"></div>
+        </div>
         <button class="ge-popup-item" id="ge-glass-btn" onclick="geEngine.ui.toggleGlass()">🫧 Жидкое стекло</button>
         <button class="ge-popup-item" id="btn-snow" onclick="geEngine.effects.toggleSnow()">❄️ Снег: Выкл</button>
         <button class="ge-popup-item" onclick="geEngine.profile.open()">👤 Профиль</button>
