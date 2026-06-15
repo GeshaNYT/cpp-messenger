@@ -1899,10 +1899,45 @@
                 </div>
             </header>
 
-            <div id="ge-msg-container" class="ge-messages-area">
+            
+                <!-- ПОИСК ПО ЧАТУ -->
+                <div id='ge-search-bar' class='ge-search-bar'>
+                    <input id='ge-search-input' placeholder='Поиск по сообщениям...' oninput='geEngine.chat.doSearch(this.value)' />
+                    <button onclick='geEngine.chat.toggleSearch()'>✕</button>
+                </div>
+                <!-- ЗАКРЕП -->
+                <div id='ge-pinned-banner' class='ge-pinned-banner' onclick='geEngine.chat.scrollToPin()'>
+                    📌 <span><b>Закреплено:</b> <span id='ge-pinned-text'></span></span>
+                    <button class='ge-pin-close' onclick='event.stopPropagation(); geEngine.chat.unpin()'>✕</button>
+                </div>
+                <!-- TYPING -->
+                <div id='ge-typing-indicator' class='ge-typing-indicator'>
+                    <div class='ge-typing-dots'><span></span><span></span><span></span></div>
+                    <span>печатает...</span>
+                </div>
+                <div id="ge-msg-container" class="ge-messages-area">
                 </div>
 
-            <footer class="ge-footer">
+            
+                <!-- REPLY PREVIEW -->
+                <div id='ge-reply-preview' class='ge-reply-preview'>
+                    <b id='ge-reply-author'></b>
+                    <span id='ge-reply-text-preview'></span>
+                    <button class='ge-reply-close' onclick='geEngine.chat.cancelReply()'>✕</button>
+                </div>
+                <!-- EDIT PREVIEW -->
+                <div id='ge-edit-preview' class='ge-edit-preview'>
+                    <b>✏️ Редактирование</b>
+                    <span id='ge-edit-text-preview'></span>
+                    <button class='ge-reply-close' onclick='geEngine.chat.cancelEdit()'>✕</button>
+                </div>
+                <!-- IMG PREVIEW -->
+                <div id='ge-img-preview-wrap' class='ge-img-preview-wrap'>
+                    <img id='ge-img-thumb' class='ge-img-thumb' />
+                    <span id='ge-img-preview-name' style='font-size:13px;color:var(--text-secondary);flex:1;'></span>
+                    <button onclick='geEngine.chat.cancelImg()' style='background:none;border:none;color:var(--text-tertiary);font-size:18px;cursor:pointer;'>✕</button>
+                </div>
+                <footer class="ge-footer">
                 <!-- Кнопка записи: 1 клик = старт, 2 клик = стоп+отправить, ПКМ = смена режима -->
                 <button class="ge-media-btn" id="ge-media-toggle-btn" title="Нажми для записи • ПКМ чтобы переключить режим">
                     <span id="ge-media-btn-icon">
@@ -2478,13 +2513,38 @@
                     else { btn.classList.remove('glass-active'); btn.innerHTML = '🫧 Жидкое стекло'; }
                 },
                 toggleTheme() {
-                    // ЗАКРЫВАЕМ МЕНЮ ПРИ НАЖАТИИ
                     document.getElementById('ge-settings-popup').classList.remove('active');
-
+                    document.getElementById('ge-settings-popup').style.display = 'none';
+                    if (localStorage.getItem('ge_autotheme') === 'on') {
+                        localStorage.setItem('ge_autotheme', 'off');
+                        const sw = document.getElementById('ge-autotheme-switch');
+                        if (sw) sw.classList.remove('on');
+                        clearInterval(geEngine.state._autoThemeInterval);
+                    }
                     const html = document.documentElement;
                     const newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
                     html.setAttribute('data-theme', newTheme);
                     localStorage.setItem('ge_theme', newTheme);
+                },
+                toggleAutoTheme() {
+                    const enabled = localStorage.getItem('ge_autotheme') === 'on';
+                    const sw = document.getElementById('ge-autotheme-switch');
+                    if (enabled) {
+                        localStorage.setItem('ge_autotheme', 'off');
+                        if (sw) sw.classList.remove('on');
+                        clearInterval(geEngine.state._autoThemeInterval);
+                    } else {
+                        localStorage.setItem('ge_autotheme', 'on');
+                        if (sw) sw.classList.add('on');
+                        geEngine.ui._applyAutoTheme();
+                        geEngine.state._autoThemeInterval = setInterval(() => geEngine.ui._applyAutoTheme(), 60000);
+                    }
+                },
+                _applyAutoTheme() {
+                    const h = new Date().getHours();
+                    const next = (h < 7 || h >= 21) ? 'dark' : 'light';
+                    document.documentElement.setAttribute('data-theme', next);
+                    localStorage.setItem('ge_theme', next);
                 },
                 setTab(tab) {
                     geEngine.state.activeTab = tab;
@@ -3462,6 +3522,21 @@
                         body: JSON.stringify({ reactions: m.reactions })
                     }).catch(() => {});
                     geEngine.chat.renderMessages(msgs);
+                },
+
+                async _pollPresence() {
+                    const room = geEngine.state.activeRoom;
+                    if (!room || !room.startsWith('private-')) return;
+                    try {
+                        const res = await fetch('/api/index?action=presence&room=' + encodeURIComponent(room) + '&user_email=' + encodeURIComponent(geEngine.state.session.email));
+                        const data = await res.json();
+                        const typInd = document.getElementById('ge-typing-indicator');
+                        if (typInd) typInd.classList.toggle('visible', !!(data.typing));
+                        const wrap = document.querySelector('.ge-active-av-wrap');
+                        const statusEl = document.getElementById('ge-active-status');
+                        if (wrap) wrap.classList.toggle('online', !!(data.online));
+                        if (statusEl) { statusEl.innerText = 'онлайн'; statusEl.classList.toggle('visible', !!(data.online)); }
+                    } catch {}
                 },
 
                 // Lightbox
