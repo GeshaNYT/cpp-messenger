@@ -2063,11 +2063,17 @@
                     const popup = document.getElementById('ge-settings-popup');
                     popup.classList.toggle('active');
 
-                    // ЗАКРЫВАЕМ ПРИ УВОДЕ КУРСОРA
+                    // ЗАКРЫВАЕМ ПО КЛИКУ ВНЕ ПОПАПА
                     if (popup.classList.contains('active') && !popup.dataset.listenerSet) {
-                        popup.addEventListener('mouseleave', () => {
-                            popup.classList.remove('active');
-                        });
+                        setTimeout(() => {
+                            document.addEventListener('click', function closePopup(ev) {
+                                if (!popup.contains(ev.target)) {
+                                    popup.classList.remove('active');
+                                    document.removeEventListener('click', closePopup);
+                                    delete popup.dataset.listenerSet;
+                                }
+                            });
+                        }, 0);
                         popup.dataset.listenerSet = "true";
                     }
                 },
