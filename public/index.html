@@ -478,11 +478,12 @@
             border: 1px solid var(--border-base);
             border-radius: var(--radius-md);
             box-shadow: var(--shadow-lg);
-            z-index: 2000;
+            z-index: 99999;
             display: none;
             flex-direction: column;
             overflow: hidden;
             animation: ge-pop-anim 0.2s var(--ease);
+            pointer-events: all;
         }
 
         .ge-settings-popup.active {
@@ -2063,8 +2064,22 @@
                     const popup = document.getElementById('ge-settings-popup');
                     popup.classList.toggle('active');
 
+                    // Позиционируем попап по координатам кнопки
+                    if (popup.classList.contains('active')) {
+                        const btn = e.currentTarget;
+                        const rect = btn.getBoundingClientRect();
+                        popup.style.position = 'fixed';
+                        popup.style.top = (rect.bottom + 8) + 'px';
+                        popup.style.right = (window.innerWidth - rect.right) + 'px';
+                        popup.style.left = 'auto';
+                    }
+
                     // ЗАКРЫВАЕМ ПО КЛИКУ ВНЕ ПОПАПА
                     if (popup.classList.contains('active') && !popup.dataset.listenerSet) {
+                        // Блокируем проваливание кликов сквозь попап
+                        popup.addEventListener('click', function(ev) {
+                            ev.stopPropagation();
+                        });
                         setTimeout(() => {
                             document.addEventListener('click', function closePopup(ev) {
                                 if (!popup.contains(ev.target)) {
