@@ -470,20 +470,17 @@
 
         /* --- МАЛЕНЬКАЯ КОШКА (ПОП-АП НАСТРОЕК) --- */
         .ge-settings-popup {
-            position: absolute;
-            top: 60px;
-            right: 0;
+            position: fixed;
             width: 240px;
             background: var(--bg-panel);
             border: 1px solid var(--border-base);
             border-radius: var(--radius-md);
             box-shadow: var(--shadow-lg);
-            z-index: 99999;
+            z-index: 999999;
             display: none;
             flex-direction: column;
             overflow: hidden;
             animation: ge-pop-anim 0.2s var(--ease);
-            pointer-events: all;
         }
 
         .ge-settings-popup.active {
@@ -1528,14 +1525,6 @@
                     
                     <div style="position: relative; overflow: visible; z-index: 99999;">
                         <button class="ge-sidebar-settings-btn" onclick="geEngine.ui.toggleSettingsMenu(event)">⚙️</button>
-                        
-                        <div id="ge-settings-popup" class="ge-settings-popup">
-                            <button class="ge-popup-item" onclick="event.stopPropagation(); geEngine.ui.toggleTheme()">🌓 Сменить тему</button>
-                            <button class="ge-popup-item" id="ge-glass-btn" onclick="event.stopPropagation(); geEngine.ui.toggleGlass()">🫧 Жидкое стекло</button>
-                            <button class="ge-popup-item" id="btn-snow" onclick="event.stopPropagation(); geEngine.effects.toggleSnow()">❄️ Снег: Выкл</button>
-                            <button class="ge-popup-item" onclick="event.stopPropagation(); geEngine.profile.open()">👤 Профиль</button>
-                            <button class="ge-popup-item danger" onclick="event.stopPropagation(); geEngine.auth.deleteAccountFull()">🗑️ Удалить аккаунт</button>
-                        </div>
                     </div>
                 </div>
 
@@ -2063,17 +2052,30 @@
                     e.stopPropagation();
                     const popup = document.getElementById('ge-settings-popup');
                     const wasActive = popup.classList.contains('active');
-                    popup.classList.toggle('active');
 
-                    if (!wasActive) {
-                        // Открылось — вешаем один глобальный обработчик закрытия
-                        setTimeout(() => {
-                            document.addEventListener('click', function closePopup(ev) {
-                                popup.classList.remove('active');
-                                document.removeEventListener('click', closePopup);
-                            });
-                        }, 0);
+                    if (wasActive) {
+                        popup.classList.remove('active');
+                        popup.style.display = 'none';
+                        return;
                     }
+
+                    // Позиционируем по кнопке
+                    const btn = e.currentTarget;
+                    const rect = btn.getBoundingClientRect();
+                    popup.style.top = (rect.bottom + 8) + 'px';
+                    popup.style.right = (window.innerWidth - rect.right) + 'px';
+                    popup.style.left = 'auto';
+                    popup.style.display = 'flex';
+                    popup.classList.add('active');
+
+                    // Закрываем по клику вне
+                    setTimeout(() => {
+                        document.addEventListener('click', function closePopup() {
+                            popup.classList.remove('active');
+                            popup.style.display = 'none';
+                            document.removeEventListener('click', closePopup);
+                        });
+                    }, 0);
                 },
                 toggleGlass() {
                     document.getElementById('ge-settings-popup').classList.remove('active');
@@ -3186,5 +3188,14 @@
             });
         };
     </script>
+    <!-- ПОПАП НАСТРОЕК — в body чтобы перекрывал всё -->
+    <div id="ge-settings-popup" class="ge-settings-popup" style="position:fixed; display:none;">
+        <button class="ge-popup-item" onclick="geEngine.ui.toggleTheme()">🌓 Сменить тему</button>
+        <button class="ge-popup-item" id="ge-glass-btn" onclick="geEngine.ui.toggleGlass()">🫧 Жидкое стекло</button>
+        <button class="ge-popup-item" id="btn-snow" onclick="geEngine.effects.toggleSnow()">❄️ Снег: Выкл</button>
+        <button class="ge-popup-item" onclick="geEngine.profile.open()">👤 Профиль</button>
+        <button class="ge-popup-item danger" onclick="geEngine.auth.deleteAccountFull()">🗑️ Удалить аккаунт</button>
+    </div>
+
 </body>
 </html>
