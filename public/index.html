@@ -2428,18 +2428,35 @@
 
                     if (!this._camOff) {
                         // Включаем камеру
-                        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+                        navigator.mediaDevices.getUserMedia({ video: { facingMode: this._facingMode }, audio: false })
                             .then(camStream => {
                                 const videoTrack = camStream.getVideoTracks()[0];
                                 if (!videoTrack) return;
-                                // Заменяем трек в PeerConnection
-                                const sender = this._pc?.getSenders().find(s => s.track?.kind === 'video');
-                                if (sender) sender.replaceTrack(videoTrack);
-                                // Добавляем в localStream
+
+                                // Обновляем localStream
                                 if (geEngine.state.localStream) {
                                     geEngine.state.localStream.getVideoTracks().forEach(t => { t.stop(); geEngine.state.localStream.removeTrack(t); });
                                     geEngine.state.localStream.addTrack(videoTrack);
                                 }
+
+                                // Передаём собеседнику
+                                if (this._pc) {
+                                    const sender = this._pc.getSenders().find(s => s.track?.kind === 'video');
+                                    if (sender) {
+                                        // Уже есть видео-sender — заменяем трек
+                                        sender.replaceTrack(videoTrack);
+                                    } else {
+                                        // Аудиозвонок — добавляем видео трек
+                                        this._pc.addTrack(videoTrack, geEngine.state.localStream);
+                                        // Пересогласовываем соединение
+                                        this._pc.createOffer().then(offer => {
+                                            return this._pc.setLocalDescription(offer).then(() => {
+                                                return this._send({ type: 'offer', from: geEngine.state.session.email, to: this._targetEmail, payload: offer, callType: 'video' });
+                                            });
+                                        }).catch(e => console.warn('Renegotiate:', e));
+                                    }
+                                }
+
                                 localVid.srcObject = geEngine.state.localStream;
                                 localVid.style.display = 'block';
                                 localVid.style.opacity = '1';
@@ -2450,7 +2467,7 @@
                                 alert('Не удалось получить доступ к камере');
                             });
                     } else {
-                        // Выключаем камеру
+                        // Выключаем камеру — отключаем трек (не удаляем, чтобы можно было включить снова)
                         if (geEngine.state.localStream) {
                             geEngine.state.localStream.getVideoTracks().forEach(t => t.enabled = false);
                         }
@@ -2762,9 +2779,23 @@
                 },
                 removeRoom(e, rid) {
                     e.stopPropagation();
-                    if(confirm("Удалить?")) {
+                    const msg = rid === 'general' ? 'Покинуть группу General?' : 'Удалить чат?';
+                    if(confirm(msg)) {
                         geEngine.state.deletedRooms.push(rid);
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+
+                        // Если открыт этот чат — переключаемся
+                        if (geEngine.state.activeRoom === rid) {
+                            // Находим первый доступный чат
+                            const otherRoom = Object.keys(geEngine.state.rooms || {}).find(r => r !== rid && !geEngine.state.deletedRooms.includes(r));
+                            if (otherRoom) {
+                                geEngine.chat.open(otherRoom, otherRoom);
+                            } else {
+                                geEngine.state.activeRoom = null;
+                                document.getElementById('ge-chat-placeholder').style.display = 'flex';
+                                document.getElementById('ge-chat-active').style.display = 'none';
+                            }
+                        }
 
                         // Если приватная комната — удаляем с сервера (только у себя)
                         if (rid.startsWith('private-')) {
