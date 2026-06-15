@@ -1618,6 +1618,13 @@
     </main>
 
     <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+        // ── JWT хелпер ───────────────────────────────────────────────────────
+        // Возвращает заголовки с токеном авторизации для всех защищённых запросов
+        function authHeaders(extra) {
+            const token = localStorage.getItem('ge_jwt');
+            return Object.assign({ 'Authorization': `Bearer ${token}` }, extra || {});
+        }
+
         const geEngine = {
             state: {
                 session: null,
@@ -1746,6 +1753,8 @@
                             });
                             const loginData = await loginRes.json();
                             if (loginData.status === 'error') return alert(loginData.message);
+                            // Сохраняем JWT токен
+                            if (loginData.token) localStorage.setItem('ge_jwt', loginData.token);
                             serverUser = loginData.user;
                         } catch(err) {
                             return alert("Ошибка соединения с сервером. Попробуйте снова.");
@@ -1786,7 +1795,7 @@
                         // Сохраняем профиль на сервере (для поиска по нику и email)
                         fetch(`/api/index?action=saveProfile&user_email=${encodeURIComponent(user.email)}`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: authHeaders({ 'Content-Type': 'application/json' }),
                             body: JSON.stringify({ name: user.name, nickname: user.nickname })
                         }).catch(() => {});
 
@@ -1818,7 +1827,9 @@
 
                     // Проверяем существует ли аккаунт
                     try {
-                        const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(email)}`);
+                        const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(email)}`, {
+                            headers: authHeaders()
+                        });
                         const data = await res.json();
                         if (data.status !== 'found' || !data.profile) {
                             return alert('На эту почту не зарегистрирован аккаунт GeLink.');
@@ -1853,9 +1864,9 @@
                     if (pass !== confirm) return alert('Пароли не совпадают!');
 
                     try {
-                        const res = await fetch(`/api/index?action=updateProfile&user_email=${encodeURIComponent(geEngine.state.forgotEmail)}`, {
+                        const res = await fetch(`/api/index?action=updateProfile`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: authHeaders({ 'Content-Type': 'application/json' }),
                             body: JSON.stringify({ password: pass })
                         });
                         const data = await res.json();
@@ -1927,7 +1938,8 @@
                 },
                 exit() {
                     if (confirm("Выйти?")) { 
-                        localStorage.removeItem('ge_v9_token'); 
+                        localStorage.removeItem('ge_v9_token');
+                        localStorage.removeItem('ge_jwt');
                         location.reload(); 
                     }
                 },
@@ -1941,6 +1953,7 @@
                         if(c2) {
                             const currentEmail = geEngine.state.session.email;
                             localStorage.removeItem('ge_v9_token');
+                            localStorage.removeItem('ge_jwt');
                             alert("Ваш аккаунт был полностью удален.");
                             location.reload();
                         }
@@ -2076,9 +2089,9 @@
                         if (newPass) body.password = newPass;
                         // avImg: base64 строка = новое фото, false = удалить, null = не трогать
                         if (avImg !== null) body.avImg = avImg || '';
-                        const res = await fetch(`/api/index?action=updateProfile&user_email=${encodeURIComponent(email)}`, {
+                        const res = await fetch(`/api/index?action=updateProfile`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: authHeaders({ 'Content-Type': 'application/json' }),
                             body: JSON.stringify(body)
                         });
                         const data = await res.json();
@@ -2217,7 +2230,9 @@
                         const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe);
                         if (!targetEmail) return;
                         try {
-                            const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
+                            const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`, {
+                                headers: authHeaders()
+                            });
                             const data = await res.json();
                             if (data.status === 'found') contactProfiles[rid] = data.profile || {};
                         } catch {}
@@ -2442,7 +2457,7 @@
                 async _send(obj) {
                     await fetch('/api/index?action=signal', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: authHeaders({ 'Content-Type': 'application/json' }),
                         body: JSON.stringify(obj)
                     });
                 },
@@ -2628,7 +2643,9 @@
 
                 async _pollSignals() {
                     try {
-                        const res = await fetch(`/api/index?action=getSignals&user_email=${encodeURIComponent(geEngine.state.session.email)}`);
+                        const res = await fetch(`/api/index?action=getSignals`, {
+                            headers: authHeaders()
+                        });
                         const data = await res.json();
                         for (const sig of (data.signals || [])) {
                             await this._handleSignal(sig);
@@ -2841,8 +2858,8 @@
             chat: {
                 async refresh() {
                     try {
-                        const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`;
-                        const res = await fetch(url);
+                        const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}`;
+                        const res = await fetch(url, { headers: authHeaders() });
                         const data = await res.json();
 
                         // Сохраняем серверные контакты для звонков
@@ -2867,7 +2884,11 @@
                         time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), status: 'sent' 
                     });
                     input.value = '';
-                    await fetch(`/api/index?room=${encodeURIComponent(geEngine.state.activeRoom)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, { method: 'POST', body: payload });
+                    await fetch(`/api/index?room=${encodeURIComponent(geEngine.state.activeRoom)}`, {
+                        method: 'POST',
+                        headers: authHeaders({ 'Content-Type': 'application/json' }),
+                        body: payload
+                    });
                     geEngine.chat.refresh();
                 },
                 async open(id, prettyName) {
@@ -2886,7 +2907,9 @@
                         const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe);
                         if (targetEmail) {
                             try {
-                                const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
+                                const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`, {
+                                    headers: authHeaders()
+                                });
                                 const data = await res.json();
                                 if (data.status === 'found' && data.profile) {
                                     const p = data.profile;
@@ -2941,7 +2964,9 @@
                                 if (expectedRoom === rid) { targetEmail = email; break; }
                             }
                             if (targetEmail) {
-                                fetch(`/api/index?action=removeContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(targetEmail)}`).catch(() => {});
+                                fetch(`/api/index?action=removeContact&target_email=${encodeURIComponent(targetEmail)}`, {
+                                    headers: authHeaders()
+                                }).catch(() => {});
                             }
                         }
 
@@ -2975,7 +3000,9 @@
 
                     try {
                         // Шаг 1: Ищем пользователя по email или нику на сервере
-                        const findRes = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(query)}`);
+                        const findRes = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(query)}`, {
+                            headers: authHeaders()
+                        });
                         const findData = await findRes.json();
 
                         if (findData.status !== 'found') {
@@ -3010,7 +3037,9 @@
                         }
 
                         // Шаг 2: Добавляем контакт
-                        const addRes = await fetch(`/api/index?action=addContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(targetEmail)}`);
+                        const addRes = await fetch(`/api/index?action=addContact&target_email=${encodeURIComponent(targetEmail)}`, {
+                            headers: authHeaders()
+                        });
                         const addData = await addRes.json();
 
                         if (addData.status === 'success') {
@@ -3202,8 +3231,10 @@
                             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             status: 'sent'
                         });
-                        await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, {
-                            method: 'POST', body: payload
+                        await fetch(`/api/index?room=${geEngine.state.activeRoom}`, {
+                            method: 'POST',
+                            headers: authHeaders({ 'Content-Type': 'application/json' }),
+                            body: payload
                         });
                         geEngine.chat.refresh();
                     };
