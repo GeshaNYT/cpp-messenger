@@ -941,6 +941,8 @@
             animation: ge-slide-up 0.4s var(--ease);
         }
 
+        .ge-av-preview:hover #ge-av-hover-overlay { opacity: 1 !important; }
+
         .ge-avatar-picker {
             display: flex;
             flex-direction: column;
@@ -1258,13 +1260,22 @@
             <h2 style="margin-bottom: 25px; text-align: center;">Настройки профиля</h2>
             
             <div class="ge-avatar-picker">
-                <div id="ge-edit-av-preview" class="ge-av-preview">?</div>
+                <div id="ge-edit-av-preview" class="ge-av-preview" style="cursor:pointer; position:relative; overflow:hidden;" onclick="document.getElementById('ge-av-file-input').click()" title="Нажмите чтобы загрузить фото">
+                    <span id="ge-edit-av-letter">?</span>
+                    <img id="ge-edit-av-img" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;border-radius:35px;" />
+                    <div style="position:absolute;inset:0;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;opacity:0;transition:0.2s;border-radius:35px;" id="ge-av-hover-overlay">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    </div>
+                </div>
+                <input type="file" id="ge-av-file-input" accept="image/*" style="display:none;" onchange="geEngine.profile.handleImgUpload(this)">
+                <p style="font-size:11px;color:var(--text-tertiary);margin-top:-10px;">Нажмите на аватар чтобы загрузить фото</p>
                 <div class="ge-av-colors">
                     <div class="ge-color-dot" style="background: linear-gradient(135deg, #0084ff 0%, #00c6ff 100%)" onclick="geEngine.profile.setAvColor('linear-gradient(135deg, #0084ff 0%, #00c6ff 100%)')"></div>
                     <div class="ge-color-dot" style="background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)" onclick="geEngine.profile.setAvColor('linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)')"></div>
                     <div class="ge-color-dot" style="background: linear-gradient(135deg, #1d976c 0%, #93f9b9 100%)" onclick="geEngine.profile.setAvColor('linear-gradient(135deg, #1d976c 0%, #93f9b9 100%)')"></div>
                     <div class="ge-color-dot" style="background: linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%)" onclick="geEngine.profile.setAvColor('linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%)')"></div>
                     <div class="ge-color-dot" style="background: #333" onclick="geEngine.profile.setAvColor('#333')"></div>
+                    <div class="ge-color-dot" style="background: var(--bg-input); border: 2px solid var(--border-base); display:flex;align-items:center;justify-content:center;" onclick="geEngine.profile.removeAvImg()" title="Убрать фото">✕</div>
                 </div>
             </div>
 
@@ -1764,7 +1775,8 @@
                             name: user.name, 
                             nickname: user.nickname, 
                             email: user.email, 
-                            avColor: user.avColor || 'var(--ge-accent-gradient)' 
+                            avColor: user.avColor || 'var(--ge-accent-gradient)',
+                            avImg: user.avImg || null
                         };
                         localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
                         
@@ -1938,15 +1950,18 @@
 
             profile: {
                 tempColor: '',
+                tempImg: null,   // base64 новой картинки или false (удалить) или null (не менять)
+
                 open() {
-                    // ЗАКРЫВАЕМ МЕНЮ ПРИ НАЖАТИИ
                     document.getElementById('ge-settings-popup').classList.remove('active');
+                    document.getElementById('ge-settings-popup').style.display = 'none';
 
                     const session = geEngine.state.session;
                     document.getElementById('prof-name').value = session.name;
                     document.getElementById('prof-nick').value = session.nickname || '';
                     document.getElementById('prof-pass').value = '';
                     this.tempColor = session.avColor || 'var(--ge-accent-gradient)';
+                    this.tempImg = null;
                     this.updatePreview();
                     document.getElementById('ge-modal-profile').style.display = 'flex';
                 },
@@ -1957,6 +1972,38 @@
                     document.getElementById('prof-otp').value = '';
                     document.getElementById('prof-pass').value = '';
                     geEngine.state.profilePending = null;
+                    // Сбрасываем file input
+                    const fi = document.getElementById('ge-av-file-input');
+                    if (fi) fi.value = '';
+                },
+                handleImgUpload(input) {
+                    const file = input.files[0];
+                    if (!file) return;
+                    // Сжимаем до 200x200
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = 200; canvas.height = 200;
+                            const ctx = canvas.getContext('2d');
+                            // Обрезаем по центру
+                            const size = Math.min(img.width, img.height);
+                            const sx = (img.width - size) / 2;
+                            const sy = (img.height - size) / 2;
+                            ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200);
+                            this.tempImg = canvas.toDataURL('image/jpeg', 0.8);
+                            this.updatePreview();
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                },
+                removeAvImg() {
+                    this.tempImg = false; // false = удалить фото
+                    this.updatePreview();
+                    const fi = document.getElementById('ge-av-file-input');
+                    if (fi) fi.value = '';
                 },
                 setAvColor(color) {
                     this.tempColor = color;
@@ -1964,9 +2011,23 @@
                 },
                 updatePreview() {
                     const preview = document.getElementById('ge-edit-av-preview');
+                    const letter = document.getElementById('ge-edit-av-letter');
+                    const img = document.getElementById('ge-edit-av-img');
                     const name = document.getElementById('prof-name').value;
-                    preview.innerText = (name[0] || '?').toUpperCase();
-                    preview.style.background = this.tempColor;
+                    letter.innerText = (name[0] || '?').toUpperCase();
+
+                    const currentImg = this.tempImg !== null ? this.tempImg : (geEngine.state.session.avImg || null);
+
+                    if (currentImg) {
+                        img.src = currentImg;
+                        img.style.display = 'block';
+                        letter.style.display = 'none';
+                        preview.style.background = '';
+                    } else {
+                        img.style.display = 'none';
+                        letter.style.display = 'block';
+                        preview.style.background = this.tempColor;
+                    }
                 },
                 async save() {
                     const newName = document.getElementById('prof-name').value.trim();
@@ -1979,13 +2040,11 @@
                     const nickRegex = /^[a-zA-Z0-9_]{3,20}$/;
                     if (!nickRegex.test(newNick)) return alert("Никнейм должен быть от 3 до 20 символов (латиница, цифры, подчёркивание)");
 
-                    // Если меняем пароль — сначала OTP
                     if (newPass) {
                         if (newPass.length < 8) return alert("Пароль слишком короткий!");
                         if (/[^a-zA-Z0-9!@#$%^&*()_+\-=\[\]{}|;':",.<>?/`~\\]/.test(newPass)) return alert("Пароль: только латинские буквы, цифры и спецсимволы. Пробелы запрещены!");
 
-                        // Сохраняем pending данные
-                        geEngine.state.profilePending = { newName, newNick, newPass, avColor: this.tempColor };
+                        geEngine.state.profilePending = { newName, newNick, newPass, avColor: this.tempColor, avImg: this.tempImg };
 
                         const success = await geEngine.auth.sendOTPEmail(email, geEngine.state.session.name);
                         if (success) {
@@ -1995,8 +2054,7 @@
                         return;
                     }
 
-                    // Без смены пароля — сохраняем сразу
-                    await geEngine.profile._doSave({ newName, newNick, avColor: this.tempColor });
+                    await geEngine.profile._doSave({ newName, newNick, avColor: this.tempColor, avImg: this.tempImg });
                 },
                 async confirmPassOTP() {
                     const entered = document.getElementById('prof-otp').value.trim();
@@ -2004,18 +2062,20 @@
                     geEngine.state.currentOTP = null;
 
                     const p = geEngine.state.profilePending;
-                    await geEngine.profile._doSave({ newName: p.newName, newNick: p.newNick, avColor: p.avColor, newPass: p.newPass });
+                    await geEngine.profile._doSave({ newName: p.newName, newNick: p.newNick, avColor: p.avColor, avImg: p.avImg, newPass: p.newPass });
                     geEngine.state.profilePending = null;
 
                     document.getElementById('prof-otp-section').classList.add('ge-hidden');
                     document.getElementById('prof-save-btns').classList.remove('ge-hidden');
                     document.getElementById('prof-otp').value = '';
                 },
-                async _doSave({ newName, newNick, avColor, newPass }) {
+                async _doSave({ newName, newNick, avColor, avImg, newPass }) {
                     const email = geEngine.state.session.email;
                     try {
                         const body = { name: newName, nickname: newNick, avColor };
                         if (newPass) body.password = newPass;
+                        // avImg: base64 строка = новое фото, false = удалить, null = не трогать
+                        if (avImg !== null) body.avImg = avImg || '';
                         const res = await fetch(`/api/index?action=updateProfile&user_email=${encodeURIComponent(email)}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -2030,14 +2090,24 @@
                     geEngine.state.session.name = newName;
                     geEngine.state.session.nickname = newNick;
                     geEngine.state.session.avColor = avColor;
+                    if (avImg !== null) geEngine.state.session.avImg = avImg || null;
                     localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
 
-                    document.getElementById('ge-my-name').innerText = newName;
-                    document.getElementById('ge-my-av').innerText = newName[0].toUpperCase();
-                    document.getElementById('ge-my-av').style.background = avColor;
+                    // Обновляем свой аватар в сайдбаре
+                    geEngine.profile._applyMyAv(document.getElementById('ge-my-av'), newName, avColor, geEngine.state.session.avImg);
 
                     alert("Профиль обновлён!");
                     this.close();
+                },
+                // Универсальный хелпер применения аватара к элементу
+                _applyMyAv(el, name, color, imgSrc) {
+                    if (imgSrc) {
+                        el.style.background = '';
+                        el.innerHTML = `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
+                    } else {
+                        el.innerHTML = (name[0] || '?').toUpperCase();
+                        el.style.background = color || 'var(--ge-accent-gradient)';
+                    }
                 }
             },
 
@@ -2112,7 +2182,7 @@
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
                     if(!isActive) menu.classList.add('active');
                 },
-                renderChatList(serverRooms) {
+                async renderChatList(serverRooms) {
                     const scroller = document.getElementById('ge-chat-list-scroller');
                     const tab = geEngine.state.activeTab;
 
@@ -2137,9 +2207,26 @@
                         return true;
                     });
 
+                    // Подгружаем профили контактов включая avImg
+                    const contactProfiles = {};
+                    await Promise.all(filtered.filter(rid => rid.startsWith('private-')).map(async rid => {
+                        const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                        const parts = rid.replace('private-', '').split('-');
+                        const otherSafe = parts.find(p => p !== myMailSafe);
+                        if (!otherSafe) return;
+                        const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe);
+                        if (!targetEmail) return;
+                        try {
+                            const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
+                            const data = await res.json();
+                            if (data.status === 'found') contactProfiles[rid] = data.profile || {};
+                        } catch {}
+                    }));
+
                     let html = filtered.map(rid => {
                         let displayName = rid;
                         let avColor = '#444';
+                        let avImg = null;
                         let isGroup = rid === 'general' || !rid.startsWith('private-');
                         const isCreator = geEngine.state.createdRooms.includes(rid);
 
@@ -2147,20 +2234,26 @@
                             const parts = rid.replace('private-', '').split('-');
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherMailSafePart = parts.find(p => p !== myMailSafe);
-                            
-                            // Пытаемся найти пользователя в базе для получения реального имени и цвета
-                            const user = geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
-                            if (user) {
-                                displayName = user.name;
-                                avColor = user.avColor;
-                            } else if (otherMailSafePart) {
-                                displayName = otherMailSafePart.split('gmailcom')[0] || otherMailSafePart;
+
+                            const profile = contactProfiles[rid];
+                            if (profile && profile.name) {
+                                displayName = decodeURIComponent(profile.name);
+                                avColor = profile.avColor ? decodeURIComponent(profile.avColor) : '#444';
+                                avImg = profile.avImg ? decodeURIComponent(profile.avImg) : null;
+                            } else {
+                                const user = geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
+                                if (user) { displayName = user.name; avColor = user.avColor; }
+                                else if (otherMailSafePart) displayName = otherMailSafePart.split('gmailcom')[0] || otherMailSafePart;
                             }
                         }
 
+                        const avHtml = avImg
+                            ? `<div class="ge-user-av" style="width:50px;height:50px;overflow:hidden;padding:0;"><img src="${avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" /></div>`
+                            : `<div class="ge-user-av" style="width:50px;height:50px;font-size:18px;background:${avColor};">${displayName[0].toUpperCase()}</div>`;
+
                         return `
-                            <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}', '${displayName}')">
-                                <div class="ge-user-av" style="width:50px; height:50px; font-size:18px; background:${avColor};">${displayName[0].toUpperCase()}</div>
+                            <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}', '${displayName.replace(/'/g, "\'")}')">
+                                ${avHtml}
                                 <div class="ge-item-content">
                                     <b>${displayName}</b>
                                     <span>${isGroup ? 'Групповой канал' : 'Активный зашифрованный канал'}</span>
@@ -3140,13 +3233,15 @@
                 document.getElementById('ge-main-app').classList.add('ge-flex');
                 const session = geEngine.state.session;
                 document.getElementById('ge-my-name').innerText = session.name;
-                document.getElementById('ge-my-av').innerText = session.name[0].toUpperCase();
-                document.getElementById('ge-my-av').style.background = session.avColor || 'var(--ge-accent-gradient)';
+                geEngine.profile._applyMyAv(
+                    document.getElementById('ge-my-av'),
+                    session.name,
+                    session.avColor,
+                    session.avImg
+                );
                 geEngine.chat.refresh();
                 setInterval(() => geEngine.chat.refresh(), 4000);
-                // Глобальный polling входящих звонков
                 setInterval(() => geEngine.calls._pollSignals(), 2000);
-                // Инициализируем кнопку записи
                 geEngine.media.init();
             }
         };
