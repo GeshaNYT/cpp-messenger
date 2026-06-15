@@ -204,6 +204,7 @@ export default async function handler(request, response) {
         if (action === 'saveProfile' && user_email && request.method === 'POST') {
             const { nickname, name } = request.body;
             await db('SADD', 'all_users', user_email);
+            await db('SADD', `user_rooms:${user_email}`, 'general'); // добавляем в general
             if (name)     await db('HSET', `profile:${user_email}`, 'name', name);
             if (nickname) {
                 const nickLower = nickname.toLowerCase();
@@ -324,6 +325,7 @@ export default async function handler(request, response) {
 
         if (emailLower) {
             await db('SADD', 'all_users', emailLower);
+            await db('SADD', `user_rooms:${emailLower}`, 'general'); // всегда в general
 
             const [rawRooms, rawContacts] = await Promise.all([
                 db('SMEMBERS', `user_rooms:${emailLower}`),
