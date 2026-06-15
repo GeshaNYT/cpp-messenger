@@ -131,14 +131,15 @@ export default async function handler(request, response) {
                 email: emailLower,
                 name: profile.name ? decodeURIComponent(profile.name) : emailLower,
                 nickname: profile.nickname ? decodeURIComponent(profile.nickname) : '',
-                avColor: profile.avColor ? decodeURIComponent(profile.avColor) : 'var(--ge-accent-gradient)'
+                avColor: profile.avColor ? decodeURIComponent(profile.avColor) : 'var(--ge-accent-gradient)',
+                avImg: profile.avImg ? decodeURIComponent(profile.avImg) : null
             }
         });
     }
 
     // ==================== ОБНОВЛЕНИЕ ПРОФИЛЯ ====================
     if (action === 'updateProfile' && user_email && request.method === 'POST') {
-        const { name, nickname, avColor, password } = request.body;
+        const { name, nickname, avColor, password, avImg } = request.body;
         const emailLower = user_email.trim().toLowerCase();
 
         if (name) {
@@ -157,6 +158,14 @@ export default async function handler(request, response) {
         }
         if (avColor) {
             await fetch(`${url}/hset/profile:${emailLower}/avColor/${encodeURIComponent(avColor)}`, { headers: { Authorization: `Bearer ${token}` } });
+        }
+        // avImg: base64 строка = сохранить, пустая строка = удалить
+        if (avImg !== undefined) {
+            if (avImg) {
+                await fetch(`${url}/hset/profile:${emailLower}/avImg/${encodeURIComponent(avImg)}`, { headers: { Authorization: `Bearer ${token}` } });
+            } else {
+                await fetch(`${url}/hdel/profile:${emailLower}/avImg`, { headers: { Authorization: `Bearer ${token}` } });
+            }
         }
         if (password) {
             const passHash = await hashPassword(password);
