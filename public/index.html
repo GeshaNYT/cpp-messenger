@@ -2870,10 +2870,40 @@
                     await fetch(`/api/index?room=${encodeURIComponent(geEngine.state.activeRoom)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, { method: 'POST', body: payload });
                     geEngine.chat.refresh();
                 },
-                open(id, prettyName) {
+                async open(id, prettyName) {
                     geEngine.state.activeRoom = id;
                     document.getElementById('ge-active-name').innerText = prettyName || id;
-                    document.getElementById('ge-active-av').innerText = (prettyName || id)[0].toUpperCase();
+                    const activeAv = document.getElementById('ge-active-av');
+                    // Сброс к букве пока грузим
+                    activeAv.innerHTML = (prettyName || id)[0].toUpperCase();
+                    activeAv.style.background = 'var(--ge-accent-gradient)';
+
+                    // Если приватный чат — грузим профиль собеседника
+                    if (id.startsWith('private-')) {
+                        const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                        const parts = id.replace('private-', '').split('-');
+                        const otherSafe = parts.find(p => p !== myMailSafe);
+                        const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe);
+                        if (targetEmail) {
+                            try {
+                                const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
+                                const data = await res.json();
+                                if (data.status === 'found' && data.profile) {
+                                    const p = data.profile;
+                                    const img = p.avImg ? decodeURIComponent(p.avImg) : null;
+                                    const color = p.avColor ? decodeURIComponent(p.avColor) : 'var(--ge-accent-gradient)';
+                                    if (img) {
+                                        activeAv.style.background = '';
+                                        activeAv.innerHTML = `<img src="${img}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
+                                    } else {
+                                        activeAv.innerHTML = (prettyName || id)[0].toUpperCase();
+                                        activeAv.style.background = color;
+                                    }
+                                }
+                            } catch {}
+                        }
+                    }
+
                     const footer = document.querySelector('.ge-footer');
                     if (footer) footer.style.visibility = 'visible';
                     geEngine.chat.refresh();
