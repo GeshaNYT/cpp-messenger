@@ -1530,11 +1530,11 @@
                         <button class="ge-sidebar-settings-btn" onclick="geEngine.ui.toggleSettingsMenu(event)">⚙️</button>
                         
                         <div id="ge-settings-popup" class="ge-settings-popup">
-                            <button class="ge-popup-item" onclick="geEngine.ui.toggleTheme()">🌓 Сменить тему</button>
-                            <button class="ge-popup-item" id="ge-glass-btn" onclick="geEngine.ui.toggleGlass()">🫧 Жидкое стекло</button>
-                            <button class="ge-popup-item" id="btn-snow" onclick="geEngine.effects.toggleSnow()">❄️ Снег: Выкл</button>
-                            <button class="ge-popup-item" onclick="geEngine.profile.open()">👤 Профиль</button>
-                            <button class="ge-popup-item danger" onclick="geEngine.auth.deleteAccountFull()">🗑️ Удалить аккаунт</button>
+                            <button class="ge-popup-item" onclick="event.stopPropagation(); geEngine.ui.toggleTheme()">🌓 Сменить тему</button>
+                            <button class="ge-popup-item" id="ge-glass-btn" onclick="event.stopPropagation(); geEngine.ui.toggleGlass()">🫧 Жидкое стекло</button>
+                            <button class="ge-popup-item" id="btn-snow" onclick="event.stopPropagation(); geEngine.effects.toggleSnow()">❄️ Снег: Выкл</button>
+                            <button class="ge-popup-item" onclick="event.stopPropagation(); geEngine.profile.open()">👤 Профиль</button>
+                            <button class="ge-popup-item danger" onclick="event.stopPropagation(); geEngine.auth.deleteAccountFull()">🗑️ Удалить аккаунт</button>
                         </div>
                     </div>
                 </div>
