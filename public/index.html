@@ -525,6 +525,7 @@
         .ge-popup-item,
         .ge-auto-theme-row {
             position: relative;
+            justify-content: flex-start;
             display: flex;
             align-items: center;
             height: 48px;
@@ -585,6 +586,9 @@
             flex-shrink: 0;
             color: var(--ge-primary);
             transition: transform 0.2s ease, color 0.2s ease;
+            position: absolute;
+            left: 0;
+            top: 0;
         }
 
         .ge-popup-item:hover .ge-popup-icon,
@@ -606,6 +610,7 @@
                 transform 0.32s cubic-bezier(.22, 1, .36, 1);
             transition-delay: 0s;
             pointer-events: none;
+            padding-left: 48px;
             padding-right: 20px;
             color: #1c1e21;
         }
@@ -685,10 +690,6 @@
         }
 
         /* --- Авто-тема ряд (с тогглом) --- */
-        .ge-auto-theme-row {
-            justify-content: flex-start;
-        }
-
         .ge-auto-theme-toggle-wrap {
             opacity: 0;
             transform: translateX(-10px);
@@ -699,6 +700,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            padding-left: 48px;
             padding-right: 16px;
         }
 
