@@ -578,21 +578,22 @@
         /* Иконка SVG (всегда видна) */
         .ge-popup-icon {
             position: absolute;
-            left: 0;
-            top: 0;
-            width: 48px;
-            height: 48px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--ge-primary);
-            transition: transform 0.2s ease, color 0.2s ease;
+            transition: color 0.2s ease;
             pointer-events: none;
         }
 
         .ge-popup-item:hover .ge-popup-icon,
         .ge-auto-theme-row:hover .ge-popup-icon {
-            transform: scale(1.15);
+            transform: translate(-50%, -50%) scale(1.15);
             color: var(--ge-primary-light);
         }
 
