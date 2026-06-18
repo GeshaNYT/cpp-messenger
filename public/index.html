@@ -525,9 +525,9 @@
         .ge-popup-item,
         .ge-auto-theme-row {
             position: relative;
-            justify-content: center;
             display: flex;
             align-items: center;
+            justify-content: center;
             height: 48px;
             width: 48px;
             padding: 0;
@@ -544,6 +544,7 @@
             cursor: pointer;
             transition:
                 width 0.58s cubic-bezier(.22, 1, .36, 1),
+                padding 0.4s cubic-bezier(.22, 1, .36, 1),
                 box-shadow 0.25s ease,
                 border-color 0.25s ease,
                 transform 0.15s ease;
@@ -563,7 +564,6 @@
             width: 215px;
             justify-content: flex-start;
             padding-left: 14px;
-            gap: 0;
             box-shadow: 0 6px 20px rgba(0,132,255,0.18), 0 0 0 2px rgba(0,132,255,0.15);
             border-color: var(--ge-primary);
             transform: translateX(3px);
@@ -581,6 +581,7 @@
         /* Иконка SVG (всегда видна) */
         .ge-popup-icon {
             flex-shrink: 0;
+            min-width: 20px;
             width: 20px;
             height: 20px;
             display: flex;
