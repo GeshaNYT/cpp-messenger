@@ -660,10 +660,18 @@
             border-color: var(--ge-primary) !important;
         }
 
-                .ge-popup-item.glass-active {
+                .ge-popup-item.glass-active,
+        .ge-popup-item.snow-active,
+        .ge-auto-theme-row.auto-theme-active {
             color: var(--ge-primary) !important;
             background: var(--ge-primary-soft) !important;
             border-color: var(--ge-primary) !important;
+        }
+
+        .ge-popup-item.glass-active .ge-popup-icon,
+        .ge-popup-item.snow-active .ge-popup-icon,
+        .ge-auto-theme-row.auto-theme-active .ge-popup-icon {
+            color: var(--ge-primary) !important;
         }
 
         /* --- Авто-тема ряд (с тогглом) --- */
@@ -2383,13 +2391,16 @@
                     this._updateThemeIcon(newTheme);
                 },
                 toggleAutoTheme(checkbox) {
+                    const row = checkbox.closest('.ge-auto-theme-row');
                     if (checkbox.checked) {
                         localStorage.setItem('ge_auto_theme', 'on');
                         geEngine.ui._applyAutoTheme();
                         geEngine.state.autoThemeInterval = setInterval(() => geEngine.ui._applyAutoTheme(), 60000);
+                        if (row) row.classList.add('auto-theme-active');
                     } else {
                         localStorage.setItem('ge_auto_theme', 'off');
                         clearInterval(geEngine.state.autoThemeInterval);
+                        if (row) row.classList.remove('auto-theme-active');
                     }
                 },
                 _applyAutoTheme() {
@@ -3066,11 +3077,13 @@
                     const lbl = document.getElementById('btn-snow-label');
                     if (geEngine.state.isSnowing) {
                         container.style.display = 'block';
+                        if (btn) btn.classList.add('snow-active');
                         if (lbl) lbl.innerText = "Снег: Вкл";
                         geEngine.state.snowInterval = setInterval(this.createSnowflake, 150);
                         localStorage.setItem('ge_snow', 'on');
                     } else {
                         container.style.display = 'none'; container.innerHTML = "";
+                        if (btn) btn.classList.remove('snow-active');
                         if (lbl) lbl.innerText = "Снег: Выкл";
                         clearInterval(geEngine.state.snowInterval);
                         localStorage.setItem('ge_snow', 'off');
@@ -3546,6 +3559,8 @@
                 if (cb) cb.checked = true;
                 geEngine.ui._applyAutoTheme();
                 geEngine.state.autoThemeInterval = setInterval(() => geEngine.ui._applyAutoTheme(), 60000);
+                const autoRow = cb ? cb.closest('.ge-auto-theme-row') : null;
+                if (autoRow) autoRow.classList.add('auto-theme-active');
             }
 
             // Восстанавливаем жидкое стекло
@@ -3565,6 +3580,7 @@
                 container.style.display = 'block';
                 const snowLbl = document.getElementById('btn-snow-label');
                 if (snowLbl) snowLbl.innerText = 'Снег: Вкл';
+                if (snowBtn) snowBtn.classList.add('snow-active');
                 geEngine.state.snowInterval = setInterval(geEngine.effects.createSnowflake, 150);
             }
 
