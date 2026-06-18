@@ -2360,14 +2360,27 @@
                     if (newVal === 'on') { btn.classList.add('glass-active'); if (glassLbl) glassLbl.innerText = 'Жидкое стекло: Вкл'; }
                     else { btn.classList.remove('glass-active'); if (glassLbl) glassLbl.innerText = 'Жидкое стекло'; }
                 },
+                _moonSVG: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`,
+                _sunSVG: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`,
+                _updateThemeIcon(theme) {
+                    const icon = document.getElementById('ge-theme-icon');
+                    const label = document.getElementById('ge-theme-label');
+                    if (!icon) return;
+                    if (theme === 'dark') {
+                        icon.innerHTML = this._sunSVG;
+                        if (label) label.innerText = 'Светлая тема';
+                    } else {
+                        icon.innerHTML = this._moonSVG;
+                        if (label) label.innerText = 'Тёмная тема';
+                    }
+                },
                 toggleTheme() {
-                    // ЗАКРЫВАЕМ МЕНЮ ПРИ НАЖАТИИ
                     document.getElementById('ge-settings-popup').classList.remove('active');
-
                     const html = document.documentElement;
                     const newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
                     html.setAttribute('data-theme', newTheme);
                     localStorage.setItem('ge_theme', newTheme);
+                    this._updateThemeIcon(newTheme);
                 },
                 toggleAutoTheme(checkbox) {
                     if (checkbox.checked) {
@@ -3520,7 +3533,11 @@
         window.onload = () => {
             // Восстанавливаем тему
             const savedTheme = localStorage.getItem('ge_theme');
-            if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+                // Иконка темы при загрузке
+                setTimeout(() => geEngine.ui._updateThemeIcon(savedTheme), 0);
+            }
 
             // Восстанавливаем авто тему
             const savedAutoTheme = localStorage.getItem('ge_auto_theme');
@@ -3567,8 +3584,8 @@
     <!-- ПОПАП НАСТРОЕК — в body чтобы перекрывал всё -->
     <div id="ge-settings-popup" class="ge-settings-popup" style="position:fixed; display:none;">
         <button class="ge-popup-item" onclick="geEngine.ui.toggleTheme()">
-            <span class="ge-popup-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
-            <span class="ge-popup-label">Сменить тему</span>
+            <span class="ge-popup-icon" id="ge-theme-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
+            <span class="ge-popup-label" id="ge-theme-label">Тёмная тема</span>
         </button>
         <div class="ge-auto-theme-row">
             <span class="ge-popup-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg></span>
