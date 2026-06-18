@@ -336,13 +336,10 @@
 
         .ge-sidebar-settings-btn {
             font-size: 26px;
-            color: var(--ge-primary);
+            color: var(--text-tertiary);
             padding: 8px;
             border-radius: 12px;
             transition: 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
 
         .ge-sidebar-settings-btn:hover {
@@ -368,6 +365,7 @@
         [data-glass="on"] .ge-sidebar-footer,
         [data-glass="on"] .ge-view-header,
         [data-glass="on"] .ge-footer,
+        [data-glass="on"] .ge-settings-popup,
         [data-glass="on"] .ge-context-menu,
         [data-glass="on"] .ge-auth-container,
         [data-glass="on"] #ge-incoming-call {
@@ -412,6 +410,7 @@
         [data-theme="dark"][data-glass="on"] .ge-sidebar-footer,
         [data-theme="dark"][data-glass="on"] .ge-view-header,
         [data-theme="dark"][data-glass="on"] .ge-footer,
+        [data-theme="dark"][data-glass="on"] .ge-settings-popup,
         [data-theme="dark"][data-glass="on"] .ge-context-menu,
         [data-theme="dark"][data-glass="on"] #ge-incoming-call,
         [data-theme="dark"][data-glass="on"] .ge-call-overlay {
@@ -435,38 +434,7 @@
             background: rgba(0,132,255,0.2) !important;
         }
 
-        /* Стекло на отдельных кнопках попапа */
-        [data-glass="on"] .ge-popup-item,
-        [data-glass="on"] .ge-auto-theme-row {
-            background: rgba(255, 255, 255, 0.55) !important;
-            backdrop-filter: blur(20px) saturate(180%) !important;
-            -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-            border-color: rgba(255, 255, 255, 0.5) !important;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.7) !important;
-        }
-
-        [data-theme="dark"][data-glass="on"] .ge-popup-item,
-        [data-theme="dark"][data-glass="on"] .ge-auto-theme-row {
-            background: rgba(30, 30, 50, 0.55) !important;
-            backdrop-filter: blur(20px) saturate(200%) !important;
-            -webkit-backdrop-filter: blur(20px) saturate(200%) !important;
-            border-color: rgba(255, 255, 255, 0.1) !important;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06) !important;
-        }
-
-        [data-glass="on"] .ge-popup-item:hover,
-        [data-glass="on"] .ge-auto-theme-row:hover {
-            background: rgba(255, 255, 255, 0.75) !important;
-            border-color: var(--ge-primary) !important;
-        }
-
-        [data-theme="dark"][data-glass="on"] .ge-popup-item:hover,
-        [data-theme="dark"][data-glass="on"] .ge-auto-theme-row:hover {
-            background: rgba(40, 40, 65, 0.75) !important;
-            border-color: var(--ge-primary) !important;
-        }
-
-                .ge-popup-item.glass-active {
+        .ge-popup-item.glass-active {
             color: var(--ge-primary) !important;
             background: var(--ge-primary-soft);
         }
@@ -500,19 +468,19 @@
         }
 
 
-        /* --- ПОП-АП НАСТРОЕК (CAPSULE MENU) --- */
+        /* --- МАЛЕНЬКАЯ КОШКА (ПОП-АП НАСТРОЕК) --- */
         .ge-settings-popup {
             position: fixed;
+            width: 240px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-base);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
             z-index: 999999;
             display: none;
             flex-direction: column;
-            gap: 7px;
-            align-items: flex-start;
-            padding: 4px 0;
-            background: none;
-            border: none;
-            box-shadow: none;
-            animation: ge-pop-anim 0.3s cubic-bezier(.22, 1, .36, 1);
+            overflow: hidden;
+            animation: ge-pop-anim 0.2s var(--ease);
         }
 
         .ge-settings-popup.active {
@@ -520,198 +488,39 @@
         }
 
         @keyframes ge-pop-anim {
-            from { opacity: 0; transform: translateX(-12px) scale(0.95); }
-            to { opacity: 1; transform: translateX(0) scale(1); }
+            from { opacity: 0; transform: scale(0.9) translateY(-10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
         }
 
-        /* Обёртка каждого пункта */
-        .ge-popup-item,
-        .ge-auto-theme-row {
-            position: relative;
+        .ge-popup-item {
+            padding: 14px 20px;
             display: flex;
             align-items: center;
-            height: 48px;
-            width: 48px;
-            padding: 0;
-            overflow: hidden;
-            border-radius: 999px;
-            box-sizing: border-box;
-            background: #ffffff;
-            border: 1.5px solid rgba(0,0,0,0.09);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06);
-            color: #1c1e21;
-            font-size: 13.5px;
-            font-weight: 600;
-            letter-spacing: 0.1px;
-            cursor: pointer;
-            transition:
-                width 0.58s cubic-bezier(.22, 1, .36, 1),
-                box-shadow 0.25s ease,
-                border-color 0.25s ease,
-                transform 0.15s ease;
-            white-space: nowrap;
-        }
-
-        [data-theme="dark"] .ge-popup-item,
-        [data-theme="dark"] .ge-auto-theme-row {
-            background: #2d2e30;
-            border-color: rgba(255,255,255,0.1);
-            color: #e4e6eb;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2);
-        }
-
-        .ge-popup-item:hover,
-        .ge-auto-theme-row:hover {
-            width: 215px;
-            box-shadow: 0 6px 20px rgba(0,132,255,0.18), 0 0 0 2px rgba(0,132,255,0.15);
-            border-color: var(--ge-primary);
-            transform: translateX(3px);
-        }
-
-        .ge-popup-item:active {
-            transform: translateX(3px) scale(0.97);
-        }
-
-        .ge-popup-item.danger:hover {
-            box-shadow: 0 6px 20px rgba(250,62,62,0.18), 0 0 0 2px rgba(250,62,62,0.12);
-            border-color: var(--ge-error);
-        }
-
-        /* Иконка SVG (всегда видна) */
-        .ge-popup-icon {
-            width: 48px;
-            min-width: 48px;
-            height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            color: var(--ge-primary);
-            transition: transform 0.2s ease, color 0.2s ease;
-        }
-
-        .ge-popup-item:hover .ge-popup-icon,
-        .ge-auto-theme-row:hover .ge-popup-icon {
-            transform: scale(1.15);
-            color: var(--ge-primary-light);
-        }
-
-        .ge-popup-item.danger .ge-popup-icon {
-            color: var(--ge-error);
-        }
-
-        /* Текст (выезжает) */
-        .ge-popup-label {
-            opacity: 0;
-            transform: translateX(-10px);
-            transition:
-                opacity 0.2s ease,
-                transform 0.32s cubic-bezier(.22, 1, .36, 1);
-            transition-delay: 0s;
-            pointer-events: none;
-            padding-right: 20px;
-            color: #1c1e21;
-        }
-
-        [data-theme="dark"] .ge-popup-label {
-            color: #e4e6eb;
-        }
-
-        .ge-popup-item:hover .ge-popup-label,
-        .ge-auto-theme-row:hover .ge-popup-label {
-            opacity: 1;
-            transform: translateX(0);
-            transition-delay: 0.16s;
-        }
-
-        .ge-popup-item.danger {
-            color: var(--ge-error);
-        }
-
-        .ge-popup-item.danger .ge-popup-label {
-            color: var(--ge-error) !important;
-        }
-
-        /* glass-active состояние */
-        /* Стекло на отдельных кнопках попапа */
-        [data-glass="on"] .ge-popup-item,
-        [data-glass="on"] .ge-auto-theme-row {
-            background: rgba(255, 255, 255, 0.55) !important;
-            backdrop-filter: blur(20px) saturate(180%) !important;
-            -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-            border-color: rgba(255, 255, 255, 0.5) !important;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.7) !important;
-        }
-
-        [data-theme="dark"][data-glass="on"] .ge-popup-item,
-        [data-theme="dark"][data-glass="on"] .ge-auto-theme-row {
-            background: rgba(30, 30, 50, 0.55) !important;
-            backdrop-filter: blur(20px) saturate(200%) !important;
-            -webkit-backdrop-filter: blur(20px) saturate(200%) !important;
-            border-color: rgba(255, 255, 255, 0.1) !important;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06) !important;
-        }
-
-        [data-glass="on"] .ge-popup-item:hover,
-        [data-glass="on"] .ge-auto-theme-row:hover {
-            background: rgba(255, 255, 255, 0.75) !important;
-            border-color: var(--ge-primary) !important;
-        }
-
-        [data-theme="dark"][data-glass="on"] .ge-popup-item:hover,
-        [data-theme="dark"][data-glass="on"] .ge-auto-theme-row:hover {
-            background: rgba(40, 40, 65, 0.75) !important;
-            border-color: var(--ge-primary) !important;
-        }
-
-                .ge-popup-item.glass-active,
-        .ge-popup-item.snow-active,
-        .ge-auto-theme-row.auto-theme-active {
-            color: var(--ge-primary) !important;
-            background: rgba(0, 132, 255, 0.12) !important;
-            border-color: var(--ge-primary) !important;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.10), 0 0 0 1px rgba(0,132,255,0.3) !important;
-        }
-
-        [data-theme="dark"] .ge-popup-item.glass-active,
-        [data-theme="dark"] .ge-popup-item.snow-active,
-        [data-theme="dark"] .ge-auto-theme-row.auto-theme-active {
-            background: rgba(0, 132, 255, 0.22) !important;
-            border-color: var(--ge-primary) !important;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,132,255,0.5), 0 0 12px rgba(0,132,255,0.15) !important;
-        }
-
-        .ge-popup-item.glass-active .ge-popup-icon,
-        .ge-popup-item.snow-active .ge-popup-icon,
-        .ge-auto-theme-row.auto-theme-active .ge-popup-icon {
-            color: var(--ge-primary) !important;
-        }
-
-        /* --- Авто-тема ряд (с тогглом) --- */
-        .ge-auto-theme-row {
-            justify-content: flex-start;
-        }
-
-        .ge-auto-theme-toggle-wrap {
-            opacity: 0;
-            transform: translateX(-10px);
-            transition:
-                opacity 0.2s ease,
-                transform 0.32s cubic-bezier(.22, 1, .36, 1);
-            transition-delay: 0s;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding-right: 16px;
-        }
-
-        .ge-auto-theme-row:hover .ge-auto-theme-toggle-wrap {
-            opacity: 1;
-            transform: translateX(0);
-            transition-delay: 0.16s;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-soft);
+            transition: 0.2s;
+            text-align: left;
+            width: 100%;
         }
 
         /* Переключатель авто темы */
+        .ge-auto-theme-row {
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-soft);
+            width: 100%;
+        }
+
+        .ge-auto-theme-row span { display: flex; align-items: center; gap: 12px; }
+
         .ge-toggle-switch {
             position: relative;
             width: 44px;
@@ -738,6 +547,18 @@
         }
         .ge-toggle-switch input:checked + .ge-toggle-slider { background: var(--ge-primary); }
         .ge-toggle-switch input:checked + .ge-toggle-slider:before { transform: translateX(20px); }
+
+        .ge-popup-item:hover {
+            background: var(--bg-input);
+        }
+
+        .ge-popup-item.danger {
+            color: var(--ge-error);
+        }
+
+        .ge-popup-item.danger:hover {
+            background: rgba(250, 62, 62, 0.08);
+        }
 
         .ge-user-av {
             width: 75px;
@@ -1756,7 +1577,7 @@
                     </div>
                     
                     <div style="position: relative; overflow: visible; z-index: 99999;">
-                        <button class="ge-sidebar-settings-btn" onclick="geEngine.ui.toggleSettingsMenu(event)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+                        <button class="ge-sidebar-settings-btn" onclick="geEngine.ui.toggleSettingsMenu(event)">⚙️</button>
                     </div>
                 </div>
 
@@ -2354,9 +2175,9 @@
                     // Позиционируем по кнопке
                     const btn = e.currentTarget;
                     const rect = btn.getBoundingClientRect();
-                    popup.style.top = (rect.bottom + 10) + 'px';
-                    popup.style.left = rect.left + 'px';
-                    popup.style.right = 'auto';
+                    popup.style.top = (rect.bottom + 8) + 'px';
+                    popup.style.right = (window.innerWidth - rect.right) + 'px';
+                    popup.style.left = 'auto';
                     popup.style.display = 'flex';
                     popup.classList.add('active');
 
@@ -2377,43 +2198,26 @@
                     html.setAttribute('data-glass', newVal);
                     localStorage.setItem('ge_glass', newVal);
                     const btn = document.getElementById('ge-glass-btn');
-                    const glassLbl = btn ? btn.querySelector('.ge-popup-label') : null;
-                    if (newVal === 'on') { btn.classList.add('glass-active'); if (glassLbl) glassLbl.innerText = 'Жидкое стекло: Вкл'; }
-                    else { btn.classList.remove('glass-active'); if (glassLbl) glassLbl.innerText = 'Жидкое стекло'; }
-                },
-                _moonSVG: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`,
-                _sunSVG: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`,
-                _updateThemeIcon(theme) {
-                    const icon = document.getElementById('ge-theme-icon');
-                    const label = document.getElementById('ge-theme-label');
-                    if (!icon) return;
-                    if (theme === 'dark') {
-                        icon.innerHTML = this._sunSVG;
-                        if (label) label.innerText = 'Светлая тема';
-                    } else {
-                        icon.innerHTML = this._moonSVG;
-                        if (label) label.innerText = 'Тёмная тема';
-                    }
+                    if (newVal === 'on') { btn.classList.add('glass-active'); btn.innerHTML = '🫧 Жидкое стекло: Вкл'; }
+                    else { btn.classList.remove('glass-active'); btn.innerHTML = '🫧 Жидкое стекло'; }
                 },
                 toggleTheme() {
+                    // ЗАКРЫВАЕМ МЕНЮ ПРИ НАЖАТИИ
                     document.getElementById('ge-settings-popup').classList.remove('active');
+
                     const html = document.documentElement;
                     const newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
                     html.setAttribute('data-theme', newTheme);
                     localStorage.setItem('ge_theme', newTheme);
-                    this._updateThemeIcon(newTheme);
                 },
                 toggleAutoTheme(checkbox) {
-                    const row = checkbox.closest('.ge-auto-theme-row');
                     if (checkbox.checked) {
                         localStorage.setItem('ge_auto_theme', 'on');
                         geEngine.ui._applyAutoTheme();
                         geEngine.state.autoThemeInterval = setInterval(() => geEngine.ui._applyAutoTheme(), 60000);
-                        if (row) row.classList.add('auto-theme-active');
                     } else {
                         localStorage.setItem('ge_auto_theme', 'off');
                         clearInterval(geEngine.state.autoThemeInterval);
-                        if (row) row.classList.remove('auto-theme-active');
                     }
                 },
                 _applyAutoTheme() {
@@ -3087,17 +2891,13 @@
                     const container = document.getElementById('ge-snow-container');
                     const btn = document.getElementById('btn-snow');
                     geEngine.state.isSnowing = !geEngine.state.isSnowing;
-                    const lbl = document.getElementById('btn-snow-label');
                     if (geEngine.state.isSnowing) {
                         container.style.display = 'block';
-                        if (btn) btn.classList.add('snow-active');
-                        if (lbl) lbl.innerText = "Снег: Вкл";
+                        btn.innerText = "❄️ Снег: Вкл";
                         geEngine.state.snowInterval = setInterval(this.createSnowflake, 150);
                         localStorage.setItem('ge_snow', 'on');
                     } else {
-                        container.style.display = 'none'; container.innerHTML = "";
-                        if (btn) btn.classList.remove('snow-active');
-                        if (lbl) lbl.innerText = "Снег: Выкл";
+                        container.style.display = 'none'; container.innerHTML = ""; btn.innerText = "❄️ Снег: Выкл";
                         clearInterval(geEngine.state.snowInterval);
                         localStorage.setItem('ge_snow', 'off');
                     }
@@ -3559,11 +3359,7 @@
         window.onload = () => {
             // Восстанавливаем тему
             const savedTheme = localStorage.getItem('ge_theme');
-            if (savedTheme) {
-                document.documentElement.setAttribute('data-theme', savedTheme);
-                // Иконка темы при загрузке
-                setTimeout(() => geEngine.ui._updateThemeIcon(savedTheme), 0);
-            }
+            if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
 
             // Восстанавливаем авто тему
             const savedAutoTheme = localStorage.getItem('ge_auto_theme');
@@ -3572,8 +3368,6 @@
                 if (cb) cb.checked = true;
                 geEngine.ui._applyAutoTheme();
                 geEngine.state.autoThemeInterval = setInterval(() => geEngine.ui._applyAutoTheme(), 60000);
-                const autoRow = cb ? cb.closest('.ge-auto-theme-row') : null;
-                if (autoRow) autoRow.classList.add('auto-theme-active');
             }
 
             // Восстанавливаем жидкое стекло
@@ -3581,7 +3375,7 @@
             if (savedGlass === 'on') {
                 document.documentElement.setAttribute('data-glass', 'on');
                 const glassBtn = document.getElementById('ge-glass-btn');
-                if (glassBtn) { glassBtn.classList.add('glass-active'); const l = glassBtn.querySelector('.ge-popup-label'); if (l) l.innerText = 'Жидкое стекло: Вкл'; }
+                if (glassBtn) { glassBtn.classList.add('glass-active'); glassBtn.innerHTML = '🫧 Жидкое стекло: Вкл'; }
             }
 
             // Восстанавливаем снег
@@ -3591,9 +3385,7 @@
                 const container = document.getElementById('ge-snow-container');
                 const snowBtn = document.getElementById('btn-snow');
                 container.style.display = 'block';
-                const snowLbl = document.getElementById('btn-snow-label');
-                if (snowLbl) snowLbl.innerText = 'Снег: Вкл';
-                if (snowBtn) snowBtn.classList.add('snow-active');
+                if (snowBtn) snowBtn.innerText = '❄️ Снег: Вкл';
                 geEngine.state.snowInterval = setInterval(geEngine.effects.createSnowflake, 150);
             }
 
@@ -3612,36 +3404,18 @@
     </script>
     <!-- ПОПАП НАСТРОЕК — в body чтобы перекрывал всё -->
     <div id="ge-settings-popup" class="ge-settings-popup" style="position:fixed; display:none;">
-        <button class="ge-popup-item" onclick="geEngine.ui.toggleTheme()">
-            <span class="ge-popup-icon" id="ge-theme-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
-            <span class="ge-popup-label" id="ge-theme-label">Тёмная тема</span>
-        </button>
+        <button class="ge-popup-item" onclick="geEngine.ui.toggleTheme()">🌓 Сменить тему</button>
         <div class="ge-auto-theme-row">
-            <span class="ge-popup-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg></span>
-            <div class="ge-auto-theme-toggle-wrap">
-                <span style="font-size:13px;font-weight:700;color:var(--text-primary)">Авто тема</span>
-                <label class="ge-toggle-switch" onclick="event.stopPropagation()">
-                    <input type="checkbox" id="ge-auto-theme-cb" onchange="geEngine.ui.toggleAutoTheme(this)">
-                    <span class="ge-toggle-slider"></span>
-                </label>
-            </div>
+            <span>🌗 Авто тема (день/ночь)</span>
+            <label class="ge-toggle-switch">
+                <input type="checkbox" id="ge-auto-theme-cb" onchange="geEngine.ui.toggleAutoTheme(this)">
+                <span class="ge-toggle-slider"></span>
+            </label>
         </div>
-        <button class="ge-popup-item" id="ge-glass-btn" onclick="geEngine.ui.toggleGlass()">
-            <span class="ge-popup-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>
-            <span class="ge-popup-label">Жидкое стекло</span>
-        </button>
-        <button class="ge-popup-item" id="btn-snow" onclick="geEngine.effects.toggleSnow()">
-            <span class="ge-popup-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/><line x1="19.07" y1="4.93" x2="4.93" y2="19.07"/><line x1="12" y1="2" x2="9" y2="5"/><line x1="12" y1="2" x2="15" y2="5"/><line x1="12" y1="22" x2="9" y2="19"/><line x1="12" y1="22" x2="15" y2="19"/><line x1="2" y1="12" x2="5" y2="9"/><line x1="2" y1="12" x2="5" y2="15"/><line x1="22" y1="12" x2="19" y2="9"/><line x1="22" y1="12" x2="19" y2="15"/></svg></span>
-            <span class="ge-popup-label" id="btn-snow-label">Снег: Выкл</span>
-        </button>
-        <button class="ge-popup-item" onclick="geEngine.profile.open()">
-            <span class="ge-popup-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-            <span class="ge-popup-label">Профиль</span>
-        </button>
-        <button class="ge-popup-item danger" onclick="geEngine.auth.deleteAccountFull()">
-            <span class="ge-popup-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></span>
-            <span class="ge-popup-label">Удалить аккаунт</span>
-        </button>
+        <button class="ge-popup-item" id="ge-glass-btn" onclick="geEngine.ui.toggleGlass()">🫧 Жидкое стекло</button>
+        <button class="ge-popup-item" id="btn-snow" onclick="geEngine.effects.toggleSnow()">❄️ Снег: Выкл</button>
+        <button class="ge-popup-item" onclick="geEngine.profile.open()">👤 Профиль</button>
+        <button class="ge-popup-item danger" onclick="geEngine.auth.deleteAccountFull()">🗑️ Удалить аккаунт</button>
     </div>
 
 </body>
