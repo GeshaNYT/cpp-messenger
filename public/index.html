@@ -365,7 +365,6 @@
         [data-glass="on"] .ge-sidebar-footer,
         [data-glass="on"] .ge-view-header,
         [data-glass="on"] .ge-footer,
-        [data-glass="on"] .ge-settings-popup,
         [data-glass="on"] .ge-context-menu,
         [data-glass="on"] .ge-auth-container,
         [data-glass="on"] #ge-incoming-call {
@@ -410,7 +409,6 @@
         [data-theme="dark"][data-glass="on"] .ge-sidebar-footer,
         [data-theme="dark"][data-glass="on"] .ge-view-header,
         [data-theme="dark"][data-glass="on"] .ge-footer,
-        [data-theme="dark"][data-glass="on"] .ge-settings-popup,
         [data-theme="dark"][data-glass="on"] .ge-context-menu,
         [data-theme="dark"][data-glass="on"] #ge-incoming-call,
         [data-theme="dark"][data-glass="on"] .ge-call-overlay {
@@ -434,7 +432,38 @@
             background: rgba(0,132,255,0.2) !important;
         }
 
-        .ge-popup-item.glass-active {
+        /* Стекло на отдельных кнопках попапа */
+        [data-glass="on"] .ge-popup-item,
+        [data-glass="on"] .ge-auto-theme-row {
+            background: rgba(255, 255, 255, 0.55) !important;
+            backdrop-filter: blur(20px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+            border-color: rgba(255, 255, 255, 0.5) !important;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.7) !important;
+        }
+
+        [data-theme="dark"][data-glass="on"] .ge-popup-item,
+        [data-theme="dark"][data-glass="on"] .ge-auto-theme-row {
+            background: rgba(30, 30, 50, 0.55) !important;
+            backdrop-filter: blur(20px) saturate(200%) !important;
+            -webkit-backdrop-filter: blur(20px) saturate(200%) !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+        }
+
+        [data-glass="on"] .ge-popup-item:hover,
+        [data-glass="on"] .ge-auto-theme-row:hover {
+            background: rgba(255, 255, 255, 0.75) !important;
+            border-color: var(--ge-primary) !important;
+        }
+
+        [data-theme="dark"][data-glass="on"] .ge-popup-item:hover,
+        [data-theme="dark"][data-glass="on"] .ge-auto-theme-row:hover {
+            background: rgba(40, 40, 65, 0.75) !important;
+            border-color: var(--ge-primary) !important;
+        }
+
+                .ge-popup-item.glass-active {
             color: var(--ge-primary) !important;
             background: var(--ge-primary-soft);
         }
@@ -498,62 +527,68 @@
             position: relative;
             display: flex;
             align-items: center;
-            height: 46px;
-            width: 46px;
+            height: 48px;
+            width: 48px;
             padding: 0;
             overflow: hidden;
             border-radius: 999px;
-            background: var(--bg-panel);
-            border: 1.5px solid var(--border-base);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-            color: var(--text-primary);
+            background: #ffffff;
+            border: 1.5px solid rgba(0,0,0,0.09);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06);
+            color: #1c1e21;
             font-size: 13.5px;
             font-weight: 600;
             letter-spacing: 0.1px;
             cursor: pointer;
             transition:
-                width 0.6s cubic-bezier(.22, 1, .36, 1),
-                background 0.2s var(--ease),
-                box-shadow 0.25s var(--ease),
-                border-color 0.25s var(--ease),
-                transform 0.15s var(--ease);
+                width 0.58s cubic-bezier(.22, 1, .36, 1),
+                box-shadow 0.25s ease,
+                border-color 0.25s ease,
+                transform 0.15s ease;
             white-space: nowrap;
+        }
+
+        [data-theme="dark"] .ge-popup-item,
+        [data-theme="dark"] .ge-auto-theme-row {
+            background: #2d2e30;
+            border-color: rgba(255,255,255,0.1);
+            color: #e4e6eb;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2);
         }
 
         .ge-popup-item:hover,
         .ge-auto-theme-row:hover {
-            width: 210px;
-            background: var(--bg-panel);
-            box-shadow: 0 4px 16px rgba(0,132,255,0.13), 0 0 0 2px var(--ge-primary-soft);
+            width: 215px;
+            box-shadow: 0 6px 20px rgba(0,132,255,0.18), 0 0 0 2px rgba(0,132,255,0.15);
             border-color: var(--ge-primary);
-            transform: translateX(2px);
+            transform: translateX(3px);
         }
 
         .ge-popup-item:active {
-            transform: translateX(2px) scale(0.97);
+            transform: translateX(3px) scale(0.97);
         }
 
         .ge-popup-item.danger:hover {
-            box-shadow: 0 4px 16px rgba(250,62,62,0.13), 0 0 0 2px rgba(250,62,62,0.1);
+            box-shadow: 0 6px 20px rgba(250,62,62,0.18), 0 0 0 2px rgba(250,62,62,0.12);
             border-color: var(--ge-error);
         }
 
         /* Иконка-эмодзи (всегда видна) */
         .ge-popup-icon {
-            width: 46px;
-            min-width: 46px;
-            height: 46px;
+            width: 48px;
+            min-width: 48px;
+            height: 48px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 19px;
+            font-size: 20px;
             flex-shrink: 0;
-            transition: transform 0.2s var(--ease);
+            transition: transform 0.2s ease;
         }
 
         .ge-popup-item:hover .ge-popup-icon,
         .ge-auto-theme-row:hover .ge-popup-icon {
-            transform: scale(1.1);
+            transform: scale(1.12);
         }
 
         /* Текст (выезжает) */
@@ -561,19 +596,23 @@
             opacity: 0;
             transform: translateX(-10px);
             transition:
-                opacity 0.22s var(--ease),
-                transform 0.35s cubic-bezier(.22, 1, .36, 1);
+                opacity 0.2s ease,
+                transform 0.32s cubic-bezier(.22, 1, .36, 1);
             transition-delay: 0s;
             pointer-events: none;
-            padding-right: 18px;
-            color: var(--text-primary);
+            padding-right: 20px;
+            color: #1c1e21;
+        }
+
+        [data-theme="dark"] .ge-popup-label {
+            color: #e4e6eb;
         }
 
         .ge-popup-item:hover .ge-popup-label,
         .ge-auto-theme-row:hover .ge-popup-label {
             opacity: 1;
             transform: translateX(0);
-            transition-delay: 0.17s;
+            transition-delay: 0.16s;
         }
 
         .ge-popup-item.danger {
@@ -581,11 +620,42 @@
         }
 
         .ge-popup-item.danger .ge-popup-label {
-            color: var(--ge-error);
+            color: var(--ge-error) !important;
         }
 
         /* glass-active состояние */
-        .ge-popup-item.glass-active {
+        /* Стекло на отдельных кнопках попапа */
+        [data-glass="on"] .ge-popup-item,
+        [data-glass="on"] .ge-auto-theme-row {
+            background: rgba(255, 255, 255, 0.55) !important;
+            backdrop-filter: blur(20px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+            border-color: rgba(255, 255, 255, 0.5) !important;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.7) !important;
+        }
+
+        [data-theme="dark"][data-glass="on"] .ge-popup-item,
+        [data-theme="dark"][data-glass="on"] .ge-auto-theme-row {
+            background: rgba(30, 30, 50, 0.55) !important;
+            backdrop-filter: blur(20px) saturate(200%) !important;
+            -webkit-backdrop-filter: blur(20px) saturate(200%) !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+        }
+
+        [data-glass="on"] .ge-popup-item:hover,
+        [data-glass="on"] .ge-auto-theme-row:hover {
+            background: rgba(255, 255, 255, 0.75) !important;
+            border-color: var(--ge-primary) !important;
+        }
+
+        [data-theme="dark"][data-glass="on"] .ge-popup-item:hover,
+        [data-theme="dark"][data-glass="on"] .ge-auto-theme-row:hover {
+            background: rgba(40, 40, 65, 0.75) !important;
+            border-color: var(--ge-primary) !important;
+        }
+
+                .ge-popup-item.glass-active {
             color: var(--ge-primary) !important;
             background: var(--ge-primary-soft) !important;
             border-color: var(--ge-primary) !important;
@@ -600,8 +670,8 @@
             opacity: 0;
             transform: translateX(-10px);
             transition:
-                opacity 0.22s var(--ease),
-                transform 0.35s cubic-bezier(.22, 1, .36, 1);
+                opacity 0.2s ease,
+                transform 0.32s cubic-bezier(.22, 1, .36, 1);
             transition-delay: 0s;
             display: flex;
             align-items: center;
@@ -612,7 +682,7 @@
         .ge-auto-theme-row:hover .ge-auto-theme-toggle-wrap {
             opacity: 1;
             transform: translateX(0);
-            transition-delay: 0.17s;
+            transition-delay: 0.16s;
         }
 
         /* Переключатель авто темы */
@@ -2258,9 +2328,9 @@
                     // Позиционируем по кнопке
                     const btn = e.currentTarget;
                     const rect = btn.getBoundingClientRect();
-                    popup.style.top = (rect.bottom + 8) + 'px';
-                    popup.style.right = (window.innerWidth - rect.right) + 'px';
-                    popup.style.left = 'auto';
+                    popup.style.top = (rect.bottom + 10) + 'px';
+                    popup.style.left = rect.left + 'px';
+                    popup.style.right = 'auto';
                     popup.style.display = 'flex';
                     popup.classList.add('active');
 
