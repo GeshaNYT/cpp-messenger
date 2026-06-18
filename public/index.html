@@ -576,22 +576,20 @@
 
         /* Иконка SVG (всегда видна) */
         .ge-popup-icon {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 24px;
-            height: 24px;
+            width: 48px;
+            min-width: 48px;
+            height: 48px;
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
             color: var(--ge-primary);
-            transition: color 0.2s ease;
-            pointer-events: none;
+            transition: transform 0.2s ease, color 0.2s ease;
         }
 
         .ge-popup-item:hover .ge-popup-icon,
         .ge-auto-theme-row:hover .ge-popup-icon {
+            transform: scale(1.15);
             color: var(--ge-primary-light);
         }
 
@@ -601,19 +599,15 @@
 
         /* Текст (выезжает) */
         .ge-popup-label {
-            position: absolute;
-            top: 50%;
-            left: 48px;
-            transform: translateY(-50%) translateX(-6px);
             opacity: 0;
+            transform: translateX(-10px);
             transition:
                 opacity 0.2s ease,
                 transform 0.32s cubic-bezier(.22, 1, .36, 1);
             transition-delay: 0s;
             pointer-events: none;
-            padding-right: 18px;
+            padding-right: 20px;
             color: #1c1e21;
-            white-space: nowrap;
         }
 
         [data-theme="dark"] .ge-popup-label {
@@ -623,7 +617,7 @@
         .ge-popup-item:hover .ge-popup-label,
         .ge-auto-theme-row:hover .ge-popup-label {
             opacity: 1;
-            transform: translateY(-50%) translateX(0);
+            transform: translateX(0);
             transition-delay: 0.16s;
         }
 
@@ -696,11 +690,8 @@
         }
 
         .ge-auto-theme-toggle-wrap {
-            position: absolute;
-            top: 50%;
-            left: 48px;
-            transform: translateY(-50%) translateX(-6px);
             opacity: 0;
+            transform: translateX(-10px);
             transition:
                 opacity 0.2s ease,
                 transform 0.32s cubic-bezier(.22, 1, .36, 1);
@@ -709,12 +700,11 @@
             align-items: center;
             gap: 10px;
             padding-right: 16px;
-            white-space: nowrap;
         }
 
         .ge-auto-theme-row:hover .ge-auto-theme-toggle-wrap {
             opacity: 1;
-            transform: translateY(-50%) translateX(0);
+            transform: translateX(0);
             transition-delay: 0.16s;
         }
 
