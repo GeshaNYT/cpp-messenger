@@ -2497,18 +2497,23 @@
                     localStorage.setItem('ge_theme', newTheme);
                     this._updateThemeIcon(newTheme);
                 },
-                toggleAutoTheme(checkbox) {
-                    const row = checkbox.closest('.ge-auto-theme-row');
-                    if (checkbox.checked) {
+                toggleAutoTheme() {
+                    const btn = document.getElementById('ge-auto-theme-btn');
+                    const label = document.getElementById('ge-auto-theme-label');
+                    const isOn = localStorage.getItem('ge_auto_theme') === 'on';
+                    if (!isOn) {
                         localStorage.setItem('ge_auto_theme', 'on');
                         geEngine.ui._applyAutoTheme();
                         geEngine.state.autoThemeInterval = setInterval(() => geEngine.ui._applyAutoTheme(), 60000);
-                        if (row) row.classList.add('auto-theme-active');
+                        if (btn) btn.classList.add('auto-theme-active');
+                        if (label) label.innerText = 'Авто тема: Вкл';
                     } else {
                         localStorage.setItem('ge_auto_theme', 'off');
                         clearInterval(geEngine.state.autoThemeInterval);
-                        if (row) row.classList.remove('auto-theme-active');
+                        if (btn) btn.classList.remove('auto-theme-active');
+                        if (label) label.innerText = 'Авто тема';
                     }
+                    document.getElementById('ge-settings-popup').classList.remove('active');
                 },
                 _applyAutoTheme() {
                     const hour = new Date().getHours();
@@ -3671,12 +3676,12 @@
             // Восстанавливаем авто тему
             const savedAutoTheme = localStorage.getItem('ge_auto_theme');
             if (savedAutoTheme === 'on') {
-                const cb = document.getElementById('ge-auto-theme-cb');
-                if (cb) cb.checked = true;
                 geEngine.ui._applyAutoTheme();
                 geEngine.state.autoThemeInterval = setInterval(() => geEngine.ui._applyAutoTheme(), 60000);
-                const autoRow = cb ? cb.closest('.ge-auto-theme-row') : null;
-                if (autoRow) autoRow.classList.add('auto-theme-active');
+                const autoBtn = document.getElementById('ge-auto-theme-btn');
+                const autoLabel = document.getElementById('ge-auto-theme-label');
+                if (autoBtn) autoBtn.classList.add('auto-theme-active');
+                if (autoLabel) autoLabel.innerText = 'Авто тема: Вкл';
             }
 
             // Восстанавливаем жидкое стекло
@@ -3719,16 +3724,10 @@
             <span class="ge-popup-icon" id="ge-theme-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
             <span class="ge-popup-label" id="ge-theme-label">Тёмная тема</span>
         </button>
-        <div class="ge-auto-theme-row">
+        <button class="ge-popup-item ge-auto-theme-row" id="ge-auto-theme-btn" onclick="geEngine.ui.toggleAutoTheme()">
             <span class="ge-popup-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg></span>
-            <div class="ge-auto-theme-toggle-wrap">
-                <span style="font-size:13px;font-weight:700;color:var(--text-primary)">Авто тема</span>
-                <label class="ge-toggle-switch" onclick="event.stopPropagation()">
-                    <input type="checkbox" id="ge-auto-theme-cb" onchange="geEngine.ui.toggleAutoTheme(this)">
-                    <span class="ge-toggle-slider"></span>
-                </label>
-            </div>
-        </div>
+            <span class="ge-popup-label" id="ge-auto-theme-label">Авто тема</span>
+        </button>
         <button class="ge-popup-item" id="ge-glass-btn" onclick="geEngine.ui.toggleGlass()">
             <span class="ge-popup-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>
             <span class="ge-popup-label">Жидкое стекло</span>
