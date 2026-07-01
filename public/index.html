@@ -1503,6 +1503,28 @@
                 max-width: 85% !important;
             }
         }
+
+        @media (max-width: 768px) {
+            .ge-settings-popup {
+                flex-direction: column !important;
+                right: 10px !important;
+                left: auto !important;
+            }
+            .ge-popup-item,
+            .ge-auto-theme-row {
+                width: 48px !important;
+            }
+            .ge-popup-item:hover,
+            .ge-auto-theme-row:hover {
+                width: 48px !important;
+                transform: none !important;
+            }
+            .ge-popup-label,
+            .ge-auto-theme-toggle-wrap {
+                display: none !important;
+                opacity: 0 !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -2449,10 +2471,16 @@
                     const btn = e.currentTarget;
                     const rect = btn.getBoundingClientRect();
                     popup.style.top = (rect.bottom + 10) + 'px';
-                    popup.style.left = rect.left + 'px';
-                    popup.style.right = 'auto';
                     popup.style.display = 'flex';
                     popup.classList.add('active');
+                    // На мобильном — прижимаем к правому краю
+                    if (window.innerWidth <= 768) {
+                        popup.style.left = 'auto';
+                        popup.style.right = '10px';
+                    } else {
+                        popup.style.left = rect.left + 'px';
+                        popup.style.right = 'auto';
+                    }
 
                     // Закрываем по клику вне
                     setTimeout(() => {
