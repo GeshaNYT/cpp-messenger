@@ -1503,29 +1503,38 @@
                 max-width: 85% !important;
             }
         }
-
+    
         @media (max-width: 768px) {
             .ge-settings-popup {
-                flex-direction: column !important;
-                right: 10px !important;
-                left: auto !important;
+                flex-direction: row !important;
+                flex-wrap: wrap !important;
+                justify-content: center !important;
+                gap: 10px !important;
+                padding: 15px !important;
+                background: var(--bg-panel) !important;
+                border-radius: 20px !important;
+                box-shadow: var(--shadow-xl) !important;
+                border: 1px solid var(--border-base) !important;
+                max-width: 260px !important;
             }
             .ge-popup-item,
             .ge-auto-theme-row {
-                width: 48px !important;
+                width: 52px !important;
+                height: 52px !important;
+                border-radius: 50% !important;
+                flex-shrink: 0 !important;
             }
             .ge-popup-item:hover,
             .ge-auto-theme-row:hover {
-                width: 48px !important;
-                transform: none !important;
+                width: 52px !important;
+                transform: scale(1.05) !important;
             }
             .ge-popup-label,
             .ge-auto-theme-toggle-wrap {
                 display: none !important;
-                opacity: 0 !important;
             }
         }
-    </style>
+</style>
 </head>
 <body>
 
@@ -2470,16 +2479,22 @@
                     // Позиционируем по кнопке
                     const btn = e.currentTarget;
                     const rect = btn.getBoundingClientRect();
-                    popup.style.top = (rect.bottom + 10) + 'px';
                     popup.style.display = 'flex';
                     popup.classList.add('active');
-                    // На мобильном — прижимаем к правому краю
                     if (window.innerWidth <= 768) {
-                        popup.style.left = 'auto';
-                        popup.style.right = '10px';
+                        popup.style.position = 'fixed';
+                        popup.style.bottom = '80px';
+                        popup.style.top = 'auto';
+                        popup.style.left = '50%';
+                        popup.style.right = 'auto';
+                        popup.style.transform = 'translateX(-50%)';
                     } else {
+                        popup.style.position = 'fixed';
+                        popup.style.bottom = 'auto';
+                        popup.style.top = (rect.bottom + 10) + 'px';
                         popup.style.left = rect.left + 'px';
                         popup.style.right = 'auto';
+                        popup.style.transform = 'none';
                     }
 
                     // Закрываем по клику вне
