@@ -1412,6 +1412,85 @@
         .ge-hidden { display: none !important; }
         .ge-flex { display: flex !important; }
         .ge-error-text { color: var(--ge-error); font-size: 12px; margin-top: 5px; font-weight: 600; }
+
+        /* ── МОБИЛЬНАЯ АДАПТАЦИЯ ─────────────────────────────── */
+        @media (max-width: 768px) {
+            /* Скрываем сайдбар когда открыт чат */
+            .ge-messenger-shell {
+                position: relative;
+                overflow: hidden;
+            }
+            .ge-sidebar {
+                position: absolute;
+                left: 0; top: 0; bottom: 0;
+                width: 100% !important;
+                z-index: 10;
+                transition: transform 0.3s ease;
+            }
+            .ge-chat-panel {
+                position: absolute;
+                left: 0; top: 0; right: 0; bottom: 0;
+                width: 100% !important;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+                z-index: 20;
+            }
+            .ge-messenger-shell.mobile-chat-open .ge-sidebar {
+                transform: translateX(-100%);
+            }
+            .ge-messenger-shell.mobile-chat-open .ge-chat-panel {
+                transform: translateX(0);
+            }
+            /* Кнопка назад в шапке чата */
+            .ge-chat-back-btn {
+                display: flex !important;
+                align-items: center;
+                justify-content: center;
+                width: 36px;
+                height: 36px;
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: var(--text-primary);
+                margin-right: 8px;
+                border-radius: 50%;
+            }
+            .ge-chat-back-btn:hover { background: var(--bg-hover); }
+            /* Размеры шрифтов */
+            body { font-size: 15px; }
+            .ge-message-text { font-size: 15px; }
+            .ge-input-field { font-size: 16px; } /* предотвращает zoom на iOS */
+            /* Инпут сообщения */
+            .ge-input-bar {
+                padding: 8px 10px;
+            }
+            /* Аватары */
+            .ge-avatar { width: 42px !important; height: 42px !important; }
+            /* Модалки на весь экран */
+            .ge-modal-content {
+                width: 100% !important;
+                height: 100% !important;
+                border-radius: 0 !important;
+                max-width: 100% !important;
+            }
+            /* Настройки попап */
+            .ge-settings-popup {
+                width: 100% !important;
+                right: 0 !important;
+                left: 0 !important;
+                border-radius: 16px 16px 0 0 !important;
+                bottom: 0 !important;
+                top: auto !important;
+            }
+            /* Звонок UI */
+            #ge-call-ui {
+                width: 100% !important;
+                right: 0 !important;
+                left: 0 !important;
+                bottom: 0 !important;
+                border-radius: 16px 16px 0 0 !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1781,6 +1860,9 @@
         </aside>
 
         <section class="ge-chat-view">
+            <button class="ge-chat-back-btn" style="display:none" onclick="if(window.innerWidth<=768){document.getElementById('ge-main-app').classList.remove('mobile-chat-open')}">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            </button>
             <header class="ge-view-header">
                 <div style="display: flex; align-items: center; gap: 20px;">
                     <div class="ge-user-av" id="ge-active-av" style="width: 55px; height: 55px; background: #555;">#</div>
@@ -3153,6 +3235,10 @@
                 async open(id, prettyName) {
                     geEngine.state.activeRoom = id;
                     document.getElementById('ge-active-name').innerText = prettyName || id;
+                    // Мобильный режим — показываем чат
+                    if (window.innerWidth <= 768) {
+                        document.getElementById('ge-main-app').classList.add('mobile-chat-open');
+                    }
                     const activeAv = document.getElementById('ge-active-av');
                     // Сброс к букве пока грузим
                     activeAv.innerHTML = (prettyName || id)[0].toUpperCase();
