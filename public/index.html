@@ -1503,35 +1503,7 @@
                 max-width: 85% !important;
             }
         }
-    
-        @media (max-width: 768px) {
-            .ge-popup-item,
-            .ge-auto-theme-row {
-                width: 52px !important;
-                height: 52px !important;
-                border-radius: 50% !important;
-                transition: none !important;
-                justify-content: center !important;
-                padding: 0 !important;
-            }
-            .ge-popup-item:hover,
-            .ge-auto-theme-row:hover {
-                width: 52px !important;
-                transform: none !important;
-            }
-            .ge-popup-label,
-            .ge-auto-theme-toggle-wrap {
-                display: none !important;
-            }
-            .ge-popup-icon {
-                width: 52px !important;
-                min-width: 52px !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-            }
-        }
-</style>
+    </style>
 </head>
 <body>
 
@@ -2564,6 +2536,7 @@
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
                     if(!isActive) menu.classList.add('active');
                 },
+                _lastChatList: null,
                 async renderChatList(serverRooms) {
                     const scroller = document.getElementById('ge-chat-list-scroller');
                     const tab = geEngine.state.activeTab;
@@ -2661,7 +2634,12 @@
                                 <span style="font-size: 12px; color: var(--text-secondary);">Вернуться в канал General</span>
                             </div>`;
                     }
-                    scroller.innerHTML = html;
+                    // Не перерисовываем список чатов если он не изменился
+                    const htmlKey = tab + '|' + html.length + '|' + (geEngine.state.activeRoom || '');
+                    if (htmlKey !== geEngine.ui._lastChatList) {
+                        geEngine.ui._lastChatList = htmlKey;
+                        scroller.innerHTML = html;
+                    }
                 },
                 renderMessages(messages) {
                     const container = document.getElementById('ge-msg-container');
@@ -3246,6 +3224,9 @@
             },
 
             chat: {
+                _lastMessages: null,
+                _isUserInteracting: false,
+
                 async refresh() {
                     try {
                         const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`;
@@ -3259,9 +3240,24 @@
                         const serverRooms = data.rooms?.result || [];
                         const allRooms = Array.from(new Set([...serverRooms, ...geEngine.state.localRooms]));
 
-                        geEngine.ui.renderChatList(allRooms);
+                        // Обновляем список чатов тихо (без сброса скролла)
+                        await geEngine.ui.renderChatList(allRooms);
+
                         if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
-                            if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(data.messages?.result);
+                            if(geEngine.state.activeTab !== 'calls') {
+                                const newMessages = JSON.stringify(data.messages?.result);
+                                // Не перерисовываем если сообщения не изменились
+                                if (newMessages !== geEngine.chat._lastMessages) {
+                                    // Не перерисовываем если играет аудио/видео
+                                    const hasPlaying = document.querySelector('audio.ge-voice-audio:not([paused])') ||
+                                        [...document.querySelectorAll('audio.ge-voice-audio')].some(a => !a.paused) ||
+                                        [...document.querySelectorAll('video')].some(v => !v.paused && v.id !== 'remoteVideo' && v.id !== 'localVideo');
+                                    if (!hasPlaying) {
+                                        geEngine.chat._lastMessages = newMessages;
+                                        geEngine.ui.renderMessages(data.messages?.result);
+                                    }
+                                }
+                            }
                         }
                     } catch (e) {}
                 },
@@ -3279,7 +3275,10 @@
                 },
                 async open(id, prettyName) {
                     geEngine.state.activeRoom = id;
+                    geEngine.chat._lastMessages = null; // сбрасываем кэш при смене чата
                     document.getElementById('ge-active-name').innerText = prettyName || id;
+                    // Сразу очищаем сообщения при смене чата
+                    document.getElementById('ge-msg-container').innerHTML = '<div style="text-align:center;padding:20px;opacity:0.4;font-size:13px;">Загрузка...</div>';
                     if (window.innerWidth <= 768) {
                         document.getElementById('ge-main-app').classList.add('mobile-chat-open');
                     }
@@ -3680,7 +3679,7 @@
                     session.avImg
                 );
                 geEngine.chat.refresh();
-                setInterval(() => geEngine.chat.refresh(), 4000);
+                setInterval(() => geEngine.chat.refresh(), 6000);
                 setInterval(() => geEngine.calls._pollSignals(), 2000);
                 geEngine.media.init();
             }
