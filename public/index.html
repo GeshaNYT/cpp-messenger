@@ -3654,6 +3654,12 @@
         };
 
         window.onload = () => {
+            // Укорачиваем placeholder на мобильном
+            if (window.innerWidth <= 768) {
+                const input = document.getElementById('ge-main-input');
+                if (input) input.placeholder = 'Сообщение...';
+            }
+
             // Восстанавливаем тему
             const savedTheme = localStorage.getItem('ge_theme');
             if (savedTheme) {
