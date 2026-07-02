@@ -2580,8 +2580,13 @@
                                 if (raw) {
                                     const lastMsg = JSON.parse(decodeURIComponent(raw));
                                     if (!geEngine.state.roomLastTime) geEngine.state.roomLastTime = {};
-                                    // ts — реальный timestamp сообщения (единый для всех, не зависит от часового пояса)
-                                    if (lastMsg.ts) geEngine.state.roomLastTime[rid] = lastMsg.ts;
+                                    // ts — реальный timestamp сообщения (единый для всех, не зависит от часового пояса).
+                                    // Обновляем ТОЛЬКО если серверное время новее уже сохранённого — иначе
+                                    // задержка на бэкенде откатывает только что отправленный чат вниз списка,
+                                    // затирая оптимистичное обновление из broadcast().
+                                    if (lastMsg.ts && lastMsg.ts > (geEngine.state.roomLastTime[rid] || 0)) {
+                                        geEngine.state.roomLastTime[rid] = lastMsg.ts;
+                                    }
                                 }
                             } catch {}
                         }));
@@ -2667,8 +2672,11 @@
                                 <span style="font-size: 12px; color: var(--text-secondary);">Вернуться в канал General</span>
                             </div>`;
                     }
-                    // Не перерисовываем список чатов если он не изменился
-                    const htmlKey = tab + '|' + html.length + '|' + (geEngine.state.activeRoom || '');
+                    // Не перерисовываем список чатов если он не изменился.
+                    // Важно: используем порядок id комнат (filtered.join), а не html.length —
+                    // при смене порядка (чат поднялся наверх) длина строки часто остаётся той же,
+                    // и старая проверка ошибочно считала, что список не изменился.
+                    const htmlKey = tab + '|' + filtered.join(',') + '|' + (geEngine.state.activeRoom || '');
                     if (htmlKey !== geEngine.ui._lastChatList) {
                         geEngine.ui._lastChatList = htmlKey;
                         scroller.innerHTML = html;
