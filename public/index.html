@@ -1489,6 +1489,11 @@
                 height: 42px !important;
                 flex-shrink: 0 !important;
             }
+            .ge-emoji-btn {
+                width: 38px !important;
+                height: 38px !important;
+                font-size: 18px !important;
+            }
             .ge-composer-input {
                 padding: 14px 18px !important;
                 min-width: 0 !important;
@@ -1502,6 +1507,49 @@
             .ge-msg-bubble {
                 max-width: 85% !important;
             }
+        }
+
+        /* --- ЭМОДЗИ ПИКЕР --- */
+        .ge-emoji-btn {
+            width: 42px; height: 42px; border-radius: 50%;
+            background: var(--bg-input);
+            display: flex; align-items: center; justify-content: center;
+            color: var(--ge-primary); font-size: 20px;
+            flex-shrink: 0; transition: 0.2s;
+        }
+        .ge-emoji-btn:hover { background: var(--ge-primary-soft); transform: scale(1.08); }
+        .ge-emoji-picker {
+            position: absolute;
+            bottom: calc(100% + 10px);
+            left: 0;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-base);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-xl);
+            padding: 12px;
+            display: none;
+            flex-wrap: wrap;
+            gap: 4px;
+            width: 280px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        .ge-emoji-picker.active { display: flex; }
+        .ge-emoji-item {
+            width: 36px; height: 36px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; border-radius: 8px; cursor: pointer;
+            transition: background 0.15s;
+        }
+        .ge-emoji-item:hover { background: var(--bg-input); }
+
+        /* --- СТАТУС ОНЛАЙН В ШАПКЕ ЧАТА --- */
+        .ge-status-online { color: var(--ge-online); font-weight: 700; }
+        .ge-status-offline { color: var(--text-tertiary); }
+
+        @media (max-width: 768px) {
+            .ge-emoji-picker { width: 240px; }
         }
     </style>
 </head>
@@ -1914,6 +1962,10 @@
                         </svg>
                     </span>
                 </button>
+                <div style="position:relative; flex-shrink:0;">
+                    <button class="ge-emoji-btn" id="ge-emoji-btn" onclick="geEngine.emoji.toggle()" title="Эмодзи">😊</button>
+                    <div class="ge-emoji-picker" id="ge-emoji-picker"></div>
+                </div>
                 <input type="text" id="ge-main-input" class="ge-composer-input" placeholder="Напишите ваше сообщение здесь...">
                 <button class="ge-send-btn" onclick="geEngine.chat.broadcast()">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -2536,7 +2588,6 @@
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
                     if(!isActive) menu.classList.add('active');
                 },
-                _lastChatList: null,
                 async renderChatList(serverRooms) {
                     const scroller = document.getElementById('ge-chat-list-scroller');
                     const tab = geEngine.state.activeTab;
@@ -2634,12 +2685,7 @@
                                 <span style="font-size: 12px; color: var(--text-secondary);">Вернуться в канал General</span>
                             </div>`;
                     }
-                    // Не перерисовываем список чатов если он не изменился
-                    const htmlKey = tab + '|' + html.length + '|' + (geEngine.state.activeRoom || '');
-                    if (htmlKey !== geEngine.ui._lastChatList) {
-                        geEngine.ui._lastChatList = htmlKey;
-                        scroller.innerHTML = html;
-                    }
+                    scroller.innerHTML = html;
                 },
                 renderMessages(messages) {
                     const container = document.getElementById('ge-msg-container');
@@ -3224,9 +3270,6 @@
             },
 
             chat: {
-                _lastMessages: null,
-                _isUserInteracting: false,
-
                 async refresh() {
                     try {
                         const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`;
@@ -3240,24 +3283,9 @@
                         const serverRooms = data.rooms?.result || [];
                         const allRooms = Array.from(new Set([...serverRooms, ...geEngine.state.localRooms]));
 
-                        // Обновляем список чатов тихо (без сброса скролла)
-                        await geEngine.ui.renderChatList(allRooms);
-
+                        geEngine.ui.renderChatList(allRooms);
                         if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
-                            if(geEngine.state.activeTab !== 'calls') {
-                                const newMessages = JSON.stringify(data.messages?.result);
-                                // Не перерисовываем если сообщения не изменились
-                                if (newMessages !== geEngine.chat._lastMessages) {
-                                    // Не перерисовываем если играет аудио/видео
-                                    const hasPlaying = document.querySelector('audio.ge-voice-audio:not([paused])') ||
-                                        [...document.querySelectorAll('audio.ge-voice-audio')].some(a => !a.paused) ||
-                                        [...document.querySelectorAll('video')].some(v => !v.paused && v.id !== 'remoteVideo' && v.id !== 'localVideo');
-                                    if (!hasPlaying) {
-                                        geEngine.chat._lastMessages = newMessages;
-                                        geEngine.ui.renderMessages(data.messages?.result);
-                                    }
-                                }
-                            }
+                            if(geEngine.state.activeTab !== 'calls') geEngine.ui.renderMessages(data.messages?.result);
                         }
                     } catch (e) {}
                 },
@@ -3275,10 +3303,7 @@
                 },
                 async open(id, prettyName) {
                     geEngine.state.activeRoom = id;
-                    geEngine.chat._lastMessages = null; // сбрасываем кэш при смене чата
                     document.getElementById('ge-active-name').innerText = prettyName || id;
-                    // Сразу очищаем сообщения при смене чата
-                    document.getElementById('ge-msg-container').innerHTML = '<div style="text-align:center;padding:20px;opacity:0.4;font-size:13px;">Загрузка...</div>';
                     if (window.innerWidth <= 768) {
                         document.getElementById('ge-main-app').classList.add('mobile-chat-open');
                     }
@@ -3667,6 +3692,78 @@
 
 
 
+            emoji: {
+                _list: ['😊','😂','❤️','👍','😍','🙏','😭','😘','😅','🔥','✨','🎉','😁','💪','🥰','😎','🤔','😢','😡','👏','🫡','💀','🤣','😈','🥳','😴','🤗','😜','🥺','💯','🫶','⭐','🎁','💬','👀','🤝','💥','🎵','🚀','💎'],
+                toggle() {
+                    const picker = document.getElementById('ge-emoji-picker');
+                    const isActive = picker.classList.contains('active');
+                    if (!isActive && !picker.innerHTML) {
+                        picker.innerHTML = this._list.map(e =>
+                            `<div class="ge-emoji-item" onclick="geEngine.emoji.insert('${e}')">${e}</div>`
+                        ).join('');
+                    }
+                    picker.classList.toggle('active', !isActive);
+                    if (!isActive) {
+                        setTimeout(() => {
+                            document.addEventListener('click', function close(ev) {
+                                if (!picker.contains(ev.target) && ev.target.id !== 'ge-emoji-btn') {
+                                    picker.classList.remove('active');
+                                    document.removeEventListener('click', close);
+                                }
+                            });
+                        }, 0);
+                    }
+                },
+                insert(emoji) {
+                    const input = document.getElementById('ge-main-input');
+                    const pos = input.selectionStart || input.value.length;
+                    input.value = input.value.slice(0, pos) + emoji + input.value.slice(pos);
+                    input.focus();
+                    input.setSelectionRange(pos + emoji.length, pos + emoji.length);
+                    document.getElementById('ge-emoji-picker').classList.remove('active');
+                }
+            },
+
+            online: {
+                _cache: {},
+                async checkStatus(email) {
+                    try {
+                        const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(email)}`);
+                        const data = await res.json();
+                        if (data.status === 'found' && data.profile) {
+                            const lastSeen = data.profile.lastSeen ? parseInt(data.profile.lastSeen) : 0;
+                            const isOnline = lastSeen && (Date.now() - lastSeen < 60000);
+                            return isOnline;
+                        }
+                    } catch {}
+                    return false;
+                },
+                async updateActiveStatus() {
+                    const room = geEngine.state.activeRoom;
+                    if (!room || !room.startsWith('private-')) return;
+                    const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                    const parts = room.replace('private-', '').split('-');
+                    const otherSafe = parts.find(p => p !== myMailSafe);
+                    const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe);
+                    if (!targetEmail) return;
+                    const isOnline = await this.checkStatus(targetEmail);
+                    const statusEl = document.getElementById('ge-active-status');
+                    if (statusEl) {
+                        statusEl.innerHTML = isOnline
+                            ? '<span class="ge-status-online">● онлайн</span>'
+                            : '<span class="ge-status-offline">● не в сети</span>';
+                    }
+                },
+                pingOnline() {
+                    if (!geEngine.state.session) return;
+                    fetch(`/api/index?action=updateProfile&user_email=${encodeURIComponent(geEngine.state.session.email)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ lastSeen: Date.now().toString() })
+                    }).catch(() => {});
+                }
+            },
+
             init() {
                 document.getElementById('ge-auth-layer').classList.add('ge-hidden');
                 document.getElementById('ge-main-app').classList.add('ge-flex');
@@ -3679,7 +3776,7 @@
                     session.avImg
                 );
                 geEngine.chat.refresh();
-                setInterval(() => geEngine.chat.refresh(), 6000);
+                setInterval(() => geEngine.chat.refresh(), 4000);
                 setInterval(() => geEngine.calls._pollSignals(), 2000);
                 geEngine.media.init();
             }
@@ -3738,11 +3835,57 @@
             document.getElementById('ge-main-input').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     if (geEngine.media._recording) {
-                        geEngine.media._stopAndSend();                    } else {
+                        geEngine.media._stopAndSend();
+                    } else {
                         geEngine.chat.broadcast();
                     }
                 }
             });
+
+            // Свайп влево для возврата к списку чатов (мобильный)
+            let _swipeStartX = 0;
+            let _swipeStartY = 0;
+            const chatView = document.querySelector('.ge-chat-view');
+            if (chatView) {
+                chatView.addEventListener('touchstart', (e) => {
+                    _swipeStartX = e.touches[0].clientX;
+                    _swipeStartY = e.touches[0].clientY;
+                }, { passive: true });
+                chatView.addEventListener('touchend', (e) => {
+                    if (!e.changedTouches.length) return;
+                    const dx = e.changedTouches[0].clientX - _swipeStartX;
+                    const dy = Math.abs(e.changedTouches[0].clientY - _swipeStartY);
+                    if (dx > 80 && dy < 60 && window.innerWidth <= 768) {
+                        document.getElementById('ge-main-app').classList.remove('mobile-chat-open');
+                        // Вибрация при возврате
+                        if (navigator.vibrate) navigator.vibrate(30);
+                    }
+                }, { passive: true });
+            }
+
+            // Вибрация при получении нового сообщения
+            geEngine.chat._prevMsgCount = 0;
+            const _origRender = geEngine.ui.renderMessages.bind(geEngine.ui);
+            geEngine.ui.renderMessages = function(messages) {
+                const count = (messages || []).length;
+                if (geEngine.chat._prevMsgCount > 0 && count > geEngine.chat._prevMsgCount) {
+                    const lastMsg = messages[0];
+                    try {
+                        const m = typeof lastMsg === 'string' ? JSON.parse(decodeURIComponent(lastMsg)) : lastMsg;
+                        if (m.email !== geEngine.state.session.email) {
+                            if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+                        }
+                    } catch {}
+                }
+                geEngine.chat._prevMsgCount = count;
+                _origRender(messages);
+            };
+
+            // Укорачиваем placeholder на мобильном
+            if (window.innerWidth <= 768) {
+                const input = document.getElementById('ge-main-input');
+                if (input) input.placeholder = 'Сообщение...';
+            }
         };
     </script>
     <!-- ПОПАП НАСТРОЕК — в body чтобы перекрывал всё -->
