@@ -2537,6 +2537,12 @@
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
                     if(!isActive) menu.classList.add('active');
                 },
+                // Форматирует timestamp сообщения в локальное время ТОГО, кто сейчас смотрит экран.
+                // Именно поэтому нельзя хранить готовую строку времени — её нужно каждый раз
+                // пересчитывать из ts под часовой пояс конкретного зрителя.
+                _fmtTime(ts) {
+                    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                },
                 _lastChatList: null,
                 async renderChatList(serverRooms) {
                     const scroller = document.getElementById('ge-chat-list-scroller');
@@ -2562,6 +2568,25 @@
                         if (tab === 'people') return rid === 'general' || !rid.startsWith('private-');
                         return true;
                     });
+
+                    // Подтягиваем реальное время последнего сообщения с сервера для КАЖДОЙ комнаты
+                    // (а не только активной) — это чинит синхронизацию порядка чатов между устройствами
+                    if (tab !== 'calls') {
+                        await Promise.all(filtered.map(async rid => {
+                            try {
+                                const res = await fetch(`/api/index?room=${encodeURIComponent(rid)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`);
+                                const data = await res.json();
+                                const raw = data.messages?.result?.[0];
+                                if (raw) {
+                                    const lastMsg = JSON.parse(decodeURIComponent(raw));
+                                    if (!geEngine.state.roomLastTime) geEngine.state.roomLastTime = {};
+                                    // ts — реальный timestamp сообщения (единый для всех, не зависит от часового пояса)
+                                    if (lastMsg.ts) geEngine.state.roomLastTime[rid] = lastMsg.ts;
+                                }
+                            } catch {}
+                        }));
+                        localStorage.setItem('ge_room_times', JSON.stringify(geEngine.state.roomLastTime));
+                    }
 
                     // Сортируем по времени последнего сообщения
                     filtered.sort((a, b) => {
@@ -2676,7 +2701,9 @@
                         try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } catch(e) { return ''; }
                         const isMe = m.email === geEngine.state.session.email;
                         const statusIcon = m.status === 'read' ? '✓✓' : (m.status === 'sent' ? '✓' : '○');
-                        const timeStr = m.time || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        // Пересчитываем время из ts под часовой пояс зрителя. Если у старого
+                        // сообщения нет ts (отправлено до этого фикса) — используем сохранённую строку как запасной вариант.
+                        const timeStr = m.ts ? geEngine.ui._fmtTime(m.ts) : (m.time || geEngine.ui._fmtTime(Date.now()));
                         const uid = msgIdCounter++;
 
                         // ГОЛОСОВОЕ СООБЩЕНИЕ
@@ -2752,7 +2779,7 @@
                     bubble.appendChild(textDiv);
                     const statusLine = document.createElement('div');
                     statusLine.className = 'ge-msg-status-line';
-                    statusLine.innerHTML = `<span>${m.time}</span><span>✓</span>`;
+                    statusLine.innerHTML = `<span>${m.ts ? geEngine.ui._fmtTime(m.ts) : m.time}</span><span>✓</span>`;
                     bubble.appendChild(statusLine);
                     // Контейнер использует flex-direction: column-reverse,
                     // поэтому самое новое сообщение вставляем первым дочерним элементом.
@@ -3273,17 +3300,6 @@
                         const serverRooms = data.rooms?.result || [];
                         const allRooms = Array.from(new Set([...serverRooms, ...geEngine.state.localRooms]));
 
-                        // Сохраняем время последнего сообщения текущей комнаты для сортировки
-                        if (geEngine.state.activeRoom && data.messages?.result?.length) {
-                            try {
-                                const lastMsg = JSON.parse(decodeURIComponent(data.messages.result[0]));
-                                if (lastMsg.time) {
-                                    if (!geEngine.state.roomLastTime) geEngine.state.roomLastTime = {};
-                                    geEngine.state.roomLastTime[geEngine.state.activeRoom] = Date.now();
-                                }
-                            } catch {}
-                        }
-
                         // Обновляем список чатов тихо (без сброса скролла)
                         await geEngine.ui.renderChatList(allRooms);
 
@@ -3309,9 +3325,11 @@
                     const input = document.getElementById('ge-main-input');
                     const text = input.value.trim();
                     if (!text || !geEngine.state.activeRoom) return;
+                    const nowTs = Date.now();
                     const msgObj = { 
                         username: geEngine.state.session.name, email: geEngine.state.session.email, text: text,
-                        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), status: 'sent' 
+                        ts: nowTs,
+                        time: new Date(nowTs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), status: 'sent' 
                     };
                     const payload = JSON.stringify(msgObj);
                     input.value = '';
@@ -3320,9 +3338,9 @@
                     // или следующего опроса — это и вызывало задержку, особенно на телефоне.
                     geEngine.ui.appendSentBubble(msgObj);
 
-                    // Обновляем время комнаты при отправке
+                    // Обновляем время комнаты при отправке (оптимистично, для мгновенного отклика в UI)
                     if (!geEngine.state.roomLastTime) geEngine.state.roomLastTime = {};
-                    geEngine.state.roomLastTime[geEngine.state.activeRoom] = Date.now();
+                    geEngine.state.roomLastTime[geEngine.state.activeRoom] = nowTs;
                     localStorage.setItem('ge_room_times', JSON.stringify(geEngine.state.roomLastTime));
                     try {
                         await fetch(`/api/index?room=${encodeURIComponent(geEngine.state.activeRoom)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, { method: 'POST', body: payload });
@@ -3656,6 +3674,7 @@
                             try { localStorage.setItem(mediaKey, base64); } catch {}
                         }
                         // Отправляем mediaData inline чтобы собеседник тоже видел
+                        const mediaTs = Date.now();
                         const payload = JSON.stringify({
                             username: geEngine.state.session.name,
                             email: geEngine.state.session.email,
@@ -3664,9 +3683,13 @@
                             mediaKey,
                             mediaData: base64,
                             mediaDuration: duration,
-                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            ts: mediaTs,
+                            time: new Date(mediaTs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             status: 'sent'
                         });
+                        if (!geEngine.state.roomLastTime) geEngine.state.roomLastTime = {};
+                        geEngine.state.roomLastTime[geEngine.state.activeRoom] = mediaTs;
+                        localStorage.setItem('ge_room_times', JSON.stringify(geEngine.state.roomLastTime));
                         await fetch(`/api/index?room=${geEngine.state.activeRoom}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, {
                             method: 'POST', body: payload
                         });
