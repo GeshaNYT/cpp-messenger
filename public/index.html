@@ -2732,6 +2732,31 @@
                                 </div>
                             </div>`;
                     }).join('');
+                },
+
+                // Мгновенно показывает своё сообщение в чате сразу после отправки,
+                // не дожидаясь ответа сервера или следующего опроса (refresh).
+                appendSentBubble(m) {
+                    const container = document.getElementById('ge-msg-container');
+                    if (!container) return;
+                    // Убираем заглушку "Здесь пока нет сообщений", если она есть
+                    if (container.children.length === 1 && container.innerText.includes('Здесь пока нет сообщений')) {
+                        container.innerHTML = '';
+                    }
+                    const bubble = document.createElement('div');
+                    bubble.className = 'ge-msg-bubble me';
+                    const textDiv = document.createElement('div');
+                    textDiv.className = 'ge-msg-text';
+                    textDiv.textContent = m.text;
+                    bubble.innerHTML = `<span class="ge-msg-meta-top">Вы</span>`;
+                    bubble.appendChild(textDiv);
+                    const statusLine = document.createElement('div');
+                    statusLine.className = 'ge-msg-status-line';
+                    statusLine.innerHTML = `<span>${m.time}</span><span>✓</span>`;
+                    bubble.appendChild(statusLine);
+                    // Контейнер использует flex-direction: column-reverse,
+                    // поэтому самое новое сообщение вставляем первым дочерним элементом.
+                    container.insertBefore(bubble, container.firstChild);
                 }
             },
 
@@ -3284,16 +3309,24 @@
                     const input = document.getElementById('ge-main-input');
                     const text = input.value.trim();
                     if (!text || !geEngine.state.activeRoom) return;
-                    const payload = JSON.stringify({ 
+                    const msgObj = { 
                         username: geEngine.state.session.name, email: geEngine.state.session.email, text: text,
                         time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), status: 'sent' 
-                    });
+                    };
+                    const payload = JSON.stringify(msgObj);
                     input.value = '';
+
+                    // Показываем сообщение сразу же, не дожидаясь ответа сервера
+                    // или следующего опроса — это и вызывало задержку, особенно на телефоне.
+                    geEngine.ui.appendSentBubble(msgObj);
+
                     // Обновляем время комнаты при отправке
                     if (!geEngine.state.roomLastTime) geEngine.state.roomLastTime = {};
                     geEngine.state.roomLastTime[geEngine.state.activeRoom] = Date.now();
                     localStorage.setItem('ge_room_times', JSON.stringify(geEngine.state.roomLastTime));
-                    await fetch(`/api/index?room=${encodeURIComponent(geEngine.state.activeRoom)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, { method: 'POST', body: payload });
+                    try {
+                        await fetch(`/api/index?room=${encodeURIComponent(geEngine.state.activeRoom)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, { method: 'POST', body: payload });
+                    } catch (e) {}
                     geEngine.chat.refresh();
                 },
                 async open(id, prettyName) {
