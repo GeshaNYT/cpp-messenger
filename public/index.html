@@ -1946,6 +1946,7 @@
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 serverContacts: [],   // email-адреса контактов с сервера
+                roomLastTime: JSON.parse(localStorage.getItem('ge_room_times') || '{}'),
                 historyCalls: [
                     {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
                     {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
@@ -2560,6 +2561,13 @@
                         if (tab === 'chats') return rid.startsWith('private-');
                         if (tab === 'people') return rid === 'general' || !rid.startsWith('private-');
                         return true;
+                    });
+
+                    // Сортируем по времени последнего сообщения
+                    filtered.sort((a, b) => {
+                        const ta = geEngine.state.roomLastTime[a] || 0;
+                        const tb = geEngine.state.roomLastTime[b] || 0;
+                        return tb - ta;
                     });
 
                     // Подгружаем профили контактов включая avImg
@@ -3240,6 +3248,17 @@
                         const serverRooms = data.rooms?.result || [];
                         const allRooms = Array.from(new Set([...serverRooms, ...geEngine.state.localRooms]));
 
+                        // Сохраняем время последнего сообщения текущей комнаты для сортировки
+                        if (geEngine.state.activeRoom && data.messages?.result?.length) {
+                            try {
+                                const lastMsg = JSON.parse(decodeURIComponent(data.messages.result[0]));
+                                if (lastMsg.time) {
+                                    if (!geEngine.state.roomLastTime) geEngine.state.roomLastTime = {};
+                                    geEngine.state.roomLastTime[geEngine.state.activeRoom] = Date.now();
+                                }
+                            } catch {}
+                        }
+
                         // Обновляем список чатов тихо (без сброса скролла)
                         await geEngine.ui.renderChatList(allRooms);
 
@@ -3270,6 +3289,10 @@
                         time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), status: 'sent' 
                     });
                     input.value = '';
+                    // Обновляем время комнаты при отправке
+                    if (!geEngine.state.roomLastTime) geEngine.state.roomLastTime = {};
+                    geEngine.state.roomLastTime[geEngine.state.activeRoom] = Date.now();
+                    localStorage.setItem('ge_room_times', JSON.stringify(geEngine.state.roomLastTime));
                     await fetch(`/api/index?room=${encodeURIComponent(geEngine.state.activeRoom)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, { method: 'POST', body: payload });
                     geEngine.chat.refresh();
                 },
