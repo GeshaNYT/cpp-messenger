@@ -1162,6 +1162,87 @@
             animation: ge-slide-up 0.4s var(--ease);
         }
 
+        /* ── Плавное закрытие модалок (групп и т.д.) ────────────── */
+        .ge-modal-overlay.ge-modal-closing { animation: ge-ov-fade-out .2s ease forwards; }
+        .ge-modal-overlay.ge-modal-closing .ge-modal-content { animation: ge-modal-scale-out .2s var(--ease) forwards; }
+        @keyframes ge-ov-fade-out { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes ge-modal-scale-out {
+            from { opacity: 1; transform: translateY(0) scale(1); }
+            to   { opacity: 0; transform: translateY(14px) scale(0.95); }
+        }
+
+        /* ── Модалки групп ───────────────────────────────────────── */
+        .ge-group-modal-sm { max-width: 380px; padding: 32px 28px; }
+        .ge-group-modal-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+        .ge-group-modal-sub { font-size: 13px; color: var(--text-secondary); margin-bottom: 22px; }
+        .ge-group-field-label { display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:8px; text-transform:uppercase; letter-spacing:.4px; }
+
+        .ge-group-action-list { display:flex; flex-direction:column; gap:12px; margin-bottom:22px; }
+        .ge-group-action-btn {
+            display:flex; align-items:center; gap:14px;
+            width:100%; padding:16px 18px;
+            background:var(--bg-input); border:1px solid var(--border-base);
+            border-radius:var(--radius-md); cursor:pointer;
+            transition: transform var(--t-fast) var(--ease), background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+            text-align:left;
+        }
+        .ge-group-action-btn:hover { background: var(--ge-primary-soft); border-color: var(--ge-primary); transform: translateY(-2px); }
+        .ge-group-action-btn:active { transform: translateY(0) scale(0.98); }
+        .ge-group-action-icon { font-size:26px; flex-shrink:0; }
+        .ge-group-action-text { flex:1; display:flex; flex-direction:column; gap:2px; }
+        .ge-group-action-text b { font-size:15px; color:var(--text-primary); }
+        .ge-group-action-text small { font-size:12px; color:var(--text-secondary); }
+        .ge-group-action-chevron { font-size:20px; color:var(--text-tertiary); }
+
+        .ge-group-cancel-btn {
+            width:100%; padding:14px; border-radius:var(--radius-sm);
+            background:transparent; border:none; color:var(--text-secondary);
+            font-weight:700; font-size:14px; cursor:pointer;
+            transition: background var(--t-fast) var(--ease);
+        }
+        .ge-group-cancel-btn:hover { background: var(--bg-input); }
+
+        .ge-group-modal-actions { display:flex; flex-direction:column; gap:10px; margin-top:20px; }
+
+        .ge-group-id-box {
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size:26px; font-weight:800; letter-spacing:6px;
+            background:var(--bg-input); border:1.5px dashed var(--ge-primary);
+            border-radius:var(--radius-sm); padding:16px 10px;
+            color:var(--ge-primary); margin-bottom:14px; user-select:all;
+        }
+        .ge-group-copy-btn {
+            width:100%; padding:12px; border-radius:var(--radius-sm);
+            background:var(--ge-primary-soft); border:none; color:var(--ge-primary);
+            font-weight:700; font-size:14px; cursor:pointer;
+            transition: background var(--t-fast) var(--ease);
+        }
+        .ge-group-copy-btn:hover { background: rgba(0,132,255,0.18); }
+        .ge-group-copy-btn.copied { background: var(--ge-success); color:#fff; }
+
+        .ge-group-id-input { text-align:center; font-size:22px; font-weight:800; letter-spacing:6px; text-transform:uppercase; }
+
+        /* ── Тосты (красивые уведомления) ───────────────────────── */
+        .ge-toast-container {
+            position:fixed; top:24px; left:50%; transform:translateX(-50%);
+            z-index:400000; display:flex; flex-direction:column; gap:10px;
+            align-items:center; pointer-events:none;
+        }
+        .ge-toast {
+            pointer-events:auto;
+            background:var(--bg-panel); color:var(--text-primary);
+            border:1px solid var(--border-base); box-shadow:var(--shadow-lg);
+            border-radius:var(--radius-full); padding:12px 22px;
+            font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px;
+            animation: ge-toast-in .3s var(--ease);
+            max-width: 90vw;
+        }
+        .ge-toast.ge-toast-out { animation: ge-toast-out .25s ease forwards; }
+        .ge-toast.ge-toast-error { border-color: var(--ge-error); color: var(--ge-error); }
+        .ge-toast.ge-toast-success { border-color: var(--ge-success); color: var(--ge-success); }
+        @keyframes ge-toast-in { from { opacity:0; transform:translateY(-14px) scale(.95);} to {opacity:1; transform:translateY(0) scale(1);} }
+        @keyframes ge-toast-out { to { opacity:0; transform:translateY(-14px) scale(.95);} }
+
         .ge-av-preview:hover #ge-av-hover-overlay { opacity: 1 !important; }
 
         .ge-avatar-picker {
@@ -1681,6 +1762,98 @@
             </div>
         </div>
     </div>
+
+    <!-- ══════════ МОДАЛКИ ГРУПП ══════════ -->
+
+    <!-- Выбор действия: войти / создать -->
+    <div id="ge-modal-group-choice" class="ge-modal-overlay" onclick="if(event.target===this)geEngine.groups.closeChoice()">
+        <div class="ge-modal-content ge-group-modal-sm">
+            <h2 class="ge-group-modal-title">Группы</h2>
+            <p class="ge-group-modal-sub">Выберите действие</p>
+            <div class="ge-group-action-list">
+                <button class="ge-group-action-btn" onclick="geEngine.groups.openJoin()">
+                    <span class="ge-group-action-icon">📂</span>
+                    <span class="ge-group-action-text">
+                        <b>Войти в группу</b>
+                        <small>По ID существующей группы</small>
+                    </span>
+                    <span class="ge-group-action-chevron">›</span>
+                </button>
+                <button class="ge-group-action-btn" onclick="geEngine.groups.openCreate()">
+                    <span class="ge-group-action-icon">➕</span>
+                    <span class="ge-group-action-text">
+                        <b>Создать группу</b>
+                        <small>Новый групповой канал</small>
+                    </span>
+                    <span class="ge-group-action-chevron">›</span>
+                </button>
+            </div>
+            <button class="ge-group-cancel-btn" onclick="geEngine.groups.closeChoice()">Отмена</button>
+        </div>
+    </div>
+
+    <!-- Создание группы -->
+    <div id="ge-modal-group-create" class="ge-modal-overlay" onclick="if(event.target===this)geEngine.groups.closeCreate()">
+        <div class="ge-modal-content ge-group-modal-sm">
+            <h2 class="ge-group-modal-title">➕ Создать группу</h2>
+            <p class="ge-group-modal-sub">Придумайте название — после создания вы получите уникальный ID для приглашения участников</p>
+            <label class="ge-group-field-label">Название группы</label>
+            <input type="text" id="ge-group-name-input" class="ge-input-core" placeholder="Например, Команда GeLink" maxlength="60">
+            <div class="ge-group-modal-actions">
+                <button class="ge-btn-submit" style="margin-top:0;" onclick="geEngine.groups.submitCreate()">Создать</button>
+                <button class="ge-group-cancel-btn" onclick="geEngine.groups.closeCreate()">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Группа успешно создана -->
+    <div id="ge-modal-group-created" class="ge-modal-overlay">
+        <div class="ge-modal-content ge-group-modal-sm" style="text-align:center;">
+            <div style="font-size:46px;margin-bottom:6px;">🎉</div>
+            <h2 class="ge-group-modal-title">Группа успешно создана!</h2>
+            <p class="ge-group-modal-sub">ID вашей группы</p>
+            <div class="ge-group-id-box" id="ge-group-created-id">A7K9P2QF</div>
+            <button class="ge-group-copy-btn" id="ge-group-created-copy-btn" onclick="geEngine.groups.copyId(document.getElementById('ge-group-created-id').innerText, this)">📋 Скопировать</button>
+            <button class="ge-btn-submit" style="margin-top:16px;" onclick="geEngine.groups.closeCreated()">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- Вступление в группу по ID -->
+    <div id="ge-modal-group-join" class="ge-modal-overlay" onclick="if(event.target===this)geEngine.groups.closeJoin()">
+        <div class="ge-modal-content ge-group-modal-sm">
+            <h2 class="ge-group-modal-title">📂 Войти в группу</h2>
+            <p class="ge-group-modal-sub">Введите ID группы</p>
+            <input type="text" id="ge-group-join-input" class="ge-input-core ge-group-id-input" placeholder="A7K9P2QF" maxlength="8"
+                   oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+                   onkeydown="if(event.key==='Enter')geEngine.groups.submitJoin()">
+            <div class="ge-group-modal-actions">
+                <button class="ge-btn-submit" style="margin-top:0;" onclick="geEngine.groups.submitJoin()">Войти</button>
+                <button class="ge-group-cancel-btn" onclick="geEngine.groups.closeJoin()">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Информация о группе -->
+    <div id="ge-modal-group-info" class="ge-modal-overlay" onclick="if(event.target===this)geEngine.groups.closeInfo()">
+        <div class="ge-modal-content ge-group-modal-sm" style="text-align:center;">
+            <div class="ge-user-av" id="ge-group-info-av" style="width:72px;height:72px;font-size:26px;margin:0 auto 14px;">#</div>
+            <h2 class="ge-group-modal-title" id="ge-group-info-name">Название группы</h2>
+            <p class="ge-group-modal-sub" id="ge-group-info-count">Участников: 0</p>
+            <div id="ge-group-info-id-wrap" class="ge-hidden">
+                <label class="ge-group-field-label" style="margin-top:10px;">ID группы</label>
+                <div class="ge-group-id-box" id="ge-group-info-id">—</div>
+                <button class="ge-group-copy-btn" onclick="geEngine.groups.copyId(document.getElementById('ge-group-info-id').innerText, this)">📋 Скопировать</button>
+            </div>
+            <div id="ge-group-info-owner-actions" class="ge-hidden" style="margin-top:18px;">
+                <button class="ge-menu-btn danger" style="width:100%;justify-content:center;" onclick="geEngine.groups.deleteGroup()">Удалить группу навсегда</button>
+            </div>
+            <button class="ge-group-cancel-btn" style="margin-top:14px;" onclick="geEngine.groups.closeInfo()">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- Тосты -->
+    <div id="ge-toast-container" class="ge-toast-container"></div>
+
     <section id="ge-auth-layer" class="ge-auth-overlay">
         <div class="ge-auth-container">
             <div class="ge-brand-logo">GeLink</div>
@@ -1859,7 +2032,7 @@
 
                 <div style="display: flex; gap: 12px;">
                     <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0;" onclick="geEngine.chat.addFriend()">+ ДОБАВИТЬ</button>
-                    <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0; background: var(--bg-body); color: var(--text-primary); box-shadow: none;" onclick="geEngine.chat.createGroup()">+ ГРУППА</button>
+                    <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0; background: var(--bg-body); color: var(--text-primary); box-shadow: none;" onclick="geEngine.groups.openChoice()">+ ГРУППА</button>
                 </div>
             </header>
 
@@ -1876,7 +2049,7 @@
                 <button class="ge-chat-back-btn" style="display:none" onclick="document.getElementById('ge-main-app').classList.remove('mobile-chat-open')">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                 </button>
-                <div style="display: flex; align-items: center; gap: 20px;">
+                <div style="display: flex; align-items: center; gap: 20px; cursor: pointer;" onclick="geEngine.groups.openInfo()">
                     <div class="ge-user-av" id="ge-active-av" style="width: 55px; height: 55px; background: #555;">#</div>
                     <div>
                         <b id="ge-active-name" style="font-size: 24px;">Выберите диалог</b>
@@ -1944,6 +2117,7 @@
                 localRooms: JSON.parse(localStorage.getItem('ge_local_rooms') || "[]"),
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
+                groupProfiles: {},    // кэш {groupId: {name, memberCount, isOwner}}
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 serverContacts: [],   // email-адреса контактов с сервера
                 roomLastTime: JSON.parse(localStorage.getItem('ge_room_times') || '{}'),
@@ -2435,6 +2609,39 @@
                 closePrivacy() {
                     document.getElementById('ge-modal-privacy').style.display = 'none';
                 },
+
+                // ── Универсальные модалки с плавной анимацией открытия/закрытия ──
+                _openModal(id) {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    el.classList.remove('ge-modal-closing');
+                    el.style.display = 'flex';
+                },
+                _closeModal(id) {
+                    const el = document.getElementById(id);
+                    if (!el || el.style.display === 'none') return;
+                    el.classList.add('ge-modal-closing');
+                    setTimeout(() => {
+                        el.style.display = 'none';
+                        el.classList.remove('ge-modal-closing');
+                    }, 200);
+                },
+
+                // ── Красивые всплывающие уведомления (тосты) ─────────────────────
+                showToast(message, type) {
+                    const container = document.getElementById('ge-toast-container');
+                    if (!container) { alert(message); return; }
+                    const toast = document.createElement('div');
+                    toast.className = `ge-toast ${type === 'error' ? 'ge-toast-error' : type === 'success' ? 'ge-toast-success' : ''}`;
+                    const icon = type === 'error' ? '⚠️' : type === 'success' ? '✅' : 'ℹ️';
+                    toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+                    container.appendChild(toast);
+                    setTimeout(() => {
+                        toast.classList.add('ge-toast-out');
+                        setTimeout(() => toast.remove(), 260);
+                    }, 3200);
+                },
+
                 toggleSettingsMenu(e) {
                     e.stopPropagation();
                     const popup = document.getElementById('ge-settings-popup');
@@ -2628,6 +2835,21 @@
                                 if (data.status === 'found') contactProfiles[rid] = data.profile || {};
                             } catch {}
                         }));
+
+                        // Название, число участников и владелец для реальных групп (не general)
+                        await Promise.all(filtered.filter(rid => rid !== 'general' && !rid.startsWith('private-')).map(async rid => {
+                            try {
+                                const res = await fetch(`/api/index?action=getGroupInfo&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(rid)}`);
+                                const data = await res.json();
+                                if (data.status === 'ok') {
+                                    geEngine.state.groupProfiles[rid] = { name: data.name, memberCount: data.memberCount, isOwner: data.isOwner };
+                                    if (data.isOwner && !geEngine.state.createdRooms.includes(rid)) {
+                                        geEngine.state.createdRooms.push(rid);
+                                        localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
+                                    }
+                                }
+                            } catch {}
+                        }));
                     }
 
                     let html = filtered.map(rid => {
@@ -2635,7 +2857,9 @@
                         let avColor = '#444';
                         let avImg = null;
                         let isGroup = rid === 'general' || !rid.startsWith('private-');
-                        const isCreator = geEngine.state.createdRooms.includes(rid);
+                        const groupProfile = geEngine.state.groupProfiles[rid];
+                        const isCreator = groupProfile ? !!groupProfile.isOwner : geEngine.state.createdRooms.includes(rid);
+                        let subtitle = isGroup ? 'Групповой канал' : 'Активный зашифрованный канал';
 
                         if (rid.startsWith('private-')) {
                             const parts = rid.replace('private-', '').split('-');
@@ -2652,6 +2876,14 @@
                                 if (user) { displayName = user.name; avColor = user.avColor; }
                                 else if (otherMailSafePart) displayName = otherMailSafePart.split('gmailcom')[0] || otherMailSafePart;
                             }
+                        } else if (rid !== 'general') {
+                            // Реальная группа — показываем название с сервера, а не сырой ID
+                            if (groupProfile && groupProfile.name) {
+                                displayName = groupProfile.name;
+                                subtitle = `Группа • ${groupProfile.memberCount} уч.`;
+                            } else {
+                                displayName = 'Загрузка…';
+                            }
                         }
 
                         const avHtml = avImg
@@ -2663,7 +2895,7 @@
                                 ${avHtml}
                                 <div class="ge-item-content">
                                     <b>${displayName}</b>
-                                    <span>${isGroup ? 'Групповой канал' : 'Активный зашифрованный канал'}</span>
+                                    <span>${subtitle}</span>
                                 </div>
                                 <div class="ge-item-dots" onclick="geEngine.ui.toggleMenu(event, '${rid}')">⋮</div>
                                 <div id="menu-${rid}" class="ge-context-menu">
@@ -2671,7 +2903,7 @@
                                         ${isGroup ? 'Покинуть группу' : 'Удалить контакт'}
                                     </button>
                                     ${isCreator && isGroup && rid !== 'general' ? `
-                                        <button class="ge-menu-btn danger" onclick="geEngine.chat.deleteRoomPermanently(event, '${rid}')">
+                                        <button class="ge-menu-btn danger" onclick="event.stopPropagation(); geEngine.groups.deleteGroupById('${rid}')">
                                             Удалить группу
                                         </button>
                                     ` : ''}
@@ -2687,12 +2919,11 @@
                             </div>`;
                     }
                     // Не перерисовываем список чатов если он не изменился.
-                    // Важно: используем порядок id комнат (filtered.join), а не html.length —
-                    // при смене порядка (чат поднялся наверх) длина строки часто остаётся той же,
-                    // и старая проверка ошибочно считала, что список не изменился.
-                    const htmlKey = tab + '|' + filtered.join(',') + '|' + (geEngine.state.activeRoom || '');
-                    if (htmlKey !== geEngine.ui._lastChatList) {
-                        geEngine.ui._lastChatList = htmlKey;
+                    // Сравниваем сам итоговый HTML, а не синтетический ключ — так гарантированно
+                    // ловим любое реальное изменение: порядок чатов, подгрузившееся название
+                    // группы, число участников и т.д.
+                    if (html !== geEngine.ui._lastChatList) {
+                        geEngine.ui._lastChatList = html;
                         scroller.innerHTML = html;
                     }
                 },
@@ -3459,16 +3690,11 @@
                             if (targetEmail) {
                                 fetch(`/api/index?action=removeContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(targetEmail)}`).catch(() => {});
                             }
+                        } else if (geEngine.groups._isRealGroup(rid)) {
+                            // Настоящая группа — снимаем членство и на сервере, иначе она вернётся в списке
+                            geEngine.groups.leaveGroupNow(rid);
                         }
 
-                        geEngine.chat.refresh();
-                    }
-                },
-                deleteRoomPermanently(e, rid) {
-                    e.stopPropagation();
-                    if(confirm("Удалить группу навсегда?")) {
-                        geEngine.state.deletedRooms.push(rid);
-                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                         geEngine.chat.refresh();
                     }
                 },
@@ -3541,19 +3767,226 @@
                     } catch(e) {
                         alert("Ошибка соединения с сервером.");
                     }
-                },
-                createGroup() {
-                    const name = prompt("Имя группы:");
-                    if (name) {
-                        geEngine.state.localRooms.push(name);
-                        geEngine.state.createdRooms.push(name);
-                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                        localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
-                        geEngine.chat.open(name, name);
-                    }
                 }
             },
 
+            groups: {
+                _pendingOpenAfterCreated: null,
+
+                _isRealGroup(rid) {
+                    return !!rid && rid !== 'general' && !rid.startsWith('private-');
+                },
+
+                // ── Модалка выбора действия ─────────────────────────────
+                openChoice() { geEngine.ui._openModal('ge-modal-group-choice'); },
+                closeChoice() { geEngine.ui._closeModal('ge-modal-group-choice'); },
+
+                // ── Создание группы ──────────────────────────────────────
+                openCreate() {
+                    geEngine.ui._closeModal('ge-modal-group-choice');
+                    document.getElementById('ge-group-name-input').value = '';
+                    setTimeout(() => geEngine.ui._openModal('ge-modal-group-create'), 180);
+                },
+                closeCreate() { geEngine.ui._closeModal('ge-modal-group-create'); },
+
+                async submitCreate() {
+                    const input = document.getElementById('ge-group-name-input');
+                    const name = (input.value || '').trim();
+                    if (!name) { geEngine.ui.showToast('Введите название группы', 'error'); input.focus(); return; }
+
+                    const btn = document.querySelector('#ge-modal-group-create .ge-btn-submit');
+                    const oldLabel = btn.innerText;
+                    btn.innerText = 'Создаём…'; btn.disabled = true;
+                    try {
+                        const res = await fetch(`/api/index?action=createGroup&user_email=${encodeURIComponent(geEngine.state.session.email)}&name=${encodeURIComponent(name)}`);
+                        const data = await res.json();
+                        if (data.status !== 'ok') {
+                            geEngine.ui.showToast(data.message || 'Не удалось создать группу', 'error');
+                            return;
+                        }
+                        const groupId = data.groupId, groupName = data.name;
+
+                        if (!geEngine.state.localRooms.includes(groupId)) geEngine.state.localRooms.push(groupId);
+                        if (!geEngine.state.createdRooms.includes(groupId)) geEngine.state.createdRooms.push(groupId);
+                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                        localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
+                        geEngine.state.groupProfiles[groupId] = { name: groupName, memberCount: 1, isOwner: true };
+
+                        geEngine.groups._pendingOpenAfterCreated = { id: groupId, name: groupName };
+                        geEngine.groups.closeCreate();
+                        document.getElementById('ge-group-created-id').innerText = groupId;
+                        const copyBtn = document.getElementById('ge-group-created-copy-btn');
+                        copyBtn.innerText = '📋 Скопировать'; copyBtn.classList.remove('copied');
+                        setTimeout(() => geEngine.ui._openModal('ge-modal-group-created'), 180);
+                    } catch (e) {
+                        geEngine.ui.showToast('Ошибка соединения с сервером', 'error');
+                    } finally {
+                        btn.innerText = oldLabel; btn.disabled = false;
+                    }
+                },
+
+                closeCreated() {
+                    geEngine.ui._closeModal('ge-modal-group-created');
+                    const pending = geEngine.groups._pendingOpenAfterCreated;
+                    geEngine.groups._pendingOpenAfterCreated = null;
+                    if (pending) geEngine.chat.open(pending.id, pending.name);
+                    geEngine.chat.refresh();
+                },
+
+                // ── Вступление в группу по ID ─────────────────────────────
+                openJoin() {
+                    geEngine.ui._closeModal('ge-modal-group-choice');
+                    document.getElementById('ge-group-join-input').value = '';
+                    setTimeout(() => {
+                        geEngine.ui._openModal('ge-modal-group-join');
+                        document.getElementById('ge-group-join-input').focus();
+                    }, 180);
+                },
+                closeJoin() { geEngine.ui._closeModal('ge-modal-group-join'); },
+
+                async submitJoin() {
+                    const input = document.getElementById('ge-group-join-input');
+                    const groupId = (input.value || '').trim().toUpperCase();
+                    if (groupId.length !== 8) { geEngine.ui.showToast('ID группы состоит из 8 символов', 'error'); return; }
+
+                    const btn = document.querySelector('#ge-modal-group-join .ge-btn-submit');
+                    const oldLabel = btn.innerText;
+                    btn.innerText = 'Входим…'; btn.disabled = true;
+                    try {
+                        const res = await fetch(`/api/index?action=joinGroup&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(groupId)}`);
+                        const data = await res.json();
+                        if (data.status !== 'ok') {
+                            geEngine.ui.showToast(data.message || 'Группа с таким ID не найдена', 'error');
+                            return;
+                        }
+                        geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== data.groupId);
+                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                        if (!geEngine.state.localRooms.includes(data.groupId)) geEngine.state.localRooms.push(data.groupId);
+                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                        geEngine.state.groupProfiles[data.groupId] = { name: data.name, memberCount: data.memberCount, isOwner: false };
+
+                        geEngine.groups.closeJoin();
+                        geEngine.ui.showToast(`Вы вступили в группу «${data.name}»`, 'success');
+                        geEngine.chat.open(data.groupId, data.name);
+                        geEngine.chat.refresh();
+                    } catch (e) {
+                        geEngine.ui.showToast('Ошибка соединения с сервером', 'error');
+                    } finally {
+                        btn.innerText = oldLabel; btn.disabled = false;
+                    }
+                },
+
+                // ── Копирование ID в буфер обмена ─────────────────────────
+                copyId(text, btn) {
+                    const done = () => {
+                        if (!btn) return;
+                        const old = btn.innerText;
+                        btn.innerText = '✅ Скопировано';
+                        btn.classList.add('copied');
+                        setTimeout(() => { btn.innerText = '📋 Скопировать'; btn.classList.remove('copied'); }, 1500);
+                    };
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(done).catch(() => geEngine.groups._fallbackCopy(text, done));
+                    } else {
+                        geEngine.groups._fallbackCopy(text, done);
+                    }
+                },
+                _fallbackCopy(text, done) {
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                        document.body.appendChild(ta); ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                        done();
+                    } catch (e) {}
+                },
+
+                // ── Информация о группе ───────────────────────────────────
+                async openInfo() {
+                    const rid = geEngine.state.activeRoom;
+                    if (!geEngine.groups._isRealGroup(rid)) return;
+
+                    geEngine.groups._fillInfo(rid, geEngine.state.groupProfiles[rid]);
+                    geEngine.ui._openModal('ge-modal-group-info');
+
+                    try {
+                        const res = await fetch(`/api/index?action=getGroupInfo&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(rid)}`);
+                        const data = await res.json();
+                        if (data.status === 'ok') {
+                            geEngine.state.groupProfiles[rid] = { name: data.name, memberCount: data.memberCount, isOwner: data.isOwner };
+                            if (data.isOwner && !geEngine.state.createdRooms.includes(rid)) {
+                                geEngine.state.createdRooms.push(rid);
+                                localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
+                            }
+                            // Модалка могла закрыться, пока шёл запрос — обновляем данные только если ещё открыта нужная группа
+                            if (geEngine.state.activeRoom === rid) geEngine.groups._fillInfo(rid, geEngine.state.groupProfiles[rid]);
+                        }
+                    } catch (e) {}
+                },
+                _fillInfo(rid, profile) {
+                    const name = (profile && profile.name) || rid;
+                    const count = profile ? profile.memberCount : '…';
+                    const isOwner = !!(profile && profile.isOwner);
+
+                    document.getElementById('ge-group-info-name').innerText = name;
+                    document.getElementById('ge-group-info-count').innerText = `Участников: ${count}`;
+                    const av = document.getElementById('ge-group-info-av');
+                    av.style.background = 'var(--ge-accent-gradient)';
+                    av.innerText = name[0] ? name[0].toUpperCase() : '#';
+
+                    document.getElementById('ge-group-info-id-wrap').classList.toggle('ge-hidden', !isOwner);
+                    if (isOwner) document.getElementById('ge-group-info-id').innerText = rid;
+                    document.getElementById('ge-group-info-owner-actions').classList.toggle('ge-hidden', !isOwner);
+                },
+                closeInfo() { geEngine.ui._closeModal('ge-modal-group-info'); },
+
+                // ── Удаление группы навсегда (только владелец) ────────────
+                async deleteGroup() {
+                    const rid = geEngine.state.activeRoom;
+                    if (!geEngine.groups._isRealGroup(rid)) return;
+                    await geEngine.groups.deleteGroupById(rid);
+                },
+                async deleteGroupById(rid) {
+                    if (!confirm('Удалить группу навсегда? Будут удалены все сообщения и участники, а ID освободится.')) return;
+                    try {
+                        const res = await fetch(`/api/index?action=deleteGroup&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(rid)}`);
+                        const data = await res.json();
+                        if (data.status !== 'ok') {
+                            geEngine.ui.showToast(data.message || 'Не удалось удалить группу', 'error');
+                            return;
+                        }
+                    } catch (e) {
+                        geEngine.ui.showToast('Ошибка соединения с сервером', 'error');
+                        return;
+                    }
+
+                    geEngine.state.deletedRooms.push(rid);
+                    localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                    geEngine.state.localRooms = geEngine.state.localRooms.filter(id => id !== rid);
+                    localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                    geEngine.state.createdRooms = geEngine.state.createdRooms.filter(id => id !== rid);
+                    localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
+                    delete geEngine.state.groupProfiles[rid];
+
+                    geEngine.groups.closeInfo();
+                    if (geEngine.state.activeRoom === rid) {
+                        geEngine.state.activeRoom = null;
+                        document.getElementById('ge-active-name').innerText = 'Выберите диалог';
+                        document.getElementById('ge-msg-container').innerHTML = '';
+                        const footer = document.querySelector('.ge-footer');
+                        if (footer) footer.style.visibility = 'hidden';
+                        if (window.innerWidth <= 768) document.getElementById('ge-main-app').classList.remove('mobile-chat-open');
+                    }
+                    geEngine.ui.showToast('Группа удалена', 'success');
+                    geEngine.chat.refresh();
+                },
+
+                // ── Выход из группы (для участников, не владельца) ───────
+                leaveGroupNow(rid) {
+                    fetch(`/api/index?action=leaveGroup&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(rid)}`).catch(() => {});
+                },
+            },
 
             media: {
                 _mode: 'voice',       // 'voice' | 'circle'
