@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeLink Enterprise Messenger | Version 2.8 Stability Update</title>
+    <title>GeLink Enterprise Messenger | Version 2.7.1 UI Update</title>
     
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script type="text/javascript">
@@ -1684,7 +1684,7 @@
     <section id="ge-auth-layer" class="ge-auth-overlay">
         <div class="ge-auth-container">
             <div class="ge-brand-logo">GeLink</div>
-            <p class="ge-auth-tagline">Профессиональный мессенджер v2.8</p>
+            <p class="ge-auth-tagline">Профессиональный мессенджер v2.7.1</p>
             
             <div class="ge-auth-tabs">
                 <button id="tab-login" class="ge-auth-tab active" onclick="geEngine.auth.switch('login')">Вход</button>
@@ -2544,6 +2544,8 @@
                     return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 },
                 _lastChatList: null,
+                _lastRoomTimesSweep: 0,
+                _lastProfilesSweep: 0,
                 async renderChatList(serverRooms) {
                     const scroller = document.getElementById('ge-chat-list-scroller');
                     const tab = geEngine.state.activeTab;
@@ -2570,8 +2572,13 @@
                     });
 
                     // Подтягиваем реальное время последнего сообщения с сервера для КАЖДОЙ комнаты
-                    // (а не только активной) — это чинит синхронизацию порядка чатов между устройствами
-                    if (tab !== 'calls') {
+                    // (а не только активной) — это чинит синхронизацию порядка чатов между устройствами.
+                    // Делаем это не на каждый 6-секундный опрос (это было тяжело для сети и дёргало
+                    // список/аватарки), а раз в ~20 секунд. Порядок между сканированиями всё равно
+                    // держится актуальным за счёт оптимистичного обновления roomLastTime при отправке.
+                    const needsSweep = (Date.now() - geEngine.ui._lastRoomTimesSweep) > 20000;
+                    if (tab !== 'calls' && needsSweep) {
+                        geEngine.ui._lastRoomTimesSweep = Date.now();
                         await Promise.all(filtered.map(async rid => {
                             try {
                                 const res = await fetch(`/api/index?room=${encodeURIComponent(rid)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`);
@@ -2600,21 +2607,28 @@
                         return tb - ta;
                     });
 
-                    // Подгружаем профили контактов включая avImg
-                    const contactProfiles = {};
-                    await Promise.all(filtered.filter(rid => rid.startsWith('private-')).map(async rid => {
-                        const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                        const parts = rid.replace('private-', '').split('-');
-                        const otherSafe = parts.find(p => p !== myMailSafe);
-                        if (!otherSafe) return;
-                        const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe);
-                        if (!targetEmail) return;
-                        try {
-                            const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
-                            const data = await res.json();
-                            if (data.status === 'found') contactProfiles[rid] = data.profile || {};
-                        } catch {}
-                    }));
+                    // Подгружаем профили контактов включая avImg. Кешируем результат и обновляем
+                    // не чаще раза в ~20 секунд — иначе аватарки/имена каждые 6 секунд на миг
+                    // сбрасывались на дефолтную букву, пока шёл повторный запрос ("мигание").
+                    if (!geEngine.ui._contactProfilesCache) geEngine.ui._contactProfilesCache = {};
+                    const contactProfiles = geEngine.ui._contactProfilesCache;
+                    const needsProfileSweep = (Date.now() - geEngine.ui._lastProfilesSweep) > 20000;
+                    if (needsProfileSweep) {
+                        geEngine.ui._lastProfilesSweep = Date.now();
+                        await Promise.all(filtered.filter(rid => rid.startsWith('private-')).map(async rid => {
+                            const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                            const parts = rid.replace('private-', '').split('-');
+                            const otherSafe = parts.find(p => p !== myMailSafe);
+                            if (!otherSafe) return;
+                            const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe);
+                            if (!targetEmail) return;
+                            try {
+                                const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
+                                const data = await res.json();
+                                if (data.status === 'found') contactProfiles[rid] = data.profile || {};
+                            } catch {}
+                        }));
+                    }
 
                     let html = filtered.map(rid => {
                         let displayName = rid;
@@ -3294,8 +3308,14 @@
             chat: {
                 _lastMessages: null,
                 _isUserInteracting: false,
+                _isRefreshing: false,
 
                 async refresh() {
+                    // Если предыдущий опрос ещё не завершился (медленная сеть) — пропускаем этот тик,
+                    // чтобы не накапливались параллельные запросы и не было гонки, из-за которой
+                    // старый ответ иногда перезаписывал более новый и список/сообщения дёргались.
+                    if (geEngine.chat._isRefreshing) return;
+                    geEngine.chat._isRefreshing = true;
                     try {
                         const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`;
                         const res = await fetch(url);
@@ -3316,18 +3336,23 @@
                                 const newMessages = JSON.stringify(data.messages?.result);
                                 // Не перерисовываем если сообщения не изменились
                                 if (newMessages !== geEngine.chat._lastMessages) {
-                                    // Не перерисовываем если играет аудио/видео
+                                    // Не перерисовываем если играет аудио/видео, или если пользователь
+                                    // сейчас проскроллил вверх и читает историю — иначе его вид "прыгал"
+                                    // обратно к последнему сообщению каждые 6 секунд.
                                     const hasPlaying = document.querySelector('audio.ge-voice-audio:not([paused])') ||
                                         [...document.querySelectorAll('audio.ge-voice-audio')].some(a => !a.paused) ||
                                         [...document.querySelectorAll('video')].some(v => !v.paused && v.id !== 'remoteVideo' && v.id !== 'localVideo');
-                                    if (!hasPlaying) {
+                                    if (!hasPlaying && !geEngine.chat._isUserInteracting) {
                                         geEngine.chat._lastMessages = newMessages;
                                         geEngine.ui.renderMessages(data.messages?.result);
                                     }
                                 }
                             }
                         }
-                    } catch (e) {}
+                    } catch (e) {
+                    } finally {
+                        geEngine.chat._isRefreshing = false;
+                    }
                 },
                 async broadcast() {
                     const input = document.getElementById('ge-main-input');
@@ -3830,6 +3855,16 @@
                     }
                 }
             });
+
+            // Если пользователь проскроллил вверх, чтобы почитать историю сообщений,
+            // не даём автообновлению (каждые 6 секунд) сбрасывать его к последнему сообщению.
+            const msgContainer = document.getElementById('ge-msg-container');
+            if (msgContainer) {
+                msgContainer.addEventListener('scroll', () => {
+                    // Контейнер использует column-reverse: положение покоя (последнее сообщение) — scrollTop ≈ 0.
+                    geEngine.chat._isUserInteracting = Math.abs(msgContainer.scrollTop) > 40;
+                });
+            }
         };
     </script>
     <!-- ПОПАП НАСТРОЕК — в body чтобы перекрывал всё -->
