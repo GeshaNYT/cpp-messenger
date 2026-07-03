@@ -68,6 +68,25 @@ function parseHash(raw) {
     return out;
 }
 
+// ── Генерация ID группы: 8 символов, A-Z0-9 ──────────────────
+const GROUP_ID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+function genGroupId() {
+    const bytes = crypto.getRandomValues(new Uint8Array(8));
+    let id = '';
+    for (let i = 0; i < 8; i++) id += GROUP_ID_CHARS[bytes[i] % GROUP_ID_CHARS.length];
+    return id;
+}
+
+// Генерирует ID и проверяет через EXISTS, что такой группы ещё нет
+async function generateUniqueGroupId(db) {
+    for (let attempt = 0; attempt < 25; attempt++) {
+        const id = genGroupId();
+        const exists = await db('EXISTS', `group:${id}`);
+        if (!exists) return id;
+    }
+    throw new Error('Не удалось сгенерировать уникальный ID группы');
+}
+
 // ── Основной обработчик ──────────────────────────────────────
 export default async function handler(request, response) {
     const env = {
@@ -289,6 +308,110 @@ export default async function handler(request, response) {
             await db('SREM', `contacts:${emailLower}`,   target_email);
             await db('SREM', `user_rooms:${emailLower}`, roomId);
             return response.status(200).json({ status: 'success', message: 'Contact removed' });
+        }
+
+        // ══════════════════════════════════════════════════════
+        //  ГРУППЫ
+        // ══════════════════════════════════════════════════════
+
+        // Создать группу
+        if (action === 'createGroup') {
+            const jwtEmail   = await tryAuth(request, env.jwt);
+            const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+            if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
+
+            const rawName = (request.query.name ?? '').toString().trim();
+            if (!rawName) return response.status(400).json({ status: 'error', message: 'Укажите название группы' });
+            const name = rawName.slice(0, 60);
+
+            const groupId = await generateUniqueGroupId(db);
+
+            await db('HSET', `group:${groupId}`,
+                'name',      name,
+                'owner',     emailLower,
+                'createdAt', Date.now(),
+            );
+            await db('SADD', `group_members:${groupId}`, emailLower);
+            await db('SADD', `user_rooms:${emailLower}`, groupId);
+            await db('SADD', 'all_users', emailLower);
+
+            return response.status(200).json({ status: 'ok', groupId, name });
+        }
+
+        // Вступить в группу по ID
+        if (action === 'joinGroup' && request.query.groupId) {
+            const jwtEmail   = await tryAuth(request, env.jwt);
+            const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+            if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
+
+            const groupId = request.query.groupId.toString().trim().toUpperCase();
+            const exists  = await db('EXISTS', `group:${groupId}`);
+            if (!exists) return response.status(404).json({ status: 'error', message: 'Группа с таким ID не найдена' });
+
+            const name = await db('HGET', `group:${groupId}`, 'name');
+
+            await db('SADD', `group_members:${groupId}`, emailLower);
+            await db('SADD', `user_rooms:${emailLower}`, groupId);
+            await db('SADD', 'all_users', emailLower);
+
+            const memberCount = await db('SCARD', `group_members:${groupId}`);
+            return response.status(200).json({ status: 'ok', groupId, name, memberCount });
+        }
+
+        // Информация о группе (название, кол-во участников; owner виден только владельцу)
+        if (action === 'getGroupInfo' && request.query.groupId) {
+            const jwtEmail   = await tryAuth(request, env.jwt);
+            const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+
+            const groupId = request.query.groupId.toString().trim().toUpperCase();
+            const exists  = await db('EXISTS', `group:${groupId}`);
+            if (!exists) return response.status(404).json({ status: 'error', message: 'Группа не найдена' });
+
+            const info        = parseHash(await db('HGETALL', `group:${groupId}`));
+            const memberCount = await db('SCARD', `group_members:${groupId}`);
+            const isOwner     = !!emailLower && emailLower === info.owner;
+
+            return response.status(200).json({
+                status: 'ok',
+                groupId,
+                name: info.name,
+                memberCount,
+                isOwner,
+            });
+        }
+
+        // Покинуть группу (для участников, не владельца)
+        if (action === 'leaveGroup' && request.query.groupId) {
+            const jwtEmail   = await tryAuth(request, env.jwt);
+            const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+            if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
+
+            const groupId = request.query.groupId.toString().trim().toUpperCase();
+            await db('SREM', `group_members:${groupId}`, emailLower);
+            await db('SREM', `user_rooms:${emailLower}`, groupId);
+
+            return response.status(200).json({ status: 'ok' });
+        }
+
+        // Удалить группу навсегда — только владелец: чистим сообщения, участников, освобождаем ID
+        if (action === 'deleteGroup' && request.query.groupId) {
+            const jwtEmail   = await tryAuth(request, env.jwt);
+            const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+            if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
+
+            const groupId = request.query.groupId.toString().trim().toUpperCase();
+            const owner    = await db('HGET', `group:${groupId}`, 'owner');
+            if (!owner) return response.status(404).json({ status: 'error', message: 'Группа не найдена' });
+            if (owner !== emailLower) return response.status(403).json({ status: 'error', message: 'Удалить группу может только владелец' });
+
+            const members = (await db('SMEMBERS', `group_members:${groupId}`)) ?? [];
+            await Promise.all(members.map(m => db('SREM', `user_rooms:${m}`, groupId)));
+
+            await db('DEL', `group_members:${groupId}`);
+            await db('DEL', `group:${groupId}`);
+            await db('DEL', `room:${groupId}`); // удаляем все сообщения группы
+
+            return response.status(200).json({ status: 'ok' });
         }
 
         // ══════════════════════════════════════════════════════
