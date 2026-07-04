@@ -466,6 +466,17 @@ export default async function handler(request, response) {
             const jwtEmail   = await tryAuth(request, env.jwt);
             const emailLower = jwtEmail ?? user_email ?? (typeof body === 'object' ? body?.email : null) ?? '';
 
+            // Если это настоящая группа (не general, не приватный чат) — проверяем, что она
+            // ещё существует. Иначе сообщение "воскрешало" удалённую группу: сервер молча
+            // принимал его и заново добавлял комнату в user_rooms отправителя.
+            const isRealGroupRoom = room !== 'general' && !room.startsWith('private-');
+            if (isRealGroupRoom) {
+                const groupExists = await db('EXISTS', `group:${room}`);
+                if (!groupExists) {
+                    return response.status(410).json({ status: 'error', message: 'Группа была удалена', groupDeleted: true });
+                }
+            }
+
             // body может прийти как строка (старый фронт) или объект (новый)
             const bodyStr = typeof body === 'string' ? body : JSON.stringify(body);
             await db('LPUSH', `room:${room}`, encodeURIComponent(bodyStr));
