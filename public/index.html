@@ -1223,6 +1223,26 @@
             border-radius:var(--radius-sm); padding:16px 10px;
             color:var(--ge-primary); margin-bottom:14px; user-select:all;
         }
+        .ge-group-id-refresh-btn {
+            flex-shrink:0; width:48px;
+            border-radius:var(--radius-sm); border:1.5px solid var(--border-base);
+            background:var(--bg-input); color:var(--ge-primary);
+            display:flex; align-items:center; justify-content:center;
+            cursor:pointer; transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), transform .15s ease;
+        }
+        .ge-group-id-refresh-btn:hover { background: var(--ge-primary-soft); border-color: var(--ge-primary); }
+        .ge-group-id-refresh-btn:active { transform: scale(0.9); }
+        .ge-group-id-refresh-btn svg { transition: transform .5s cubic-bezier(.4,0,.2,1); }
+        .ge-group-id-refresh-btn.spinning { pointer-events:none; opacity:0.8; }
+        .ge-group-id-refresh-btn.spinning svg { animation: ge-id-spin .7s linear infinite; }
+        @keyframes ge-id-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .ge-group-id-box.ge-id-swap { animation: ge-id-swap .4s var(--ease); }
+        @keyframes ge-id-swap {
+            0%   { opacity: 1; transform: scale(1); }
+            40%  { opacity: 0; transform: scale(0.9) rotateX(90deg); }
+            60%  { opacity: 0; transform: scale(0.9) rotateX(-90deg); }
+            100% { opacity: 1; transform: scale(1) rotateX(0); }
+        }
         .ge-group-copy-btn {
             width:100%; padding:12px; border-radius:var(--radius-sm);
             background:var(--ge-primary-soft); border:none; color:var(--ge-primary);
@@ -1867,7 +1887,12 @@
             <p class="ge-group-modal-sub" id="ge-group-info-count">Участников: 0</p>
             <div id="ge-group-info-id-wrap" class="ge-hidden">
                 <label class="ge-group-field-label" style="margin-top:10px;">ID группы</label>
-                <div class="ge-group-id-box" id="ge-group-info-id">—</div>
+                <div style="display:flex; align-items:stretch; gap:8px; margin-bottom:14px;">
+                    <div class="ge-group-id-box" id="ge-group-info-id" style="flex:1; margin-bottom:0;">—</div>
+                    <button id="ge-group-id-refresh-btn" class="ge-group-id-refresh-btn ge-hidden" title="Сменить ID группы" onclick="geEngine.groups.changeGroupId()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.4-6.4L21 8"/><polyline points="21 3 21 8 16 8"/><path d="M21 12a9 9 0 0 1-15.4 6.4L3 16"/><polyline points="3 21 3 16 8 16"/></svg>
+                    </button>
+                </div>
                 <button class="ge-group-copy-btn" onclick="geEngine.groups.copyId(document.getElementById('ge-group-info-id').innerText, this)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     <span>Скопировать</span>
@@ -4041,8 +4066,66 @@
                     document.getElementById('ge-group-info-id-wrap').classList.toggle('ge-hidden', !showIdBox);
                     if (showIdBox) document.getElementById('ge-group-info-id').innerText = displayId;
                     document.getElementById('ge-group-info-owner-actions').classList.toggle('ge-hidden', !showDeleteBtn);
+                    document.getElementById('ge-group-id-refresh-btn').classList.toggle('ge-hidden', !showDeleteBtn);
                 },
                 closeInfo() { geEngine.ui._closeModal('ge-modal-group-info'); },
+
+                // ── Смена ID группы (только владелец): старый ID освобождается ──
+                async changeGroupId() {
+                    const rid = geEngine.state.activeRoom;
+                    if (!geEngine.groups._isRealGroup(rid)) return;
+                    if (!confirm('Сменить ID группы? Старый ID перестанет работать и освободится, новый увидят все участники.')) return;
+
+                    const btn = document.getElementById('ge-group-id-refresh-btn');
+                    btn.classList.add('spinning');
+                    try {
+                        const res = await fetch(`/api/index?action=changeGroupId&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(rid)}`);
+                        const data = await res.json();
+                        if (data.status !== 'ok') {
+                            geEngine.ui.showToast(data.message || 'Не удалось сменить ID группы', 'error');
+                            return;
+                        }
+                        const { oldId, newId, name, memberCount } = data;
+
+                        // Переносим локальные ссылки со старого ID на новый
+                        geEngine.state.localRooms = geEngine.state.localRooms.filter(id => id !== oldId);
+                        if (!geEngine.state.localRooms.includes(newId)) geEngine.state.localRooms.push(newId);
+                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+
+                        geEngine.state.createdRooms = geEngine.state.createdRooms.filter(id => id !== oldId);
+                        if (!geEngine.state.createdRooms.includes(newId)) geEngine.state.createdRooms.push(newId);
+                        localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
+
+                        delete geEngine.state.groupProfiles[oldId];
+                        geEngine.state.groupProfiles[newId] = { name, memberCount, isOwner: true };
+
+                        if (geEngine.state.roomLastTime && geEngine.state.roomLastTime[oldId] != null) {
+                            geEngine.state.roomLastTime[newId] = geEngine.state.roomLastTime[oldId];
+                            delete geEngine.state.roomLastTime[oldId];
+                            localStorage.setItem('ge_room_times', JSON.stringify(geEngine.state.roomLastTime));
+                        }
+
+                        // Если этот чат сейчас открыт у нас — переключаемся на новый ID незаметно
+                        if (geEngine.state.activeRoom === oldId) {
+                            geEngine.state.activeRoom = newId;
+                            geEngine.chat._lastMessages = null;
+                        }
+
+                        // Красивая анимация смены значения в ID-боксе
+                        const idBox = document.getElementById('ge-group-info-id');
+                        idBox.classList.remove('ge-id-swap');
+                        void idBox.offsetWidth; // рестарт анимации
+                        idBox.classList.add('ge-id-swap');
+                        setTimeout(() => { idBox.innerText = newId; }, 200);
+
+                        geEngine.ui.showToast('ID группы обновлён', 'success');
+                        geEngine.chat.refresh();
+                    } catch (e) {
+                        geEngine.ui.showToast('Ошибка соединения с сервером', 'error');
+                    } finally {
+                        btn.classList.remove('spinning');
+                    }
+                },
 
                 // ── Удаление группы навсегда (только владелец) ────────────
                 async deleteGroup() {
