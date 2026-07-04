@@ -1185,6 +1185,24 @@
             border-radius:50%; background: var(--ge-primary-soft); color: var(--ge-success);
         }
 
+        .ge-group-avatar-edit { position:relative; width:72px; margin:0 auto; }
+        .ge-group-avatar-edit.editable { cursor:pointer; }
+        .ge-group-avatar-pencil {
+            position:absolute; right:-2px; bottom:-2px;
+            width:26px; height:26px; border-radius:50%;
+            background: var(--ge-primary); color:#fff;
+            display:flex; align-items:center; justify-content:center;
+            border:2px solid var(--bg-panel);
+        }
+        .ge-group-name-edit-btn {
+            width:26px; height:26px; border-radius:50%; border:none;
+            background:transparent; color:var(--text-secondary);
+            display:inline-flex; align-items:center; justify-content:center;
+            cursor:pointer; vertical-align:middle; margin-left:4px;
+            transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+        }
+        .ge-group-name-edit-btn:hover { background: var(--bg-input); color: var(--ge-primary); }
+
         .ge-group-action-list { display:flex; flex-direction:column; gap:12px; margin-bottom:22px; }
         .ge-group-action-btn {
             display:flex; align-items:center; gap:14px;
@@ -1882,8 +1900,31 @@
     <!-- Информация о группе -->
     <div id="ge-modal-group-info" class="ge-modal-overlay" onclick="if(event.target===this)geEngine.groups.closeInfo()">
         <div class="ge-modal-content ge-group-modal-sm" style="text-align:center;">
-            <div class="ge-user-av" id="ge-group-info-av" style="width:72px;height:72px;font-size:26px;margin:0 auto 14px;">#</div>
-            <h2 class="ge-group-modal-title" id="ge-group-info-name">Название группы</h2>
+            <div class="ge-group-avatar-edit" id="ge-group-info-av-wrap" onclick="geEngine.groups.triggerAvatarUpload()">
+                <div class="ge-user-av" id="ge-group-info-av" style="width:72px;height:72px;font-size:26px;margin:0 auto;">#</div>
+                <div class="ge-group-avatar-pencil ge-hidden" id="ge-group-info-av-pencil">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                </div>
+            </div>
+            <input type="file" id="ge-group-avatar-input" accept="image/*" class="ge-hidden" onchange="geEngine.groups.handleAvatarUpload(this)">
+
+            <div id="ge-group-info-name-display" style="margin-top:14px;">
+                <h2 class="ge-group-modal-title" id="ge-group-info-name" style="display:inline;">Название группы</h2>
+                <button id="ge-group-info-name-edit-btn" class="ge-group-name-edit-btn ge-hidden" title="Изменить название" onclick="geEngine.groups.startRenaming()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                </button>
+            </div>
+            <div id="ge-group-info-name-edit" class="ge-hidden" style="margin-top:14px; display:flex; gap:8px; align-items:center;">
+                <input type="text" id="ge-group-info-name-input" class="ge-input-core" maxlength="60" style="margin:0; flex:1;"
+                       onkeydown="if(event.key==='Enter')geEngine.groups.submitRename(); if(event.key==='Escape')geEngine.groups.cancelRenaming();">
+                <button class="ge-group-id-refresh-btn" title="Сохранить" onclick="geEngine.groups.submitRename()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </button>
+                <button class="ge-group-id-refresh-btn" title="Отмена" onclick="geEngine.groups.cancelRenaming()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
             <p class="ge-group-modal-sub" id="ge-group-info-count">Участников: 0</p>
             <div id="ge-group-info-id-wrap" class="ge-hidden">
                 <label class="ge-group-field-label" style="margin-top:10px;">ID группы</label>
@@ -2901,7 +2942,7 @@
                                 const res = await fetch(`/api/index?action=getGroupInfo&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(rid)}`);
                                 const data = await res.json();
                                 if (data.status === 'ok') {
-                                    geEngine.state.groupProfiles[rid] = { name: data.name, memberCount: data.memberCount, isOwner: data.isOwner };
+                                    geEngine.state.groupProfiles[rid] = { name: data.name, memberCount: data.memberCount, isOwner: data.isOwner, avImg: data.avImg };
                                     if (data.isOwner && !geEngine.state.createdRooms.includes(rid)) {
                                         geEngine.state.createdRooms.push(rid);
                                         localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
@@ -2945,6 +2986,7 @@
                             if (groupProfile && groupProfile.name) {
                                 displayName = groupProfile.name;
                                 subtitle = `Группа • ${groupProfile.memberCount} уч.`;
+                                if (groupProfile.avImg) avImg = groupProfile.avImg;
                             } else {
                                 displayName = 'Загрузка…';
                             }
@@ -3734,6 +3776,13 @@
                                 }
                             } catch {}
                         }
+                    } else if (geEngine.groups._isRealGroup(id)) {
+                        // Групповой чат — если аватар уже есть в кэше, показываем сразу
+                        const cached = geEngine.state.groupProfiles[id];
+                        if (cached && cached.avImg) {
+                            activeAv.style.background = '';
+                            activeAv.innerHTML = `<img src="${cached.avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
+                        }
                     }
 
                     const footer = document.querySelector('.ge-footer');
@@ -3856,6 +3905,20 @@
             },
 
             groups: {
+                // Обновляет шапку открытого чата (имя+аватар), если это активная группа
+                _applyHeaderIfActive(rid, name, avImg) {
+                    if (geEngine.state.activeRoom !== rid) return;
+                    if (name) document.getElementById('ge-active-name').innerText = name;
+                    const activeAv = document.getElementById('ge-active-av');
+                    if (avImg) {
+                        activeAv.style.background = '';
+                        activeAv.innerHTML = `<img src="${avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
+                    } else if (name) {
+                        activeAv.innerHTML = name[0] ? name[0].toUpperCase() : '#';
+                        activeAv.style.background = 'var(--ge-accent-gradient)';
+                    }
+                },
+
                 // Быстрая проверка (без троттлинга) — существует ли ещё открытая прямо сейчас
                 // группа. В отличие от общей сверки списка (раз в ~10-20с), это нужно быстрее,
                 // т.к. пользователь смотрит именно на этот чат прямо сейчас.
@@ -3866,7 +3929,8 @@
                         const res = await fetch(`/api/index?action=getGroupInfo&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(rid)}`);
                         const data = await res.json();
                         if (data.status === 'ok') {
-                            geEngine.state.groupProfiles[rid] = { name: data.name, memberCount: data.memberCount, isOwner: data.isOwner };
+                            geEngine.state.groupProfiles[rid] = { name: data.name, memberCount: data.memberCount, isOwner: data.isOwner, avImg: data.avImg };
+                            geEngine.groups._applyHeaderIfActive(rid, data.name, data.avImg);
                         } else if (res.status === 404 && geEngine.state.activeRoom === rid) {
                             geEngine.groups._forgetDeletedGroup(rid);
                         }
@@ -3915,7 +3979,7 @@
                         if (!geEngine.state.createdRooms.includes(groupId)) geEngine.state.createdRooms.push(groupId);
                         localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
                         localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
-                        geEngine.state.groupProfiles[groupId] = { name: groupName, memberCount: 1, isOwner: true };
+                        geEngine.state.groupProfiles[groupId] = { name: groupName, memberCount: 1, isOwner: true, avImg: null };
 
                         geEngine.groups._pendingOpenAfterCreated = { id: groupId, name: groupName };
                         geEngine.groups.closeCreate();
@@ -3983,7 +4047,7 @@
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                         if (!geEngine.state.localRooms.includes(data.groupId)) geEngine.state.localRooms.push(data.groupId);
                         localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                        geEngine.state.groupProfiles[data.groupId] = { name: data.name, memberCount: data.memberCount, isOwner: false };
+                        geEngine.state.groupProfiles[data.groupId] = { name: data.name, memberCount: data.memberCount, isOwner: false, avImg: data.avImg };
 
                         geEngine.groups.closeJoin();
                         geEngine.ui.showToast(`Вы вступили в группу «${data.name}»`, 'success');
@@ -4036,7 +4100,7 @@
                         const res = await fetch(`/api/index?action=getGroupInfo&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(rid)}`);
                         const data = await res.json();
                         if (data.status === 'ok') {
-                            geEngine.state.groupProfiles[rid] = { name: data.name, memberCount: data.memberCount, isOwner: data.isOwner, isGeneral: !!data.isGeneral };
+                            geEngine.state.groupProfiles[rid] = { name: data.name, memberCount: data.memberCount, isOwner: data.isOwner, isGeneral: !!data.isGeneral, avImg: data.avImg };
                             if (data.isOwner && !geEngine.state.createdRooms.includes(rid)) {
                                 geEngine.state.createdRooms.push(rid);
                                 localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
@@ -4054,21 +4118,124 @@
                     // Для General ID-бокс показываем всегда (это её постоянный, известный всем ID),
                     // а кнопку удаления навсегда — никогда, т.к. General удалить нельзя
                     const showIdBox = isOwner || isGeneral;
-                    const showDeleteBtn = isOwner && !isGeneral;
+                    const canManage = isOwner && !isGeneral; // менять аватар/название/ID можно только владельцу настоящей группы
                     const displayId = isGeneral ? '00000000' : rid;
+                    const avImg = profile && profile.avImg;
 
-                    document.getElementById('ge-group-info-name').innerText = name;
+                    // Пока идёт переименование — не затираем то, что человек печатает
+                    if (!geEngine.groups._isRenaming) {
+                        document.getElementById('ge-group-info-name').innerText = name;
+                    }
                     document.getElementById('ge-group-info-count').innerText = `Участников: ${count}`;
                     const av = document.getElementById('ge-group-info-av');
-                    av.style.background = 'var(--ge-accent-gradient)';
-                    av.innerText = name[0] ? name[0].toUpperCase() : '#';
+                    if (avImg) {
+                        av.style.background = '';
+                        av.innerHTML = `<img src="${avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
+                    } else {
+                        av.innerHTML = '';
+                        av.style.background = 'var(--ge-accent-gradient)';
+                        av.innerText = name[0] ? name[0].toUpperCase() : '#';
+                    }
 
                     document.getElementById('ge-group-info-id-wrap').classList.toggle('ge-hidden', !showIdBox);
                     if (showIdBox) document.getElementById('ge-group-info-id').innerText = displayId;
-                    document.getElementById('ge-group-info-owner-actions').classList.toggle('ge-hidden', !showDeleteBtn);
-                    document.getElementById('ge-group-id-refresh-btn').classList.toggle('ge-hidden', !showDeleteBtn);
+                    document.getElementById('ge-group-info-owner-actions').classList.toggle('ge-hidden', !canManage);
+                    document.getElementById('ge-group-id-refresh-btn').classList.toggle('ge-hidden', !canManage);
+                    document.getElementById('ge-group-info-av-wrap').classList.toggle('editable', canManage);
+                    document.getElementById('ge-group-info-av-pencil').classList.toggle('ge-hidden', !canManage);
+                    document.getElementById('ge-group-info-name-edit-btn').classList.toggle('ge-hidden', !canManage);
                 },
-                closeInfo() { geEngine.ui._closeModal('ge-modal-group-info'); },
+                closeInfo() {
+                    geEngine.groups.cancelRenaming();
+                    geEngine.ui._closeModal('ge-modal-group-info');
+                },
+
+                // ── Аватар группы (только владелец) ──────────────────────
+                triggerAvatarUpload() {
+                    const rid = geEngine.state.activeRoom;
+                    const profile = geEngine.state.groupProfiles[rid];
+                    if (!geEngine.groups._isRealGroup(rid) || !(profile && profile.isOwner)) return;
+                    document.getElementById('ge-group-avatar-input').click();
+                },
+                handleAvatarUpload(input) {
+                    const file = input.files[0];
+                    if (!file) return;
+                    const rid = geEngine.state.activeRoom;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            // Сжимаем до 200x200, кроп по центру — как и для аватара пользователя
+                            const canvas = document.createElement('canvas');
+                            canvas.width = 200; canvas.height = 200;
+                            const ctx = canvas.getContext('2d');
+                            const size = Math.min(img.width, img.height);
+                            const sx = (img.width - size) / 2;
+                            const sy = (img.height - size) / 2;
+                            ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200);
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                            geEngine.groups._saveGroupProfile(rid, { avImg: dataUrl });
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                    input.value = '';
+                },
+
+                // ── Название группы (только владелец) ────────────────────
+                _isRenaming: false,
+                startRenaming() {
+                    const rid = geEngine.state.activeRoom;
+                    const profile = geEngine.state.groupProfiles[rid];
+                    if (!geEngine.groups._isRealGroup(rid) || !(profile && profile.isOwner)) return;
+                    geEngine.groups._isRenaming = true;
+                    document.getElementById('ge-group-info-name-display').classList.add('ge-hidden');
+                    const input = document.getElementById('ge-group-info-name-input');
+                    input.value = document.getElementById('ge-group-info-name').innerText;
+                    document.getElementById('ge-group-info-name-edit').classList.remove('ge-hidden');
+                    input.focus(); input.select();
+                },
+                cancelRenaming() {
+                    geEngine.groups._isRenaming = false;
+                    document.getElementById('ge-group-info-name-edit').classList.add('ge-hidden');
+                    document.getElementById('ge-group-info-name-display').classList.remove('ge-hidden');
+                },
+                submitRename() {
+                    const rid = geEngine.state.activeRoom;
+                    const newName = document.getElementById('ge-group-info-name-input').value.trim();
+                    geEngine.groups._isRenaming = false;
+                    document.getElementById('ge-group-info-name-edit').classList.add('ge-hidden');
+                    document.getElementById('ge-group-info-name-display').classList.remove('ge-hidden');
+                    if (!newName || newName === document.getElementById('ge-group-info-name').innerText) return;
+                    geEngine.groups._saveGroupProfile(rid, { name: newName });
+                },
+
+                // Общее сохранение названия/аватарки группы на сервере — видно всем участникам
+                async _saveGroupProfile(rid, { name, avImg } = {}) {
+                    try {
+                        const res = await fetch(`/api/index?action=updateGroupProfile&user_email=${encodeURIComponent(geEngine.state.session.email)}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ groupId: rid, name, avImg }),
+                        });
+                        const data = await res.json();
+                        if (data.status !== 'ok') {
+                            geEngine.ui.showToast(data.message || 'Не удалось сохранить изменения', 'error');
+                            return;
+                        }
+                        const prev = geEngine.state.groupProfiles[rid] || {};
+                        geEngine.state.groupProfiles[rid] = { ...prev, name: data.name, avImg: data.avImg };
+
+                        if (geEngine.state.activeRoom === rid) {
+                            geEngine.groups._fillInfo(rid, geEngine.state.groupProfiles[rid]);
+                        }
+                        geEngine.groups._applyHeaderIfActive(rid, data.name, data.avImg);
+                        geEngine.ui.showToast('Изменения сохранены', 'success');
+                        geEngine.chat.refresh();
+                    } catch (e) {
+                        geEngine.ui.showToast('Ошибка соединения с сервером', 'error');
+                    }
+                },
 
                 // ── Смена ID группы (только владелец): старый ID освобождается ──
                 async changeGroupId() {
@@ -4097,7 +4264,7 @@
                         localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
 
                         delete geEngine.state.groupProfiles[oldId];
-                        geEngine.state.groupProfiles[newId] = { name, memberCount, isOwner: true };
+                        geEngine.state.groupProfiles[newId] = { name, memberCount, isOwner: true, avImg };
 
                         if (geEngine.state.roomLastTime && geEngine.state.roomLastTime[oldId] != null) {
                             geEngine.state.roomLastTime[newId] = geEngine.state.roomLastTime[oldId];
