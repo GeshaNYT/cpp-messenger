@@ -385,7 +385,23 @@ export default async function handler(request, response) {
             const jwtEmail   = await tryAuth(request, env.jwt);
             const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
 
-            const groupId = request.query.groupId.toString().trim().toUpperCase();
+            const groupIdRaw = request.query.groupId.toString().trim();
+            const groupId = groupIdRaw.toUpperCase();
+
+            // Общий канал General не хранится в group:* — считаем участников иначе
+            // (в него автоматически входят все зарегистрированные пользователи)
+            if (groupIdRaw.toLowerCase() === 'general' || groupId === GENERAL_GROUP_ID) {
+                const memberCount = await db('SCARD', 'all_users');
+                return response.status(200).json({
+                    status: 'ok',
+                    groupId: 'general',
+                    name: 'general',
+                    memberCount,
+                    isOwner: false,
+                    isGeneral: true,
+                });
+            }
+
             const exists  = await db('EXISTS', `group:${groupId}`);
             if (!exists) return response.status(404).json({ status: 'error', message: 'Группа не найдена' });
 
