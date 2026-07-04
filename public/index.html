@@ -4074,7 +4074,7 @@
                 async changeGroupId() {
                     const rid = geEngine.state.activeRoom;
                     if (!geEngine.groups._isRealGroup(rid)) return;
-                    if (!confirm('Сменить ID группы? Старый ID перестанет работать и освободится, новый увидят все участники.')) return;
+                    if (!confirm('Сменить ID группы? Старый ID перестанет работать и освободится. Новый ID увидите только вы как владелец — остальным участникам, кто уже в группе, ничего сообщать не нужно.')) return;
 
                     const btn = document.getElementById('ge-group-id-refresh-btn');
                     btn.classList.add('spinning');
