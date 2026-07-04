@@ -3955,7 +3955,8 @@
                 // ── Информация о группе ───────────────────────────────────
                 async openInfo() {
                     const rid = geEngine.state.activeRoom;
-                    if (!geEngine.groups._isRealGroup(rid)) return;
+                    const isGeneral = rid === 'general';
+                    if (!isGeneral && !geEngine.groups._isRealGroup(rid)) return;
 
                     geEngine.groups._fillInfo(rid, geEngine.state.groupProfiles[rid]);
                     geEngine.ui._openModal('ge-modal-group-info');
@@ -3964,7 +3965,7 @@
                         const res = await fetch(`/api/index?action=getGroupInfo&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(rid)}`);
                         const data = await res.json();
                         if (data.status === 'ok') {
-                            geEngine.state.groupProfiles[rid] = { name: data.name, memberCount: data.memberCount, isOwner: data.isOwner };
+                            geEngine.state.groupProfiles[rid] = { name: data.name, memberCount: data.memberCount, isOwner: data.isOwner, isGeneral: !!data.isGeneral };
                             if (data.isOwner && !geEngine.state.createdRooms.includes(rid)) {
                                 geEngine.state.createdRooms.push(rid);
                                 localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
@@ -3978,6 +3979,12 @@
                     const name = (profile && profile.name) || rid;
                     const count = profile ? profile.memberCount : '…';
                     const isOwner = !!(profile && profile.isOwner);
+                    const isGeneral = rid === 'general' || !!(profile && profile.isGeneral);
+                    // Для General ID-бокс показываем всегда (это её постоянный, известный всем ID),
+                    // а кнопку удаления навсегда — никогда, т.к. General удалить нельзя
+                    const showIdBox = isOwner || isGeneral;
+                    const showDeleteBtn = isOwner && !isGeneral;
+                    const displayId = isGeneral ? '00000000' : rid;
 
                     document.getElementById('ge-group-info-name').innerText = name;
                     document.getElementById('ge-group-info-count').innerText = `Участников: ${count}`;
@@ -3985,9 +3992,9 @@
                     av.style.background = 'var(--ge-accent-gradient)';
                     av.innerText = name[0] ? name[0].toUpperCase() : '#';
 
-                    document.getElementById('ge-group-info-id-wrap').classList.toggle('ge-hidden', !isOwner);
-                    if (isOwner) document.getElementById('ge-group-info-id').innerText = rid;
-                    document.getElementById('ge-group-info-owner-actions').classList.toggle('ge-hidden', !isOwner);
+                    document.getElementById('ge-group-info-id-wrap').classList.toggle('ge-hidden', !showIdBox);
+                    if (showIdBox) document.getElementById('ge-group-info-id').innerText = displayId;
+                    document.getElementById('ge-group-info-owner-actions').classList.toggle('ge-hidden', !showDeleteBtn);
                 },
                 closeInfo() { geEngine.ui._closeModal('ge-modal-group-info'); },
 
