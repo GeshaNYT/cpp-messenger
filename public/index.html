@@ -2815,9 +2815,9 @@
                     // Подтягиваем реальное время последнего сообщения с сервера для КАЖДОЙ комнаты
                     // (а не только активной) — это чинит синхронизацию порядка чатов между устройствами.
                     // Делаем это не на каждый 6-секундный опрос (это было тяжело для сети и дёргало
-                    // список/аватарки), а раз в ~20 секунд. Порядок между сканированиями всё равно
+                    // список/аватарки), а раз в ~12 секунд. Порядок между сканированиями всё равно
                     // держится актуальным за счёт оптимистичного обновления roomLastTime при отправке.
-                    const needsSweep = (Date.now() - geEngine.ui._lastRoomTimesSweep) > 20000;
+                    const needsSweep = (Date.now() - geEngine.ui._lastRoomTimesSweep) > 12000;
                     if (tab !== 'calls' && needsSweep) {
                         geEngine.ui._lastRoomTimesSweep = Date.now();
                         await Promise.all(filtered.map(async rid => {
@@ -2849,11 +2849,11 @@
                     });
 
                     // Подгружаем профили контактов включая avImg. Кешируем результат и обновляем
-                    // не чаще раза в ~20 секунд — иначе аватарки/имена каждые 6 секунд на миг
+                    // не чаще раза в ~12 секунд — иначе аватарки/имена каждые 6 секунд на миг
                     // сбрасывались на дефолтную букву, пока шёл повторный запрос ("мигание").
                     if (!geEngine.ui._contactProfilesCache) geEngine.ui._contactProfilesCache = {};
                     const contactProfiles = geEngine.ui._contactProfilesCache;
-                    const needsProfileSweep = (Date.now() - geEngine.ui._lastProfilesSweep) > 20000;
+                    const needsProfileSweep = (Date.now() - geEngine.ui._lastProfilesSweep) > 12000;
                     if (needsProfileSweep) {
                         geEngine.ui._lastProfilesSweep = Date.now();
                         await Promise.all(filtered.filter(rid => rid.startsWith('private-')).map(async rid => {
@@ -3602,6 +3602,14 @@
                         // Обновляем список чатов тихо (без сброса скролла)
                         await geEngine.ui.renderChatList(allRooms);
 
+                        // Если сейчас открыта настоящая группа — проверяем её существование на
+                        // КАЖДЫЙ тик (не по троттлингу общего списка), чтобы если её удалили,
+                        // это стало понятно быстро, а не только при следующей плановой сверке
+                        // всего списка раз в ~12 секунд.
+                        if (geEngine.groups._isRealGroup(geEngine.state.activeRoom)) {
+                            geEngine.groups._checkActiveGroupAlive(geEngine.state.activeRoom);
+                        }
+
                         if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
                             if(geEngine.state.activeTab !== 'calls') {
                                 const newMessages = JSON.stringify(data.messages?.result);
@@ -3659,12 +3667,16 @@
                     } catch (e) {}
                     geEngine.chat.refresh();
                 },
-                async open(id, prettyName) {
+                async open(id, prettyName, knownEmpty) {
                     geEngine.state.activeRoom = id;
                     geEngine.chat._lastMessages = null; // сбрасываем кэш при смене чата
                     document.getElementById('ge-active-name').innerText = prettyName || id;
-                    // Сразу очищаем сообщения при смене чата
-                    document.getElementById('ge-msg-container').innerHTML = '<div style="text-align:center;padding:20px;opacity:0.4;font-size:13px;">Загрузка...</div>';
+                    // Сразу очищаем сообщения при смене чата.
+                    // Если точно знаем, что чат новый и пустой (только что создали/вступили) —
+                    // сразу показываем пустое состояние, а не мигаем "Загрузка...".
+                    document.getElementById('ge-msg-container').innerHTML = knownEmpty
+                        ? '<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Здесь пока нет сообщений.</div>'
+                        : '<div style="text-align:center;padding:20px;opacity:0.4;font-size:13px;">Загрузка...</div>';
                     if (window.innerWidth <= 768) {
                         document.getElementById('ge-main-app').classList.add('mobile-chat-open');
                     }
@@ -3819,6 +3831,26 @@
             },
 
             groups: {
+                // Быстрая проверка (без троттлинга) — существует ли ещё открытая прямо сейчас
+                // группа. В отличие от общей сверки списка (раз в ~10-20с), это нужно быстрее,
+                // т.к. пользователь смотрит именно на этот чат прямо сейчас.
+                async _checkActiveGroupAlive(rid) {
+                    if (geEngine.groups._checkingActive === rid) return; // уже проверяем
+                    geEngine.groups._checkingActive = rid;
+                    try {
+                        const res = await fetch(`/api/index?action=getGroupInfo&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(rid)}`);
+                        const data = await res.json();
+                        if (data.status === 'ok') {
+                            geEngine.state.groupProfiles[rid] = { name: data.name, memberCount: data.memberCount, isOwner: data.isOwner };
+                        } else if (res.status === 404 && geEngine.state.activeRoom === rid) {
+                            geEngine.groups._forgetDeletedGroup(rid);
+                        }
+                    } catch (e) {
+                    } finally {
+                        if (geEngine.groups._checkingActive === rid) geEngine.groups._checkingActive = null;
+                    }
+                },
+
                 _pendingOpenAfterCreated: null,
 
                 _isRealGroup(rid) {
@@ -3878,7 +3910,7 @@
                     geEngine.ui._closeModal('ge-modal-group-created');
                     const pending = geEngine.groups._pendingOpenAfterCreated;
                     geEngine.groups._pendingOpenAfterCreated = null;
-                    if (pending) geEngine.chat.open(pending.id, pending.name);
+                    if (pending) geEngine.chat.open(pending.id, pending.name, true);
                     geEngine.chat.refresh();
                 },
 
