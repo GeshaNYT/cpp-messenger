@@ -70,6 +70,8 @@ function parseHash(raw) {
 
 // ── Генерация ID группы: 8 символов, A-Z0-9 ──────────────────
 const GROUP_ID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+// Зарезервированный ID общего канала General — никогда не выдаётся новым группам
+const GENERAL_GROUP_ID = '00000000';
 function genGroupId() {
     const bytes = crypto.getRandomValues(new Uint8Array(8));
     let id = '';
@@ -78,9 +80,11 @@ function genGroupId() {
 }
 
 // Генерирует ID и проверяет через EXISTS, что такой группы ещё нет
+// (а также что это не зарезервированный ID General)
 async function generateUniqueGroupId(db) {
     for (let attempt = 0; attempt < 25; attempt++) {
         const id = genGroupId();
+        if (id === GENERAL_GROUP_ID) continue;
         const exists = await db('EXISTS', `group:${id}`);
         if (!exists) return id;
     }
@@ -345,6 +349,24 @@ export default async function handler(request, response) {
             if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
 
             const groupId = request.query.groupId.toString().trim().toUpperCase();
+
+            // Зарезервированный ID 00000000 — это общий канал General, а не отдельная группа.
+            // Никакой новой группы не создаём: просто добавляем комнату 'general' пользователю,
+            // если он ещё не состоит в ней (повторное вступление не выполняем).
+            if (groupId === GENERAL_GROUP_ID) {
+                const alreadyMember = !!(await db('SISMEMBER', 'user_rooms:' + emailLower, 'general'));
+                if (!alreadyMember) {
+                    await db('SADD', `user_rooms:${emailLower}`, 'general');
+                    await db('SADD', 'all_users', emailLower);
+                }
+                return response.status(200).json({
+                    status: 'ok',
+                    groupId: 'general',
+                    name: 'general',
+                    alreadyMember,
+                });
+            }
+
             const exists  = await db('EXISTS', `group:${groupId}`);
             if (!exists) return response.status(404).json({ status: 'error', message: 'Группа с таким ID не найдена' });
 
@@ -400,6 +422,12 @@ export default async function handler(request, response) {
             if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
 
             const groupId = request.query.groupId.toString().trim().toUpperCase();
+
+            // ID 00000000 зарезервирован за General — его нельзя удалить ни при каких условиях
+            if (groupId === GENERAL_GROUP_ID) {
+                return response.status(403).json({ status: 'error', message: 'ID 00000000 зарезервирован и не может быть удалён' });
+            }
+
             const owner    = await db('HGET', `group:${groupId}`, 'owner');
             if (!owner) return response.status(404).json({ status: 'error', message: 'Группа не найдена' });
             if (owner !== emailLower) return response.status(403).json({ status: 'error', message: 'Удалить группу может только владелец' });
