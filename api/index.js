@@ -458,6 +458,45 @@ export default async function handler(request, response) {
             return response.status(200).json({ status: 'ok' });
         }
 
+        // Сменить ID группы (только владелец): старый ID полностью освобождается,
+        // новый выдаётся так же, как при создании. Сообщения и участники переносятся.
+        if (action === 'changeGroupId' && request.query.groupId) {
+            const jwtEmail   = await tryAuth(request, env.jwt);
+            const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+            if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
+
+            const oldId = request.query.groupId.toString().trim().toUpperCase();
+
+            // ID 00000000 зарезервирован за General — его нельзя менять
+            if (oldId === GENERAL_GROUP_ID) {
+                return response.status(403).json({ status: 'error', message: 'ID 00000000 зарезервирован и не может быть изменён' });
+            }
+
+            const owner = await db('HGET', `group:${oldId}`, 'owner');
+            if (!owner) return response.status(404).json({ status: 'error', message: 'Группа не найдена' });
+            if (owner !== emailLower) return response.status(403).json({ status: 'error', message: 'Сменить ID может только владелец' });
+
+            const name  = await db('HGET', `group:${oldId}`, 'name');
+            const newId = await generateUniqueGroupId(db);
+
+            // Переносим метаданные и участников группы под новым ключом
+            await db('RENAME', `group:${oldId}`, `group:${newId}`);
+            await db('RENAME', `group_members:${oldId}`, `group_members:${newId}`);
+            // Сообщения переносим, только если они вообще есть (RENAME падает на несуществующем ключе)
+            const hasMessages = await db('EXISTS', `room:${oldId}`);
+            if (hasMessages) await db('RENAME', `room:${oldId}`, `room:${newId}`);
+
+            // У всех участников заменяем старый ID на новый в их списке комнат
+            const members = (await db('SMEMBERS', `group_members:${newId}`)) ?? [];
+            await Promise.all(members.map(async m => {
+                await db('SREM', `user_rooms:${m}`, oldId);
+                await db('SADD', `user_rooms:${m}`, newId);
+            }));
+
+            const memberCount = await db('SCARD', `group_members:${newId}`);
+            return response.status(200).json({ status: 'ok', oldId, newId, name, memberCount });
+        }
+
         // ══════════════════════════════════════════════════════
         //  ОТПРАВИТЬ СООБЩЕНИЕ
         // ══════════════════════════════════════════════════════
