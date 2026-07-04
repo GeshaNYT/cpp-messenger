@@ -2881,6 +2881,11 @@
                                         geEngine.state.createdRooms.push(rid);
                                         localStorage.setItem('ge_created_rooms', JSON.stringify(geEngine.state.createdRooms));
                                     }
+                                } else if (res.status === 404) {
+                                    // Группу удалил владелец — она пропала на сервере, но у нас
+                                    // осталась локально (localStorage) и вечно показывала "Загрузка…".
+                                    // Чистим её у себя: убираем из списка и запрещаем писать в неё.
+                                    geEngine.groups._forgetDeletedGroup(rid);
                                 }
                             } catch {}
                         }));
@@ -3071,6 +3076,7 @@
                     // Контейнер использует flex-direction: column-reverse,
                     // поэтому самое новое сообщение вставляем первым дочерним элементом.
                     container.insertBefore(bubble, container.firstChild);
+                    return bubble;
                 }
             },
 
@@ -3623,6 +3629,7 @@
                     const input = document.getElementById('ge-main-input');
                     const text = input.value.trim();
                     if (!text || !geEngine.state.activeRoom) return;
+                    const targetRoom = geEngine.state.activeRoom;
                     const nowTs = Date.now();
                     const msgObj = { 
                         username: geEngine.state.session.name, email: geEngine.state.session.email, text: text,
@@ -3634,14 +3641,21 @@
 
                     // Показываем сообщение сразу же, не дожидаясь ответа сервера
                     // или следующего опроса — это и вызывало задержку, особенно на телефоне.
-                    geEngine.ui.appendSentBubble(msgObj);
+                    const bubble = geEngine.ui.appendSentBubble(msgObj);
 
                     // Обновляем время комнаты при отправке (оптимистично, для мгновенного отклика в UI)
                     if (!geEngine.state.roomLastTime) geEngine.state.roomLastTime = {};
-                    geEngine.state.roomLastTime[geEngine.state.activeRoom] = nowTs;
+                    geEngine.state.roomLastTime[targetRoom] = nowTs;
                     localStorage.setItem('ge_room_times', JSON.stringify(geEngine.state.roomLastTime));
                     try {
-                        await fetch(`/api/index?room=${encodeURIComponent(geEngine.state.activeRoom)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, { method: 'POST', body: payload });
+                        const res = await fetch(`/api/index?room=${encodeURIComponent(targetRoom)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, { method: 'POST', body: payload });
+                        if (res.status === 410) {
+                            // Группу удалил владелец прямо сейчас, пока мы печатали — сервер
+                            // отклонил сообщение. Откатываем оптимистичный пузырёк и чистим у себя.
+                            if (bubble && bubble.parentNode) bubble.parentNode.removeChild(bubble);
+                            geEngine.groups._forgetDeletedGroup(targetRoom);
+                            return;
+                        }
                     } catch (e) {}
                     geEngine.chat.refresh();
                 },
@@ -4018,7 +4032,26 @@
                         return;
                     }
 
-                    geEngine.state.deletedRooms.push(rid);
+                    geEngine.groups._localCleanupAfterDeletion(rid);
+                    geEngine.ui.showToast('Группа удалена', 'success');
+                    geEngine.chat.refresh();
+                },
+
+                // Группа исчезла на сервере (владелец удалил её), а у нас на этом устройстве
+                // она всё ещё числилась локально — убираем её у себя и предупреждаем, если
+                // как раз сейчас был открыт её чат.
+                _forgetDeletedGroup(rid) {
+                    if (geEngine.state.deletedRooms.includes(rid) && !geEngine.state.localRooms.includes(rid)) return; // уже почищено
+                    const wasOpen = geEngine.state.activeRoom === rid;
+                    geEngine.groups._localCleanupAfterDeletion(rid);
+                    if (wasOpen) geEngine.ui.showToast('Эта группа была удалена владельцем', 'info');
+                    geEngine.chat.refresh();
+                },
+
+                // Общая локальная очистка: убрать комнату из списков и, если её чат открыт,
+                // закрыть его (без права писать в удалённую группу)
+                _localCleanupAfterDeletion(rid) {
+                    if (!geEngine.state.deletedRooms.includes(rid)) geEngine.state.deletedRooms.push(rid);
                     localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                     geEngine.state.localRooms = geEngine.state.localRooms.filter(id => id !== rid);
                     localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
@@ -4035,8 +4068,6 @@
                         if (footer) footer.style.visibility = 'hidden';
                         if (window.innerWidth <= 768) document.getElementById('ge-main-app').classList.remove('mobile-chat-open');
                     }
-                    geEngine.ui.showToast('Группа удалена', 'success');
-                    geEngine.chat.refresh();
                 },
 
                 // ── Выход из группы (для участников, не владельца) ───────
