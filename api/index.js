@@ -342,6 +342,44 @@ export default async function handler(request, response) {
             return response.status(200).json({ status: 'ok', groupId, name });
         }
 
+        // Изменить название и/или аватар группы (только владелец) — видно всем участникам
+        if (action === 'updateGroupProfile' && request.method === 'POST') {
+            const jwtEmail   = await tryAuth(request, env.jwt);
+            const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+            if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
+
+            const body = request.body ?? {};
+            const groupIdRaw = (body.groupId ?? '').toString().trim();
+            if (!groupIdRaw) return response.status(400).json({ status: 'error', message: 'Не указан ID группы' });
+            const groupId = groupIdRaw.toUpperCase();
+
+            if (groupId === GENERAL_GROUP_ID) {
+                return response.status(403).json({ status: 'error', message: 'Изменить General нельзя' });
+            }
+
+            const owner = await db('HGET', `group:${groupId}`, 'owner');
+            if (!owner) return response.status(404).json({ status: 'error', message: 'Группа не найдена' });
+            if (owner !== emailLower) return response.status(403).json({ status: 'error', message: 'Изменить группу может только владелец' });
+
+            const fields = [];
+            if (typeof body.name === 'string' && body.name.trim()) {
+                fields.push('name', body.name.trim().slice(0, 60));
+            }
+            if (body.avImg !== undefined) {
+                if (body.avImg) fields.push('avImg', body.avImg);
+                else await db('HDEL', `group:${groupId}`, 'avImg');
+            }
+            if (fields.length > 0) await db('HSET', `group:${groupId}`, ...fields);
+
+            const info = parseHash(await db('HGETALL', `group:${groupId}`));
+            return response.status(200).json({
+                status: 'ok',
+                groupId,
+                name: info.name,
+                avImg: info.avImg || null,
+            });
+        }
+
         // Вступить в группу по ID
         if (action === 'joinGroup' && request.query.groupId) {
             const jwtEmail   = await tryAuth(request, env.jwt);
@@ -370,14 +408,14 @@ export default async function handler(request, response) {
             const exists  = await db('EXISTS', `group:${groupId}`);
             if (!exists) return response.status(404).json({ status: 'error', message: 'Группа с таким ID не найдена' });
 
-            const name = await db('HGET', `group:${groupId}`, 'name');
+            const info = parseHash(await db('HGETALL', `group:${groupId}`));
 
             await db('SADD', `group_members:${groupId}`, emailLower);
             await db('SADD', `user_rooms:${emailLower}`, groupId);
             await db('SADD', 'all_users', emailLower);
 
             const memberCount = await db('SCARD', `group_members:${groupId}`);
-            return response.status(200).json({ status: 'ok', groupId, name, memberCount });
+            return response.status(200).json({ status: 'ok', groupId, name: info.name, avImg: info.avImg || null, memberCount });
         }
 
         // Информация о группе (название, кол-во участников; owner виден только владельцу)
@@ -415,6 +453,7 @@ export default async function handler(request, response) {
                 name: info.name,
                 memberCount,
                 isOwner,
+                avImg: info.avImg || null,
             });
         }
 
@@ -477,6 +516,7 @@ export default async function handler(request, response) {
             if (owner !== emailLower) return response.status(403).json({ status: 'error', message: 'Сменить ID может только владелец' });
 
             const name  = await db('HGET', `group:${oldId}`, 'name');
+            const avImg = await db('HGET', `group:${oldId}`, 'avImg');
             const newId = await generateUniqueGroupId(db);
 
             // Переносим метаданные и участников группы под новым ключом
@@ -494,7 +534,7 @@ export default async function handler(request, response) {
             }));
 
             const memberCount = await db('SCARD', `group_members:${newId}`);
-            return response.status(200).json({ status: 'ok', oldId, newId, name, memberCount });
+            return response.status(200).json({ status: 'ok', oldId, newId, name, avImg: avImg || null, memberCount });
         }
 
         // ══════════════════════════════════════════════════════
