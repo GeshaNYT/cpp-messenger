@@ -91,7 +91,17 @@ async function generateUniqueGroupId(db) {
     throw new Error('Не удалось сгенерировать уникальный ID группы');
 }
 
-// ── Основной обработчик ──────────────────────────────────────
+// Публикует системное сообщение в чат группы (о вступлении/выходе участника)
+async function pushSystemMessage(db, roomId, text, email) {
+    const msg = {
+        type: 'system',
+        text,
+        ts: Date.now(),
+        username: 'System',
+        email: email || '',
+    };
+    await db('LPUSH', `room:${roomId}`, encodeURIComponent(JSON.stringify(msg)));
+}
 export default async function handler(request, response) {
     const env = {
         url:   process.env.UPSTASH_URL,
@@ -410,9 +420,15 @@ export default async function handler(request, response) {
 
             const info = parseHash(await db('HGETALL', `group:${groupId}`));
 
+            const wasAlreadyMember = !!(await db('SISMEMBER', `group_members:${groupId}`, emailLower));
             await db('SADD', `group_members:${groupId}`, emailLower);
             await db('SADD', `user_rooms:${emailLower}`, groupId);
             await db('SADD', 'all_users', emailLower);
+
+            if (!wasAlreadyMember) {
+                const myName = (await db('HGET', `profile:${emailLower}`, 'name')) || emailLower;
+                await pushSystemMessage(db, groupId, `${myName} вступил(а) в группу`, emailLower);
+            }
 
             const memberCount = await db('SCARD', `group_members:${groupId}`);
             return response.status(200).json({ status: 'ok', groupId, name: info.name, avImg: info.avImg || null, memberCount });
@@ -464,8 +480,20 @@ export default async function handler(request, response) {
             if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
 
             const groupId = request.query.groupId.toString().trim().toUpperCase();
+
+            const wasMember = !!(await db('SISMEMBER', `group_members:${groupId}`, emailLower));
             await db('SREM', `group_members:${groupId}`, emailLower);
             await db('SREM', `user_rooms:${emailLower}`, groupId);
+
+            // Сообщение о выходе публикуем, только если группа ещё существует
+            // (её не удалили только что владелец) и человек реально в ней состоял
+            if (wasMember) {
+                const stillExists = await db('EXISTS', `group:${groupId}`);
+                if (stillExists) {
+                    const myName = (await db('HGET', `profile:${emailLower}`, 'name')) || emailLower;
+                    await pushSystemMessage(db, groupId, `${myName} покинул(а) группу`, emailLower);
+                }
+            }
 
             return response.status(200).json({ status: 'ok' });
         }
