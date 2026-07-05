@@ -2973,9 +2973,9 @@
 
                     let html = filtered.map(rid => {
                         let displayName = rid;
-                        let avColor = '#444';
-                        let avImg = null;
                         let isGroup = rid === 'general' || !rid.startsWith('private-');
+                        let avColor = isGroup ? 'var(--ge-accent-gradient)' : '#444';
+                        let avImg = null;
                         const groupProfile = geEngine.state.groupProfiles[rid];
                         const isCreator = groupProfile ? !!groupProfile.isOwner : geEngine.state.createdRooms.includes(rid);
                         let subtitle = isGroup ? 'Групповой канал' : 'Активный зашифрованный канал';
