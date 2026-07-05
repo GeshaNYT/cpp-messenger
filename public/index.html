@@ -931,6 +931,20 @@
             flex-direction: column;
         }
 
+        .ge-system-msg {
+            align-self: center;
+            max-width: 80%;
+            text-align: center;
+            font-size: 12.5px;
+            color: var(--text-secondary);
+            background: var(--bg-panel);
+            border: 1px solid var(--border-base);
+            padding: 6px 16px;
+            border-radius: var(--radius-full);
+            opacity: 0.9;
+            animation: ge-msg-pop 0.4s var(--ease);
+        }
+
         @keyframes ge-msg-pop {
             from { opacity: 0; transform: scale(0.9) translateY(10px); }
             to { opacity: 1; transform: scale(1) translateY(0); }
@@ -3043,6 +3057,7 @@
                     const validMessages = (messages || []).filter(raw => {
                         try {
                             const m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw;
+                            if (m.type === 'system') return !!m.text;
                             if (m.username === 'System') return false;
                             if (m.mediaType === 'voice' || m.mediaType === 'circle') return true;
                             return m.text && !m.text.includes('EmailJS');
@@ -3064,6 +3079,11 @@
                         // сообщения нет ts (отправлено до этого фикса) — используем сохранённую строку как запасной вариант.
                         const timeStr = m.ts ? geEngine.ui._fmtTime(m.ts) : (m.time || geEngine.ui._fmtTime(Date.now()));
                         const uid = msgIdCounter++;
+
+                        // СИСТЕМНОЕ СООБЩЕНИЕ (вступление/выход из группы и т.п.)
+                        if (m.type === 'system') {
+                            return `<div class="ge-system-msg">${m.text}</div>`;
+                        }
 
                         // ГОЛОСОВОЕ СООБЩЕНИЕ
                         if (m.mediaType === 'voice') {
