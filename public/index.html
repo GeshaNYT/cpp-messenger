@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeLink Enterprise Messenger | Version 2.9 Better Experience</title>
+    <title>GeLink Enterprise Messenger | Version 3.0 Better Experience</title>
     
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script type="text/javascript">
@@ -339,7 +339,7 @@
             color: var(--ge-primary);
             padding: 8px;
             border-radius: 12px;
-            transition: 0.3s;
+            transition: transform 0.3s var(--ease), background 0.3s, color 0.3s;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -347,6 +347,10 @@
 
         .ge-sidebar-settings-btn:hover {
             color: var(--ge-primary);
+            background: var(--ge-primary-soft);
+        }
+
+        .ge-sidebar-settings-btn.active {
             background: var(--ge-primary-soft);
             transform: rotate(45deg);
         }
@@ -1966,7 +1970,7 @@
     <section id="ge-auth-layer" class="ge-auth-overlay">
         <div class="ge-auth-container">
             <div class="ge-brand-logo">GeLink</div>
-            <p class="ge-auth-tagline">Профессиональный мессенджер v2.9</p>
+            <p class="ge-auth-tagline">Профессиональный мессенджер v3.0</p>
             
             <div class="ge-auth-tabs">
                 <button id="tab-login" class="ge-auth-tab active" onclick="geEngine.auth.switch('login')">Вход</button>
@@ -2129,7 +2133,7 @@
                     </div>
                     
                     <div style="position: relative; overflow: visible; z-index: 99999;">
-                        <button class="ge-sidebar-settings-btn" onclick="geEngine.ui.toggleSettingsMenu(event)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+                        <button id="ge-settings-gear-btn" class="ge-sidebar-settings-btn" onclick="geEngine.ui.toggleSettingsMenu(event)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
                     </div>
                 </div>
 
@@ -2533,7 +2537,7 @@
                 },
                 deleteAccountFull() {
                     // ЗАКРЫВАЕМ МЕНЮ ПРИ НАЖАТИИ
-                    document.getElementById('ge-settings-popup').classList.remove('active');
+                    geEngine.ui.closeSettingsPopup();
 
                     const c1 = confirm("⚠️ ВНИМАНИЕ! Вы собираетесь полностью удалить аккаунт.");
                     if(c1) {
@@ -2553,8 +2557,7 @@
                 tempImg: null,   // base64 новой картинки или false (удалить) или null (не менять)
 
                 open() {
-                    document.getElementById('ge-settings-popup').classList.remove('active');
-                    document.getElementById('ge-settings-popup').style.display = 'none';
+                    geEngine.ui.closeSettingsPopup();
 
                     const session = geEngine.state.session;
                     document.getElementById('prof-name').value = session.name;
@@ -2756,37 +2759,45 @@
                     }, 3200);
                 },
 
+                // Единая функция закрытия меню настроек — используется везде, чтобы шестерёнка
+                // гарантированно возвращалась в исходное положение вместе с закрытием попапа.
+                closeSettingsPopup() {
+                    const popup = document.getElementById('ge-settings-popup');
+                    const btn = document.getElementById('ge-settings-gear-btn');
+                    popup.classList.remove('active');
+                    popup.style.display = 'none';
+                    if (btn) btn.classList.remove('active');
+                },
                 toggleSettingsMenu(e) {
                     e.stopPropagation();
                     const popup = document.getElementById('ge-settings-popup');
+                    const btn = document.getElementById('ge-settings-gear-btn');
                     const wasActive = popup.classList.contains('active');
 
                     if (wasActive) {
-                        popup.classList.remove('active');
-                        popup.style.display = 'none';
+                        geEngine.ui.closeSettingsPopup();
                         return;
                     }
 
                     // Позиционируем по кнопке
-                    const btn = e.currentTarget;
-                    const rect = btn.getBoundingClientRect();
+                    const rect = (e.currentTarget || btn).getBoundingClientRect();
                     popup.style.top = (rect.bottom + 10) + 'px';
                     popup.style.left = rect.left + 'px';
                     popup.style.right = 'auto';
                     popup.style.display = 'flex';
                     popup.classList.add('active');
+                    if (btn) btn.classList.add('active');
 
                     // Закрываем по клику вне
                     setTimeout(() => {
                         document.addEventListener('click', function closePopup() {
-                            popup.classList.remove('active');
-                            popup.style.display = 'none';
+                            geEngine.ui.closeSettingsPopup();
                             document.removeEventListener('click', closePopup);
                         });
                     }, 0);
                 },
                 toggleGlass() {
-                    document.getElementById('ge-settings-popup').classList.remove('active');
+                    geEngine.ui.closeSettingsPopup();
                     const html = document.documentElement;
                     const isOn = html.getAttribute('data-glass') === 'on';
                     const newVal = isOn ? 'off' : 'on';
@@ -2812,7 +2823,7 @@
                     }
                 },
                 toggleTheme() {
-                    document.getElementById('ge-settings-popup').classList.remove('active');
+                    geEngine.ui.closeSettingsPopup();
                     const html = document.documentElement;
                     const newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
                     html.setAttribute('data-theme', newTheme);
@@ -2835,7 +2846,7 @@
                         if (btn) btn.classList.remove('auto-theme-active');
                         if (label) label.innerText = 'Авто тема';
                     }
-                    document.getElementById('ge-settings-popup').classList.remove('active');
+                    geEngine.ui.closeSettingsPopup();
                 },
                 _applyAutoTheme() {
                     const hour = new Date().getHours();
@@ -2894,7 +2905,7 @@
 
                     // Подтягиваем реальное время последнего сообщения с сервера для КАЖДОЙ комнаты
                     // (а не только активной) — это чинит синхронизацию порядка чатов между устройствами.
-                    // Делаем это не на каждый 6-секундный опрос (это было тяжело для сети и дёргало
+                    // Делаем это не на каждый базовый опрос (это было тяжело для сети и дёргало
                     // список/аватарки), а раз в ~12 секунд. Порядок между сканированиями всё равно
                     // держится актуальным за счёт оптимистичного обновления roomLastTime при отправке.
                     const needsSweep = (Date.now() - geEngine.ui._lastRoomTimesSweep) > 12000;
@@ -2929,7 +2940,7 @@
                     });
 
                     // Подгружаем профили контактов включая avImg. Кешируем результат и обновляем
-                    // не чаще раза в ~12 секунд — иначе аватарки/имена каждые 6 секунд на миг
+                    // не чаще раза в ~12 секунд — иначе аватарки/имена каждый тик опроса на миг
                     // сбрасывались на дефолтную букву, пока шёл повторный запрос ("мигание").
                     if (!geEngine.ui._contactProfilesCache) geEngine.ui._contactProfilesCache = {};
                     const contactProfiles = geEngine.ui._contactProfilesCache;
@@ -3074,7 +3085,16 @@
                         let m;
                         try { m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw; } catch(e) { return ''; }
                         const isMe = m.email === geEngine.state.session.email;
-                        const statusIcon = m.status === 'read' ? '✓✓' : (m.status === 'sent' ? '✓' : '○');
+                        // Статус прочтения считаем по факту: "прочитано" (двойная галочка), если
+                        // кто-то ДРУГОЙ (не сам отправитель) открывал этот чат позже времени отправки.
+                        // Раньше статус был статичным полем m.status, которое никогда не менялось —
+                        // поэтому вторая галочка не появлялась вообще.
+                        let statusIcon = '✓';
+                        if (isMe) {
+                            const reads = geEngine.state.currentRoomReads || {};
+                            const readByOther = Object.entries(reads).some(([email, ts]) => email !== m.email && Number(ts) >= (m.ts || 0));
+                            statusIcon = readByOther ? '✓✓' : '✓';
+                        }
                         // Пересчитываем время из ts под часовой пояс зрителя. Если у старого
                         // сообщения нет ts (отправлено до этого фикса) — используем сохранённую строку как запасной вариант.
                         const timeStr = m.ts ? geEngine.ui._fmtTime(m.ts) : (m.time || geEngine.ui._fmtTime(Date.now()));
@@ -3699,17 +3719,20 @@
 
                         if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
                             if(geEngine.state.activeTab !== 'calls') {
-                                const newMessages = JSON.stringify(data.messages?.result);
+                                // Учитываем и сами сообщения, и отметки прочтения — иначе двойная
+                                // галочка не появлялась бы, пока не изменится текст сообщений.
+                                const newMessages = JSON.stringify({ m: data.messages?.result, r: data.reads });
                                 // Не перерисовываем если сообщения не изменились
                                 if (newMessages !== geEngine.chat._lastMessages) {
                                     // Не перерисовываем если играет аудио/видео, или если пользователь
                                     // сейчас проскроллил вверх и читает историю — иначе его вид "прыгал"
-                                    // обратно к последнему сообщению каждые 6 секунд.
+                                    // обратно к последнему сообщению на каждый тик опроса.
                                     const hasPlaying = document.querySelector('audio.ge-voice-audio:not([paused])') ||
                                         [...document.querySelectorAll('audio.ge-voice-audio')].some(a => !a.paused) ||
                                         [...document.querySelectorAll('video')].some(v => !v.paused && v.id !== 'remoteVideo' && v.id !== 'localVideo');
                                     if (!hasPlaying && !geEngine.chat._isUserInteracting) {
                                         geEngine.chat._lastMessages = newMessages;
+                                        geEngine.state.currentRoomReads = data.reads || {};
                                         geEngine.ui.renderMessages(data.messages?.result);
                                     }
                                 }
@@ -4614,7 +4637,11 @@
                     session.avImg
                 );
                 geEngine.chat.refresh();
-                setInterval(() => geEngine.chat.refresh(), 6000);
+                // Опрос сервера — раз в 3 секунды вместо 6, сообщения и список чатов
+                // приходят быстрее. Это безопасно: тяжёлые фоновые проверки (сверка списка
+                // чатов, профили групп) не участятся — они защищены собственным троттлингом
+                // (~12 сек) независимо от частоты этого тика.
+                setInterval(() => geEngine.chat.refresh(), 3000);
                 setInterval(() => geEngine.calls._pollSignals(), 2000);
                 geEngine.media.init();
             }
@@ -4680,7 +4707,7 @@
             });
 
             // Если пользователь проскроллил вверх, чтобы почитать историю сообщений,
-            // не даём автообновлению (каждые 6 секунд) сбрасывать его к последнему сообщению.
+            // не даём автообновлению (на каждый тик опроса) сбрасывать его к последнему сообщению.
             const msgContainer = document.getElementById('ge-msg-container');
             if (msgContainer) {
                 msgContainer.addEventListener('scroll', () => {
