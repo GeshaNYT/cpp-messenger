@@ -2860,6 +2860,13 @@
                         const el = document.getElementById('nav-' + t);
                         if(el) el.classList.toggle('active', tab === t);
                     });
+                    // Мгновенно показываем список из уже известных данных (без ожидания сети).
+                    // Список звонков и так локальный (geEngine.state.historyCalls), а для
+                    // чатов/групп используем последний полученный набор комнат.
+                    if (geEngine.state._lastAllRooms) {
+                        geEngine.ui.renderChatList(geEngine.state._lastAllRooms);
+                    }
+                    // Сеть обновляет данные в фоне, не блокируя переключение вкладки визуально.
                     geEngine.chat.refresh();
                 },
                 toggleMenu(e, rid) {
@@ -3705,6 +3712,7 @@
                         // Объединяем серверные комнаты с локальными (группы)
                         const serverRooms = data.rooms?.result || [];
                         const allRooms = Array.from(new Set([...serverRooms, ...geEngine.state.localRooms]));
+                        geEngine.state._lastAllRooms = allRooms; // кэш для мгновенного переключения вкладок
 
                         // Обновляем список чатов тихо (без сброса скролла)
                         await geEngine.ui.renderChatList(allRooms);
@@ -3734,6 +3742,13 @@
                                         geEngine.chat._lastMessages = newMessages;
                                         geEngine.state.currentRoomReads = data.reads || {};
                                         geEngine.ui.renderMessages(data.messages?.result);
+                                        // Кэшируем — чтобы при следующем открытии этого чата
+                                        // сообщения показались мгновенно, без "Загрузка...".
+                                        if (!geEngine.state._msgCache) geEngine.state._msgCache = {};
+                                        geEngine.state._msgCache[geEngine.state.activeRoom] = {
+                                            messages: data.messages?.result,
+                                            reads: data.reads || {},
+                                        };
                                     }
                                 }
                             }
@@ -3779,14 +3794,24 @@
                 },
                 async open(id, prettyName, knownEmpty) {
                     geEngine.state.activeRoom = id;
-                    geEngine.chat._lastMessages = null; // сбрасываем кэш при смене чата
+                    geEngine.chat._lastMessages = null; // сбрасываем кэш сравнения, чтобы фоновый refresh точно перерисовал актуальные данные
                     document.getElementById('ge-active-name').innerText = prettyName || id;
-                    // Сразу очищаем сообщения при смене чата.
-                    // Если точно знаем, что чат новый и пустой (только что создали/вступили) —
-                    // сразу показываем пустое состояние, а не мигаем "Загрузка...".
-                    document.getElementById('ge-msg-container').innerHTML = knownEmpty
-                        ? '<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Здесь пока нет сообщений.</div>'
-                        : '<div style="text-align:center;padding:20px;opacity:0.4;font-size:13px;">Загрузка...</div>';
+
+                    // Если сообщения этой комнаты уже есть в кэше (открывали её раньше в этой
+                    // сессии) — показываем их МГНОВЕННО, не дожидаясь сети. Свежие данные (новые
+                    // сообщения, статусы прочтения) подтянутся в фоне на следующем тике опроса.
+                    const cachedMsgs = geEngine.state._msgCache && geEngine.state._msgCache[id];
+                    if (cachedMsgs) {
+                        geEngine.state.currentRoomReads = cachedMsgs.reads || {};
+                        geEngine.ui.renderMessages(cachedMsgs.messages);
+                    } else {
+                        // Сразу очищаем сообщения при смене чата.
+                        // Если точно знаем, что чат новый и пустой (только что создали/вступили) —
+                        // сразу показываем пустое состояние, а не мигаем "Загрузка...".
+                        document.getElementById('ge-msg-container').innerHTML = knownEmpty
+                            ? '<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Здесь пока нет сообщений.</div>'
+                            : '<div style="text-align:center;padding:20px;opacity:0.4;font-size:13px;">Загрузка...</div>';
+                    }
                     if (window.innerWidth <= 768) {
                         document.getElementById('ge-main-app').classList.add('mobile-chat-open');
                     }
