@@ -607,20 +607,28 @@ export default async function handler(request, response) {
 
         let rooms    = { result: [] };
         let contacts = { result: [] };
+        let reads    = {};
 
         if (emailLower) {
             await db('SADD', 'all_users', emailLower);
             await db('SADD', `user_rooms:${emailLower}`, 'general'); // всегда в general
 
-            const [rawRooms, rawContacts] = await Promise.all([
+            // Раз мы загружаем сообщения этой комнаты — значит, пользователь её сейчас
+            // просматривает. Отмечаем время прочтения и возвращаем отметки всех участников,
+            // чтобы отправитель видел двойную галочку, когда получатель прочитал сообщение.
+            await db('HSET', `room_reads:${room}`, emailLower, Date.now());
+
+            const [rawRooms, rawContacts, rawReads] = await Promise.all([
                 db('SMEMBERS', `user_rooms:${emailLower}`),
                 db('SMEMBERS', `contacts:${emailLower}`),
+                db('HGETALL', `room_reads:${room}`),
             ]);
             rooms    = { result: rawRooms    ?? [] };
             contacts = { result: rawContacts ?? [] };
+            reads    = parseHash(rawReads);
         }
 
-        return response.status(200).json({ messages: { result: messages ?? [] }, rooms, contacts });
+        return response.status(200).json({ messages: { result: messages ?? [] }, rooms, contacts, reads });
 
     } catch (err) {
         if (err.status === 401) return response.status(401).json({ status: 'error', message: err.message });
