@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeLink Enterprise Messenger | Version 3.0 Better Experience</title>
+    <title>GeLink Enterprise Messenger | Version 2.9 Better Experience</title>
     
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script type="text/javascript">
@@ -949,6 +949,15 @@
             animation: ge-msg-pop 0.4s var(--ease);
         }
 
+        .ge-call-bubble-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+        .ge-call-bubble-icon { display:flex; flex-shrink:0; color: var(--ge-success); }
+        .ge-call-bubble.missed .ge-call-bubble-icon { color: var(--ge-error); }
+
         @keyframes ge-msg-pop {
             from { opacity: 0; transform: scale(0.9) translateY(10px); }
             to { opacity: 1; transform: scale(1) translateY(0); }
@@ -1352,6 +1361,104 @@
         }
 
         .ge-color-dot.active { border-color: var(--text-primary); transform: scale(1.2); }
+
+        /* --- ПОИСК --- */
+        .ge-search-box-wrap { padding: 12px 16px; }
+        .ge-search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: var(--radius-full);
+            border: 1.5px solid var(--border-base);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: border-color var(--t-fast) var(--ease);
+        }
+        .ge-search-input:focus { border-color: var(--ge-primary); }
+        .ge-search-section-label {
+            padding: 10px 16px 6px;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            color: var(--text-tertiary);
+        }
+
+        /* --- ЗАКРЕПЛЁННЫЕ ЧАТЫ --- */
+        .ge-chat-item.pinned { background: var(--ge-primary-soft); }
+        .ge-pin-badge {
+            display: inline-flex;
+            color: var(--ge-primary);
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        /* --- МЕНЮ СКРЕПКИ (галерея/файл) --- */
+        #ge-attach-btn { position: relative; }
+        .ge-attach-menu {
+            position: absolute;
+            bottom: calc(100% + 12px);
+            left: 0;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-base);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            padding: 8px;
+            display: none;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 170px;
+            z-index: 200;
+        }
+        .ge-attach-menu.active {
+            display: flex;
+            animation: ge-slide-up 0.25s var(--ease);
+        }
+        .ge-attach-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            transition: background var(--t-fast) var(--ease);
+        }
+        .ge-attach-menu-item:hover { background: var(--ge-primary-soft); color: var(--ge-primary); }
+
+        /* --- ВЛОЖЕНИЯ В СООБЩЕНИЯХ (фото/файл) --- */
+        .ge-msg-image {
+            max-width: 260px;
+            max-height: 320px;
+            border-radius: 14px;
+            display: block;
+            cursor: pointer;
+            object-fit: cover;
+        }
+        .ge-msg-file {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 4px;
+            text-decoration: none;
+            color: inherit;
+        }
+        .ge-msg-file-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            background: rgba(255,255,255,0.15);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .ge-msg-bubble.them .ge-msg-file-icon { background: var(--ge-primary-soft); color: var(--ge-primary); }
+        .ge-msg-file-info { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+        .ge-msg-file-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+        .ge-msg-file-size { font-size: 12px; opacity: 0.7; }
 
 
 
@@ -1964,13 +2071,40 @@
         </div>
     </div>
 
+    <!-- Очистка чата -->
+    <div id="ge-modal-clear-chat" class="ge-modal-overlay" onclick="if(event.target===this)geEngine.chat.closeClearChatModal()">
+        <div class="ge-modal-content ge-group-modal-sm">
+            <h2 class="ge-group-modal-title">Очистить чат</h2>
+            <p class="ge-group-modal-sub" id="ge-clear-chat-sub">Сообщения удалятся из этой переписки</p>
+            <div class="ge-group-action-list">
+                <button class="ge-group-action-btn" onclick="geEngine.chat.submitClearChat('me')">
+                    <span class="ge-group-action-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></span>
+                    <span class="ge-group-action-text">
+                        <b>Очистить только у меня</b>
+                        <small>У собеседника переписка останется</small>
+                    </span>
+                    <span class="ge-group-action-chevron">›</span>
+                </button>
+                <button id="ge-clear-chat-all-btn" class="ge-group-action-btn ge-hidden" onclick="geEngine.chat.submitClearChat('all')">
+                    <span class="ge-group-action-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></span>
+                    <span class="ge-group-action-text">
+                        <b id="ge-clear-chat-all-label">Очистить у меня и у собеседника</b>
+                        <small>Переписка удалится безвозвратно у обоих</small>
+                    </span>
+                    <span class="ge-group-action-chevron">›</span>
+                </button>
+            </div>
+            <button class="ge-group-cancel-btn" onclick="geEngine.chat.closeClearChatModal()">Отмена</button>
+        </div>
+    </div>
+
     <!-- Тосты -->
     <div id="ge-toast-container" class="ge-toast-container"></div>
 
     <section id="ge-auth-layer" class="ge-auth-overlay">
         <div class="ge-auth-container">
             <div class="ge-brand-logo">GeLink</div>
-            <p class="ge-auth-tagline">Профессиональный мессенджер v3.0</p>
+            <p class="ge-auth-tagline">Профессиональный мессенджер v2.9</p>
             
             <div class="ge-auth-tabs">
                 <button id="tab-login" class="ge-auth-tab active" onclick="geEngine.auth.switch('login')">Вход</button>
@@ -2141,6 +2275,7 @@
                     <button id="nav-chats" class="ge-nav-tab active" onclick="geEngine.ui.setTab('chats')">ЧАТЫ</button>
                     <button id="nav-people" class="ge-nav-tab" onclick="geEngine.ui.setTab('people')">ГРУППЫ</button>
                     <button id="nav-calls" class="ge-nav-tab" onclick="geEngine.ui.setTab('calls')">ЗВОНКИ</button>
+                    <button id="nav-search" class="ge-nav-tab" onclick="geEngine.ui.setTab('search')">ПОИСК</button>
                 </div>
 
                 <div style="display: flex; gap: 12px;">
@@ -2189,6 +2324,25 @@
                 </div>
 
             <footer class="ge-footer">
+                <!-- Скрепка: прикрепить фото или файл -->
+                <button class="ge-media-btn" id="ge-attach-btn" title="Прикрепить" onclick="geEngine.media.toggleAttachMenu(event)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                    </svg>
+                </button>
+                <div id="ge-attach-menu" class="ge-attach-menu">
+                    <button class="ge-attach-menu-item" onclick="geEngine.media.pickGallery()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                        <span>Галерея</span>
+                    </button>
+                    <button class="ge-attach-menu-item" onclick="geEngine.media.pickFile()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                        <span>Файл</span>
+                    </button>
+                </div>
+                <input type="file" id="ge-attach-image-input" accept="image/*" class="ge-hidden" onchange="geEngine.media.handleImageAttach(this)">
+                <input type="file" id="ge-attach-file-input" class="ge-hidden" onchange="geEngine.media.handleFileAttach(this)">
+
                 <!-- Кнопка записи: 1 клик = старт, 2 клик = стоп+отправить, ПКМ = смена режима -->
                 <button class="ge-media-btn" id="ge-media-toggle-btn" title="Нажми для записи • ПКМ чтобы переключить режим">
                     <span id="ge-media-btn-icon">
@@ -2230,14 +2384,12 @@
                 localRooms: JSON.parse(localStorage.getItem('ge_local_rooms') || "[]"),
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
+                pinnedRooms: JSON.parse(localStorage.getItem('ge_pinned_rooms') || "[]"), // закреплённые чаты/группы, максимум 5
                 groupProfiles: {},    // кэш {groupId: {name, memberCount, isOwner}}
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 serverContacts: [],   // email-адреса контактов с сервера
                 roomLastTime: JSON.parse(localStorage.getItem('ge_room_times') || '{}'),
-                historyCalls: [
-                    {name: "Техподдержка", type: "video", time: "10:45", status: "Входящий"},
-                    {name: "Александр В.", type: "audio", time: "Вчера", status: "Пропущенный"}
-                ],
+                historyCalls: JSON.parse(localStorage.getItem('ge_call_history') || "[]"),
                 currentOTP: null,
                 forgotEmail: null,
                 forgotName: null,
@@ -2535,7 +2687,7 @@
                         location.reload(); 
                     }
                 },
-                deleteAccountFull() {
+                async deleteAccountFull() {
                     // ЗАКРЫВАЕМ МЕНЮ ПРИ НАЖАТИИ
                     geEngine.ui.closeSettingsPopup();
 
@@ -2544,6 +2696,9 @@
                         const c2 = confirm("Это действие сотрет ваши данные из системы GeLink навсегда. Вы уверены?");
                         if(c2) {
                             const currentEmail = geEngine.state.session.email;
+                            try {
+                                await fetch(`/api/index?action=deleteAccount&user_email=${encodeURIComponent(currentEmail)}`);
+                            } catch (e) {}
                             localStorage.removeItem('ge_v9_token');
                             alert("Ваш аккаунт был полностью удален.");
                             location.reload();
@@ -2740,6 +2895,74 @@
                 },
 
                 // ── Красивые всплывающие уведомления (тосты) ─────────────────────
+                // ── Поиск по чатам, группам и уже загруженным сообщениям ──────
+                runSearch(query) {
+                    const resultsEl = document.getElementById('ge-search-results');
+                    if (!resultsEl) return;
+                    const q = (query || '').trim().toLowerCase();
+                    if (!q) {
+                        resultsEl.innerHTML = `<div style="text-align:center;padding:30px 20px;opacity:0.5;font-size:13px;">Начните вводить, чтобы найти чат, группу или сообщение</div>`;
+                        return;
+                    }
+
+                    const allRooms = geEngine.state._lastAllRooms || [];
+                    const chatMatches = [];
+                    allRooms.forEach(rid => {
+                        if (geEngine.state.deletedRooms.includes(rid)) return;
+                        let name = rid, isGroup = rid === 'general' || !rid.startsWith('private-');
+                        if (rid.startsWith('private-')) {
+                            const profile = geEngine.ui._contactProfilesCache && geEngine.ui._contactProfilesCache[rid];
+                            name = profile && profile.name ? decodeURIComponent(profile.name) : rid;
+                        } else if (rid !== 'general') {
+                            const gp = geEngine.state.groupProfiles[rid];
+                            name = (gp && gp.name) || rid;
+                        } else {
+                            name = 'general';
+                        }
+                        if (name.toLowerCase().includes(q)) chatMatches.push({ rid, name, isGroup });
+                    });
+
+                    // Ищем и по тексту сообщений — но только там, где они уже загружены в этой
+                    // сессии (кэш), т.к. полнотекстового поиска на сервере пока нет.
+                    const msgMatches = [];
+                    const cache = geEngine.state._msgCache || {};
+                    Object.entries(cache).forEach(([rid, data]) => {
+                        (data.messages || []).forEach(raw => {
+                            try {
+                                const m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw;
+                                if (m.text && m.text.toLowerCase().includes(q)) {
+                                    msgMatches.push({ rid, text: m.text, ts: m.ts, username: m.username });
+                                }
+                            } catch {}
+                        });
+                    });
+                    msgMatches.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+                    let html = '';
+                    if (chatMatches.length) {
+                        html += `<div class="ge-search-section-label">Чаты и группы</div>`;
+                        html += chatMatches.map(c => `
+                            <div class="ge-chat-item" onclick="geEngine.chat.open('${c.rid}', '${c.name.replace(/'/g, "\\'")}')">
+                                <div class="ge-user-av" style="width:44px;height:44px;font-size:16px;background:${c.isGroup ? 'var(--ge-accent-gradient)' : '#444'};">${(c.name[0] || '#').toUpperCase()}</div>
+                                <div class="ge-item-content"><b>${c.name}</b></div>
+                            </div>
+                        `).join('');
+                    }
+                    if (msgMatches.length) {
+                        html += `<div class="ge-search-section-label">Сообщения</div>`;
+                        html += msgMatches.slice(0, 25).map(m => `
+                            <div class="ge-chat-item" onclick="geEngine.chat.open('${m.rid}', '${m.rid.replace(/'/g, "\\'")}')">
+                                <div class="ge-user-av" style="width:44px;height:44px;font-size:15px;">💬</div>
+                                <div class="ge-item-content"><b>${m.username || ''}</b><span>${(m.text || '').slice(0, 70)}</span></div>
+                            </div>
+                        `).join('');
+                    }
+                    if (!chatMatches.length && !msgMatches.length) {
+                        html = `<div style="text-align:center;padding:30px 20px;opacity:0.5;font-size:13px;">Ничего не найдено</div>`;
+                    }
+                    resultsEl.innerHTML = html;
+                },
+
                 showToast(message, type) {
                     const container = document.getElementById('ge-toast-container');
                     if (!container) { alert(message); return; }
@@ -2856,7 +3079,7 @@
                 },
                 setTab(tab) {
                     geEngine.state.activeTab = tab;
-                    ['chats', 'people', 'calls'].forEach(t => {
+                    ['chats', 'people', 'calls', 'search'].forEach(t => {
                         const el = document.getElementById('nav-' + t);
                         if(el) el.classList.toggle('active', tab === t);
                     });
@@ -2889,13 +3112,34 @@
                     const scroller = document.getElementById('ge-chat-list-scroller');
                     const tab = geEngine.state.activeTab;
 
+                    if (tab === 'search') {
+                        // Не перестраиваем разметку повторно на каждый тик опроса — иначе
+                        // сбрасывался бы набранный текст и фокус поля поиска.
+                        if (!document.getElementById('ge-search-input')) {
+                            scroller.innerHTML = `
+                                <div class="ge-search-box-wrap">
+                                    <input type="text" id="ge-search-input" class="ge-search-input" placeholder="Поиск чатов, групп и сообщений..." oninput="geEngine.ui.runSearch(this.value)">
+                                </div>
+                                <div id="ge-search-results"></div>
+                            `;
+                            document.getElementById('ge-search-input').focus();
+                            geEngine.ui.runSearch('');
+                        }
+                        return;
+                    }
+
                     if (tab === 'calls') {
-                        scroller.innerHTML = geEngine.state.historyCalls.map(c => `
-                            <div class="ge-chat-item">
-                                <div class="ge-user-av" style="width:50px; height:50px; background:#f5f5f5; color:#555;">${c.type === 'video' ? '📹' : '📞'}</div>
+                        scroller.innerHTML = geEngine.state.historyCalls.length === 0
+                            ? `<div style="text-align:center;padding:40px 20px;opacity:0.5;font-size:14px;">Звонков пока не было</div>`
+                            : geEngine.state.historyCalls.map(c => `
+                            <div class="ge-chat-item" ${c.roomId ? `onclick="geEngine.chat.open('${c.roomId}', '${(c.name||'').replace(/'/g, "\\'")}')"` : ''}>
+                                <div class="ge-user-av" style="width:50px; height:50px; background:#f5f5f5; color:#555;">${c.type === 'video'
+                                    ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>'
+                                    : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.23h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6.29 6.29l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
+                                }</div>
                                 <div class="ge-item-content">
                                     <b>${c.name}</b>
-                                    <span style="color: ${c.status === 'Пропущенный' ? 'var(--ge-error)' : ''}">${c.status} • ${c.time}</span>
+                                    <span style="color: ${c.status === 'Пропущенный' ? 'var(--ge-error)' : ''}">${c.status}${c.duration ? ' • ' + c.duration : ''} • ${c.time}</span>
                                 </div>
                             </div>
                         `).join('');
@@ -2939,8 +3183,11 @@
                         localStorage.setItem('ge_room_times', JSON.stringify(geEngine.state.roomLastTime));
                     }
 
-                    // Сортируем по времени последнего сообщения
+                    // Сортируем: закреплённые — всегда сверху, дальше — по времени последнего сообщения
                     filtered.sort((a, b) => {
+                        const pa = geEngine.state.pinnedRooms.includes(a);
+                        const pb = geEngine.state.pinnedRooms.includes(b);
+                        if (pa !== pb) return pa ? -1 : 1;
                         const ta = geEngine.state.roomLastTime[a] || 0;
                         const tb = geEngine.state.roomLastTime[b] || 0;
                         return tb - ta;
@@ -3028,15 +3275,24 @@
                             ? `<div class="ge-user-av" style="width:50px;height:50px;overflow:hidden;padding:0;"><img src="${avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" /></div>`
                             : `<div class="ge-user-av" style="width:50px;height:50px;font-size:18px;background:${avColor};">${displayName[0].toUpperCase()}</div>`;
 
+                        const isPinned = geEngine.state.pinnedRooms.includes(rid);
+                        const pinIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="transform:rotate(45deg);"><path d="M16 3l5 5-5.5 1.5L12 14l-2-2 4.5-4.5L16 3z"/><path d="M9 15l-6 6"/><path d="M12.5 8.5L9 12l3 3 3.5-3.5"/></svg>`;
+
                         return `
-                            <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''}" onclick="geEngine.chat.open('${rid}', '${displayName.replace(/'/g, "\'")}')">
+                            <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''} ${isPinned ? 'pinned' : ''}" onclick="geEngine.chat.open('${rid}', '${displayName.replace(/'/g, "\'")}')">
                                 ${avHtml}
                                 <div class="ge-item-content">
-                                    <b>${displayName}</b>
+                                    <b>${isPinned ? `<span class="ge-pin-badge">${pinIcon}</span>` : ''}${displayName}</b>
                                     <span>${subtitle}</span>
                                 </div>
                                 <div class="ge-item-dots" onclick="geEngine.ui.toggleMenu(event, '${rid}')">⋮</div>
                                 <div id="menu-${rid}" class="ge-context-menu">
+                                    <button class="ge-menu-btn" onclick="event.stopPropagation(); geEngine.chat.togglePin(event, '${rid}')">
+                                        ${isPinned ? 'Открепить' : 'Закрепить'}
+                                    </button>
+                                    <button class="ge-menu-btn" onclick="event.stopPropagation(); geEngine.chat.openClearChatModal(event, '${rid}')">
+                                        Очистить чат
+                                    </button>
                                     <button class="ge-menu-btn" onclick="geEngine.chat.removeRoom(event, '${rid}')">
                                         ${isGroup ? 'Покинуть группу' : 'Удалить контакт'}
                                     </button>
@@ -3076,8 +3332,9 @@
                         try {
                             const m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw;
                             if (m.type === 'system') return !!m.text;
+                            if (m.type === 'call') return true;
                             if (m.username === 'System') return false;
-                            if (m.mediaType === 'voice' || m.mediaType === 'circle') return true;
+                            if (['voice', 'circle', 'image', 'file'].includes(m.mediaType)) return true;
                             return m.text && !m.text.includes('EmailJS');
                         } catch(e) { return false; }
                     });
@@ -3110,6 +3367,65 @@
                         // СИСТЕМНОЕ СООБЩЕНИЕ (вступление/выход из группы и т.п.)
                         if (m.type === 'system') {
                             return `<div class="ge-system-msg">${m.text}</div>`;
+                        }
+
+                        // КАРТОЧКА ЗВОНКА (принят/пропущен/отклонён + длительность)
+                        if (m.type === 'call') {
+                            const isVideo = m.callType === 'video';
+                            const missed = m.status !== 'answered';
+                            const icon = isVideo
+                                ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`
+                                : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.23h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6.29 6.29l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
+                            const label = m.status === 'answered'
+                                ? `${isVideo ? 'Видеозвонок' : 'Аудиозвонок'} • ${Math.floor((m.duration||0)/60)}:${String((m.duration||0)%60).padStart(2,'0')}`
+                                : (m.status === 'declined' ? 'Звонок отклонён' : 'Пропущенный звонок');
+                            return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'} ge-call-bubble ${missed ? 'missed' : ''}">
+                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
+                                <div class="ge-call-bubble-row">
+                                    <span class="ge-call-bubble-icon">${icon}</span>
+                                    <span>${label}</span>
+                                </div>
+                                <div class="ge-msg-status-line">
+                                    <span>${timeStr}</span>
+                                    ${isMe ? `<span>${statusIcon}</span>` : ''}
+                                </div>
+                            </div>`;
+                        }
+
+                        // ФОТО
+                        if (m.mediaType === 'image') {
+                            const mediaSrc = m.mediaData || (m.mediaKey ? localStorage.getItem(m.mediaKey) : null) || '';
+                            if (!mediaSrc) return '';
+                            return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}" style="padding:6px;">
+                                <span class="ge-msg-meta-top" style="padding:6px 8px 0;">${isMe ? 'Вы' : m.username}</span>
+                                <img class="ge-msg-image" src="${mediaSrc}" onclick="window.open('${mediaSrc}', '_blank')" alt="Фото">
+                                <div class="ge-msg-status-line" style="padding:4px 8px 2px;">
+                                    <span>${timeStr}</span>
+                                    ${isMe ? `<span>${statusIcon}</span>` : ''}
+                                </div>
+                            </div>`;
+                        }
+
+                        // ФАЙЛ
+                        if (m.mediaType === 'file') {
+                            const mediaSrc = m.mediaData || (m.mediaKey ? localStorage.getItem(m.mediaKey) : null) || '';
+                            if (!mediaSrc) return '';
+                            const sizeStr = m.fileSize ? (m.fileSize > 1024*1024 ? (m.fileSize/1024/1024).toFixed(1)+' МБ' : Math.round(m.fileSize/1024)+' КБ') : '';
+                            const fileIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`;
+                            return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}">
+                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
+                                <a class="ge-msg-file" href="${mediaSrc}" download="${m.fileName || 'файл'}">
+                                    <span class="ge-msg-file-icon">${fileIcon}</span>
+                                    <span class="ge-msg-file-info">
+                                        <span class="ge-msg-file-name">${m.fileName || 'Файл'}</span>
+                                        <span class="ge-msg-file-size">${sizeStr}</span>
+                                    </span>
+                                </a>
+                                <div class="ge-msg-status-line">
+                                    <span>${timeStr}</span>
+                                    ${isMe ? `<span>${statusIcon}</span>` : ''}
+                                </div>
+                            </div>`;
                         }
 
                         // ГОЛОСОВОЕ СООБЩЕНИЕ
@@ -3201,6 +3517,9 @@
                 _targetName: null,
                 _signalInterval: null,
                 _incomingOffer: null,
+                _isOutgoing: false,
+                _callAnswered: false,
+                _callAnsweredAt: null,
                 _ringCtx: null,
                 _ringNode: null,
 
@@ -3474,6 +3793,9 @@
                         this._targetEmail = sig.from;
                         this._targetName = sig.fromName || sig.from;
                         this._callType = sig.callType || 'audio';
+                        this._isOutgoing = false;
+                        this._callAnswered = false;
+                        this._callAnsweredAt = null;
                         document.getElementById('ge-inc-av').innerText = (this._targetName[0] || '?').toUpperCase();
                         document.getElementById('ge-inc-name').innerText = this._targetName;
                         document.getElementById('ge-inc-type').innerHTML = this._callType === 'video' ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> Видео звонок' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.23h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6.29 6.29l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Аудио звонок';
@@ -3482,6 +3804,11 @@
                     }
                     if (sig.type === 'call-request') { this._playRing('incoming'); }
                     if (sig.type === 'call-end') {
+                        // Собеседник завершил/отменил/не поднял. Карточку в чат уже отправила
+                        // та сторона, что реально положила трубку — здесь только обновляем
+                        // СВОЮ локальную историю в "Звонки", без повторной отправки в чат
+                        // (иначе в переписке дублировалась бы карточка звонка).
+                        this._logCall(this._callAnswered ? 'answered' : 'missed', { postMessage: false });
                         this._cleanupCall();
                         document.getElementById('ge-incoming-call').style.display = 'none';
                         return;
@@ -3491,6 +3818,8 @@
                     if (sig.type === 'answer') {
                         if (this._pc.signalingState === 'have-local-offer') {
                             await this._pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+                            this._callAnswered = true;
+                            this._callAnsweredAt = Date.now();
                         }
                     } else if (sig.type === 'offer') {
                         // Повторный offer во время звонка (например, собеседник включил камеру)
@@ -3524,6 +3853,9 @@
 
                     this._targetEmail = targetEmail;
                     this._callType = type;
+                    this._isOutgoing = true;
+                    this._callAnswered = false;
+                    this._callAnsweredAt = null;
                     const targetName = document.getElementById('ge-active-name').innerText;
                     this._targetName = targetName;
 
@@ -3599,6 +3931,8 @@
                         payload: answer
                     });
 
+                    this._callAnswered = true;
+                    this._callAnsweredAt = Date.now();
                     this._startSignalPolling();
                     this._incomingOffer = null;
                 },
@@ -3610,6 +3944,7 @@
                     if (this._targetEmail) {
                         await this._send({ type: 'call-end', from: geEngine.state.session.email, to: this._targetEmail });
                     }
+                    this._logCall('declined');
                     this._targetEmail = null;
                     this._incomingOffer = null;
                 },
@@ -3621,7 +3956,66 @@
                     if (this._targetEmail) {
                         await this._send({ type: 'call-end', from: geEngine.state.session.email, to: this._targetEmail }).catch(() => {});
                     }
+                    this._logCall(this._callAnswered ? 'answered' : 'missed');
                     this._cleanupCall();
+                },
+
+                // ── Запись звонка в историю (вкладка "Звонки") и как сообщение в чат ──
+                async _logCall(status, { postMessage = true } = {}) {
+                    const targetEmail = this._targetEmail;
+                    if (!targetEmail) return;
+                    const targetName = this._targetName || targetEmail;
+                    const direction = this._isOutgoing ? 'outgoing' : 'incoming';
+                    const duration = (status === 'answered' && this._callAnsweredAt)
+                        ? Math.max(1, Math.round((Date.now() - this._callAnsweredAt) / 1000))
+                        : 0;
+                    const durationStr = duration
+                        ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}`
+                        : '';
+
+                    const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                    const otherSafe = targetEmail.replace(/[@.]/g, '').toLowerCase();
+                    const roomId = `private-${[myMailSafe, otherSafe].sort().join('-')}`;
+
+                    if (postMessage) {
+                        // Сообщение-карточка звонка — попадает прямо в переписку
+                        const msgObj = {
+                            type: 'call',
+                            callType: this._callType,
+                            direction,
+                            status,
+                            duration,
+                            ts: Date.now(),
+                            username: geEngine.state.session.name,
+                            email: geEngine.state.session.email,
+                        };
+                        try {
+                            await fetch(`/api/index?room=${encodeURIComponent(roomId)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`, {
+                                method: 'POST',
+                                body: JSON.stringify(msgObj),
+                            });
+                            if (geEngine.state.activeRoom === roomId) geEngine.chat.refresh();
+                        } catch (e) {}
+                    }
+
+                    // Запись в локальную историю для вкладки "Звонки"
+                    const statusLabel = status === 'answered'
+                        ? (direction === 'outgoing' ? 'Исходящий' : 'Входящий')
+                        : (status === 'declined' ? 'Отклонён' : (direction === 'outgoing' ? 'Нет ответа' : 'Пропущенный'));
+                    const entry = {
+                        name: targetName,
+                        type: this._callType,
+                        time: new Date().toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
+                        status: statusLabel,
+                        duration: durationStr,
+                        roomId,
+                        ts: Date.now(),
+                    };
+                    if (!geEngine.state.historyCalls) geEngine.state.historyCalls = [];
+                    geEngine.state.historyCalls.unshift(entry);
+                    geEngine.state.historyCalls = geEngine.state.historyCalls.slice(0, 50);
+                    localStorage.setItem('ge_call_history', JSON.stringify(geEngine.state.historyCalls));
+                    if (geEngine.state.activeTab === 'calls') geEngine.ui.renderChatList(geEngine.state._lastAllRooms || []);
                 },
 
                 _cleanupCall() {
@@ -3857,6 +4251,79 @@
                     if (footer) footer.style.visibility = 'visible';
                     geEngine.chat.refresh();
                 },
+                // ── Очистка чата ──────────────────────────────────────────────
+                _clearChatTarget: null,
+                openClearChatModal(e, rid) {
+                    if (e) e.stopPropagation();
+                    // Закрываем открытое контекстное меню, если было
+                    document.querySelectorAll('.ge-context-menu.active').forEach(m => m.classList.remove('active'));
+
+                    geEngine.chat._clearChatTarget = rid;
+                    const isPrivate = rid.startsWith('private-');
+                    const profile = geEngine.state.groupProfiles[rid];
+                    const name = isPrivate
+                        ? (geEngine.ui._contactProfilesCache?.[rid]?.name ? decodeURIComponent(geEngine.ui._contactProfilesCache[rid].name) : 'собеседника')
+                        : (profile?.name || rid);
+
+                    document.getElementById('ge-clear-chat-sub').innerText = isPrivate
+                        ? `Выберите, как очистить переписку с «${name}»`
+                        : 'Сообщения пропадут только в вашей ленте';
+                    document.getElementById('ge-clear-chat-all-btn').classList.toggle('ge-hidden', !isPrivate);
+                    if (isPrivate) document.getElementById('ge-clear-chat-all-label').innerText = `Очистить у меня и у ${name}`;
+
+                    geEngine.ui._openModal('ge-modal-clear-chat');
+                },
+                closeClearChatModal() {
+                    geEngine.ui._closeModal('ge-modal-clear-chat');
+                },
+                async submitClearChat(mode) {
+                    const rid = geEngine.chat._clearChatTarget;
+                    if (!rid) return;
+                    if (mode === 'all' && !confirm('Переписка удалится безвозвратно у обеих сторон. Продолжить?')) return;
+
+                    try {
+                        const res = await fetch(`/api/index?action=clearChat&room=${encodeURIComponent(rid)}&mode=${mode}&user_email=${encodeURIComponent(geEngine.state.session.email)}`);
+                        const data = await res.json();
+                        if (data.status !== 'ok') {
+                            geEngine.ui.showToast(data.message || 'Не удалось очистить чат', 'error');
+                            return;
+                        }
+                    } catch (e) {
+                        geEngine.ui.showToast('Ошибка соединения с сервером', 'error');
+                        return;
+                    }
+
+                    // Чистим локальный кэш сообщений этой комнаты
+                    if (geEngine.state._msgCache) delete geEngine.state._msgCache[rid];
+                    geEngine.chat._lastMessages = null;
+                    if (geEngine.state.activeRoom === rid) {
+                        document.getElementById('ge-msg-container').innerHTML = '<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Здесь пока нет сообщений.</div>';
+                    }
+
+                    geEngine.chat.closeClearChatModal();
+                    geEngine.ui.showToast('Чат очищен', 'success');
+                    geEngine.chat.refresh();
+                },
+
+                togglePin(e, rid) {
+                    e.stopPropagation();
+                    document.querySelectorAll('.ge-context-menu.active').forEach(m => m.classList.remove('active'));
+
+                    const idx = geEngine.state.pinnedRooms.indexOf(rid);
+                    if (idx !== -1) {
+                        geEngine.state.pinnedRooms.splice(idx, 1);
+                    } else {
+                        if (geEngine.state.pinnedRooms.length >= 5) {
+                            geEngine.ui.showToast('Можно закрепить не больше 5 чатов и групп', 'error');
+                            return;
+                        }
+                        geEngine.state.pinnedRooms.push(rid);
+                    }
+                    localStorage.setItem('ge_pinned_rooms', JSON.stringify(geEngine.state.pinnedRooms));
+                    geEngine.ui._lastChatList = null; // форсируем перерисовку списка
+                    geEngine.chat.refresh();
+                },
+
                 removeRoom(e, rid) {
                     e.stopPropagation();
                     const msg = rid === 'general' ? 'Покинуть группу General?' : 'Удалить чат?';
@@ -4435,6 +4902,74 @@
                 _timerInterval: null,
                 _startTime: 0,
 
+                // ── Скрепка: галерея / файл ──────────────────────────────
+                toggleAttachMenu(e) {
+                    e.stopPropagation();
+                    const menu = document.getElementById('ge-attach-menu');
+                    const wasActive = menu.classList.contains('active');
+                    menu.classList.remove('active');
+                    if (wasActive) return;
+
+                    menu.classList.add('active');
+                    setTimeout(() => {
+                        document.addEventListener('click', function closeAttach() {
+                            menu.classList.remove('active');
+                            document.removeEventListener('click', closeAttach);
+                        });
+                    }, 0);
+                },
+                pickGallery() {
+                    document.getElementById('ge-attach-menu').classList.remove('active');
+                    if (!geEngine.state.activeRoom) { alert('Сначала выберите чат.'); return; }
+                    document.getElementById('ge-attach-image-input').click();
+                },
+                pickFile() {
+                    document.getElementById('ge-attach-menu').classList.remove('active');
+                    if (!geEngine.state.activeRoom) { alert('Сначала выберите чат.'); return; }
+                    document.getElementById('ge-attach-file-input').click();
+                },
+                handleImageAttach(input) {
+                    const file = input.files[0];
+                    input.value = '';
+                    if (!file || !geEngine.state.activeRoom) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            // Сжимаем, сохраняя пропорции (макс. сторона 1280px), чтобы влезть в лимит
+                            let { width, height } = img;
+                            const maxDim = 1280;
+                            if (width > maxDim || height > maxDim) {
+                                const scale = maxDim / Math.max(width, height);
+                                width = Math.round(width * scale);
+                                height = Math.round(height * scale);
+                            }
+                            const canvas = document.createElement('canvas');
+                            canvas.width = width; canvas.height = height;
+                            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                            canvas.toBlob(blob => {
+                                geEngine.media._sendMediaMessage(blob, 'image', 0, {
+                                    maxSize: 900 * 1024,
+                                    tooLargeMsg: 'Фото слишком большое даже после сжатия. Попробуйте другое изображение.',
+                                });
+                            }, 'image/jpeg', 0.75);
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                },
+                handleFileAttach(input) {
+                    const file = input.files[0];
+                    input.value = '';
+                    if (!file || !geEngine.state.activeRoom) return;
+                    geEngine.media._sendMediaMessage(file, 'file', 0, {
+                        maxSize: 900 * 1024,
+                        tooLargeMsg: `Файл слишком большой (${(file.size/1024).toFixed(0)}KB). Максимум ~900KB.`,
+                        fileName: file.name,
+                        fileSize: file.size,
+                    });
+                },
+
                 _micSVG: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`,
                 _circleSVG: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>`,
                 _stopSVG: `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>`,
@@ -4561,11 +5096,11 @@
                     this._recorder.stop();
                 },
 
-                _sendMediaMessage(blob, mediaType, duration) {
-                    // Ограничение: голосовые/кружочки не более 30 сек (иначе не влезет в Redis ~1MB)
-                    const maxSize = 800 * 1024; // 800KB
+                _sendMediaMessage(blob, mediaType, duration, extra = {}) {
+                    // Ограничение по размеру: голосовые/кружочки/фото/файлы — иначе не влезет в Redis (~1MB на значение)
+                    const maxSize = extra.maxSize || (800 * 1024);
                     if (blob.size > maxSize) {
-                        alert(`Медиа слишком большое (${(blob.size/1024).toFixed(0)}KB). Запись до 15 сек.`);
+                        alert(extra.tooLargeMsg || `Медиа слишком большое (${(blob.size/1024).toFixed(0)}KB). Максимум ${(maxSize/1024).toFixed(0)}KB.`);
                         return;
                     }
                     const reader = new FileReader();
@@ -4587,6 +5122,8 @@
                             mediaKey,
                             mediaData: base64,
                             mediaDuration: duration,
+                            fileName: extra.fileName || undefined,
+                            fileSize: extra.fileSize || undefined,
                             ts: mediaTs,
                             time: new Date(mediaTs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             status: 'sent'
