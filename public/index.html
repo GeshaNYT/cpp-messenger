@@ -343,7 +343,12 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            outline: none;
         }
+        /* Убираем кольцо фокуса при клике мышью — оно "залипало" синим вокруг иконки после
+           открытия/закрытия меню. Для навигации с клавиатуры (Tab) кольцо остаётся. */
+        .ge-sidebar-settings-btn:focus:not(:focus-visible) { outline: none; box-shadow: none; }
+        .ge-sidebar-settings-btn:focus-visible { outline: 2px solid var(--ge-primary); outline-offset: 2px; }
 
         .ge-sidebar-settings-btn:hover {
             color: var(--ge-primary);
@@ -957,6 +962,28 @@
         }
         .ge-call-bubble-icon { display:flex; flex-shrink:0; color: var(--ge-success); }
         .ge-call-bubble.missed .ge-call-bubble-icon { color: var(--ge-error); }
+
+        /* --- КЛИКАБЕЛЬНОЕ ИМЯ ОТПРАВИТЕЛЯ + МИНИ-ПРОФИЛЬ --- */
+        .ge-user-link { cursor: pointer; }
+        .ge-user-link:hover { text-decoration: underline; }
+        .ge-user-profile-tiles { display: flex; gap: 10px; margin-top: 4px; }
+        .ge-user-profile-tile {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 14px 8px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-base);
+            background: var(--bg-input);
+            color: var(--ge-primary);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+        }
+        .ge-user-profile-tile:hover { background: var(--ge-primary-soft); border-color: var(--ge-primary); transform: translateY(-2px); }
 
         @keyframes ge-msg-pop {
             from { opacity: 0; transform: scale(0.9) translateY(10px); }
@@ -1860,6 +1887,11 @@
                     <input type="text" id="prof-nick" class="ge-input-core" placeholder="Ivan_GE_2026" oninput="geEngine.auth.filterLatinNick(this)">
                 </div>
                 <div class="ge-field">
+                    <label class="ge-label">О себе</label>
+                    <textarea id="prof-bio" class="ge-input-core" maxlength="150" rows="3" placeholder="Пара слов о себе…" style="resize:none; font-family:inherit;" oninput="geEngine.profile.updateBioCounter(this)"></textarea>
+                    <div style="text-align:right; font-size:11px; color:var(--text-tertiary); margin-top:4px;"><span id="prof-bio-counter">0</span>/150</div>
+                </div>
+                <div class="ge-field">
                     <label class="ge-label">Новый пароль (оставьте пустым, если не меняете)</label>
                     <div style="position:relative;">
                         <input type="password" id="prof-pass" class="ge-input-core" placeholder="••••••••" style="padding-right:44px;" oninput="geEngine.auth.filterLatinPass(this)">
@@ -2068,6 +2100,61 @@
                 <button class="ge-menu-btn danger" style="width:100%;justify-content:center;" onclick="geEngine.groups.deleteGroup()">Удалить группу навсегда</button>
             </div>
             <button class="ge-group-cancel-btn" style="margin-top:14px;" onclick="geEngine.groups.closeInfo()">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- Поддержать проект -->
+    <div id="ge-modal-donate" class="ge-modal-overlay" onclick="if(event.target===this)geEngine.ui.closeDonate()">
+        <div class="ge-modal-content ge-group-modal-sm" style="text-align:center;">
+            <div class="ge-group-success-icon" style="color: var(--ge-error); background: rgba(255,64,80,0.12);">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            </div>
+            <h2 class="ge-group-modal-title">Поддержать GeLink</h2>
+            <p class="ge-group-modal-sub">Проект развивается без рекламы и платных подписок — если он вам полезен, можно поддержать разработку</p>
+
+            <label class="ge-group-field-label" style="text-align:left;">Банковская карта</label>
+            <div style="display:flex; align-items:stretch; gap:8px; margin-bottom:14px;">
+                <div class="ge-group-id-box" id="ge-donate-card" style="flex:1; font-size:18px; letter-spacing:2px; margin-bottom:0;">0000 0000 0000 0000</div>
+            </div>
+            <button class="ge-group-copy-btn" style="margin-bottom:16px;" onclick="geEngine.groups.copyId(document.getElementById('ge-donate-card').innerText.replace(/\s/g,''), this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>Скопировать номер карты</span>
+            </button>
+
+            <label class="ge-group-field-label" style="text-align:left;">Крипто-кошелёк (USDT, TRC-20)</label>
+            <div style="display:flex; align-items:stretch; gap:8px; margin-bottom:14px;">
+                <div class="ge-group-id-box" id="ge-donate-crypto" style="flex:1; font-size:13px; letter-spacing:0; word-break:break-all; margin-bottom:0;">TXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</div>
+            </div>
+            <button class="ge-group-copy-btn" onclick="geEngine.groups.copyId(document.getElementById('ge-donate-crypto').innerText, this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>Скопировать адрес кошелька</span>
+            </button>
+
+            <button class="ge-group-cancel-btn" style="margin-top:16px;" onclick="geEngine.ui.closeDonate()">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- Мини-профиль пользователя (клик по имени в сообщении) -->
+    <div id="ge-modal-user-profile" class="ge-modal-overlay" onclick="if(event.target===this)geEngine.ui.closeUserProfile()">
+        <div class="ge-modal-content ge-group-modal-sm" style="text-align:center;">
+            <div class="ge-user-av" id="ge-user-profile-av" style="width:84px;height:84px;font-size:30px;margin:0 auto 14px;">#</div>
+            <h2 class="ge-group-modal-title" id="ge-user-profile-name">Имя</h2>
+            <p class="ge-group-modal-sub ge-hidden" id="ge-user-profile-bio" style="margin-bottom:18px;"></p>
+            <div class="ge-user-profile-tiles">
+                <button class="ge-user-profile-tile" onclick="geEngine.ui.userProfileOpenChat()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                    <span>Чат</span>
+                </button>
+                <button class="ge-user-profile-tile" onclick="geEngine.ui.userProfileCall('audio')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.23h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6.29 6.29l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    <span>Звонок</span>
+                </button>
+                <button class="ge-user-profile-tile" onclick="geEngine.ui.userProfileCall('video')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    <span>Видео</span>
+                </button>
+            </div>
+            <button class="ge-group-cancel-btn" style="margin-top:16px;" onclick="geEngine.ui.closeUserProfile()">Закрыть</button>
         </div>
     </div>
 
@@ -2373,6 +2460,19 @@
     </main>
 
     <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+        // Извлекает "safe"-идентификатор (email без @ и .) собеседника из id приватной комнаты.
+        // Комната всегда называется private-<mySafe>-<otherSafe> (отсортировано), но наивное
+        // split('-') ломается, если у кого-то в email есть дефис в локальной части — тогда частей
+        // получается больше двух. Используем startsWith/endsWith по известному mySafe вместо split.
+        function otherPrivateSafe(rid, myMailSafe) {
+            const combined = rid.replace('private-', '');
+            if (combined.startsWith(myMailSafe + '-')) return combined.slice(myMailSafe.length + 1);
+            if (combined.endsWith('-' + myMailSafe)) return combined.slice(0, combined.length - myMailSafe.length - 1);
+            // Резервный вариант (не должен срабатывать при нормальных данных)
+            const parts = combined.split('-');
+            return parts.find(p => p !== myMailSafe) || null;
+        }
+
         const geEngine = {
             state: {
                 session: null,
@@ -2532,7 +2632,8 @@
                             nickname: user.nickname, 
                             email: user.email, 
                             avColor: user.avColor || 'var(--ge-accent-gradient)',
-                            avImg: user.avImg || null
+                            avImg: user.avImg || null,
+                            bio: user.bio || ''
                         };
                         localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
                         
@@ -2718,10 +2819,15 @@
                     document.getElementById('prof-name').value = session.name;
                     document.getElementById('prof-nick').value = session.nickname || '';
                     document.getElementById('prof-pass').value = '';
+                    document.getElementById('prof-bio').value = session.bio || '';
+                    document.getElementById('prof-bio-counter').innerText = (session.bio || '').length;
                     this.tempColor = session.avColor || 'var(--ge-accent-gradient)';
                     this.tempImg = null;
                     this.updatePreview();
                     document.getElementById('ge-modal-profile').style.display = 'flex';
+                },
+                updateBioCounter(el) {
+                    document.getElementById('prof-bio-counter').innerText = el.value.length;
                 },
                 close() {
                     document.getElementById('ge-modal-profile').style.display = 'none';
@@ -2791,6 +2897,7 @@
                     const newName = document.getElementById('prof-name').value.trim();
                     const newNick = document.getElementById('prof-nick').value.trim().toLowerCase();
                     const newPass = document.getElementById('prof-pass').value.trim();
+                    const newBio = document.getElementById('prof-bio').value.trim().slice(0, 150);
                     const email = geEngine.state.session.email;
 
                     if (!newName) return alert("Имя не может быть пустым!");
@@ -2802,7 +2909,7 @@
                         if (newPass.length < 8) return alert("Пароль слишком короткий!");
                         if (/[^a-zA-Z0-9!@#$%^&*()_+\-=\[\]{}|;':",.<>?/`~\\]/.test(newPass)) return alert("Пароль: только латинские буквы, цифры и спецсимволы. Пробелы запрещены!");
 
-                        geEngine.state.profilePending = { newName, newNick, newPass, avColor: this.tempColor, avImg: this.tempImg };
+                        geEngine.state.profilePending = { newName, newNick, newPass, newBio, avColor: this.tempColor, avImg: this.tempImg };
 
                         const success = await geEngine.auth.sendOTPEmail(email, geEngine.state.session.name);
                         if (success) {
@@ -2812,7 +2919,7 @@
                         return;
                     }
 
-                    await geEngine.profile._doSave({ newName, newNick, avColor: this.tempColor, avImg: this.tempImg });
+                    await geEngine.profile._doSave({ newName, newNick, newBio, avColor: this.tempColor, avImg: this.tempImg });
                 },
                 async confirmPassOTP() {
                     const entered = document.getElementById('prof-otp').value.trim();
@@ -2820,17 +2927,17 @@
                     geEngine.state.currentOTP = null;
 
                     const p = geEngine.state.profilePending;
-                    await geEngine.profile._doSave({ newName: p.newName, newNick: p.newNick, avColor: p.avColor, avImg: p.avImg, newPass: p.newPass });
+                    await geEngine.profile._doSave({ newName: p.newName, newNick: p.newNick, newBio: p.newBio, avColor: p.avColor, avImg: p.avImg, newPass: p.newPass });
                     geEngine.state.profilePending = null;
 
                     document.getElementById('prof-otp-section').classList.add('ge-hidden');
                     document.getElementById('prof-save-btns').classList.remove('ge-hidden');
                     document.getElementById('prof-otp').value = '';
                 },
-                async _doSave({ newName, newNick, avColor, avImg, newPass }) {
+                async _doSave({ newName, newNick, newBio, avColor, avImg, newPass }) {
                     const email = geEngine.state.session.email;
                     try {
-                        const body = { name: newName, nickname: newNick, avColor };
+                        const body = { name: newName, nickname: newNick, avColor, bio: newBio || '' };
                         if (newPass) body.password = newPass;
                         // avImg: base64 строка = новое фото, false = удалить, null = не трогать
                         if (avImg !== null) body.avImg = avImg || '';
@@ -2848,6 +2955,7 @@
                     geEngine.state.session.name = newName;
                     geEngine.state.session.nickname = newNick;
                     geEngine.state.session.avColor = avColor;
+                    geEngine.state.session.bio = newBio || '';
                     if (avImg !== null) geEngine.state.session.avImg = avImg || null;
                     localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
 
@@ -2876,6 +2984,13 @@
                 closePrivacy() {
                     document.getElementById('ge-modal-privacy').style.display = 'none';
                 },
+                openDonate() {
+                    geEngine.ui.closeSettingsPopup();
+                    geEngine.ui._openModal('ge-modal-donate');
+                },
+                closeDonate() {
+                    geEngine.ui._closeModal('ge-modal-donate');
+                },
 
                 // ── Универсальные модалки с плавной анимацией открытия/закрытия ──
                 _openModal(id) {
@@ -2896,6 +3011,67 @@
 
                 // ── Красивые всплывающие уведомления (тосты) ─────────────────────
                 // ── Поиск по чатам, группам и уже загруженным сообщениям ──────
+                // ── Мини-профиль пользователя (клик по имени в сообщении) ────────
+                _userProfileTarget: null,
+                async openUserProfile(email, name) {
+                    if (!email || email === geEngine.state.session.email) return; // не показываем себя
+                    geEngine.ui._userProfileTarget = { email, name };
+
+                    document.getElementById('ge-user-profile-name').innerText = name || email;
+                    const av = document.getElementById('ge-user-profile-av');
+                    av.innerHTML = ((name && name[0]) || '?').toUpperCase();
+                    av.style.background = 'var(--ge-accent-gradient)';
+                    document.getElementById('ge-user-profile-bio').classList.add('ge-hidden');
+
+                    geEngine.ui._openModal('ge-modal-user-profile');
+
+                    try {
+                        const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(email)}`);
+                        const data = await res.json();
+                        // Модалка могла закрыться/смениться пока шёл запрос
+                        if (!(data.status === 'found' && geEngine.ui._userProfileTarget && geEngine.ui._userProfileTarget.email === email)) return;
+                        const profile = data.profile || {};
+                        if (profile.avImg) {
+                            av.style.background = '';
+                            av.innerHTML = `<img src="${profile.avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
+                        } else if (profile.avColor) {
+                            av.style.background = profile.avColor;
+                        }
+                        // bio хранится как есть (не URI-кодировано) — не декодируем, иначе "%"
+                        // в тексте пользователя может сломать decodeURIComponent
+                        if (profile.bio) {
+                            document.getElementById('ge-user-profile-bio').innerText = profile.bio;
+                            document.getElementById('ge-user-profile-bio').classList.remove('ge-hidden');
+                        }
+                        if (profile.name) document.getElementById('ge-user-profile-name').innerText = profile.name;
+                    } catch (e) {}
+                },
+                closeUserProfile() {
+                    geEngine.ui._closeModal('ge-modal-user-profile');
+                },
+                userProfileOpenChat() {
+                    const t = geEngine.ui._userProfileTarget;
+                    if (!t) return;
+                    geEngine.ui.closeUserProfile();
+                    const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                    const otherSafe = t.email.replace(/[@.]/g, '').toLowerCase();
+                    const roomId = `private-${[myMailSafe, otherSafe].sort().join('-')}`;
+                    geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
+                    localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                    if (!geEngine.state.localRooms.includes(roomId)) geEngine.state.localRooms.push(roomId);
+                    localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                    geEngine.chat.open(roomId, t.name || t.email);
+                },
+                userProfileCall(type) {
+                    const t = geEngine.ui._userProfileTarget;
+                    if (!t) return;
+                    geEngine.ui.closeUserProfile();
+                    geEngine.ui.userProfileOpenChat();
+                    // Звонки возможны только в приватном чате — небольшая задержка, чтобы чат
+                    // успел открыться и geEngine.state.activeRoom обновился
+                    setTimeout(() => geEngine.calls.initiate(type), 250);
+                },
+
                 runSearch(query) {
                     const resultsEl = document.getElementById('ge-search-results');
                     if (!resultsEl) return;
@@ -2989,7 +3165,7 @@
                     const btn = document.getElementById('ge-settings-gear-btn');
                     popup.classList.remove('active');
                     popup.style.display = 'none';
-                    if (btn) btn.classList.remove('active');
+                    if (btn) { btn.classList.remove('active'); btn.blur(); }
                 },
                 toggleSettingsMenu(e) {
                     e.stopPropagation();
@@ -3193,18 +3369,21 @@
                         return tb - ta;
                     });
 
-                    // Подгружаем профили контактов включая avImg. Кешируем результат и обновляем
-                    // не чаще раза в ~12 секунд — иначе аватарки/имена каждый тик опроса на миг
-                    // сбрасывались на дефолтную букву, пока шёл повторный запрос ("мигание").
+                    // Подгружаем профили контактов включая avImg. Кешируем результат.
+                    // Уже известные чаты обновляем не чаще раза в ~12 секунд — иначе аватарки/имена
+                    // каждый тик опроса на миг сбрасывались на дефолтную букву ("мигание").
+                    // А вот НОВЫЕ чаты (профиль которых мы ещё ни разу не получали) подгружаем
+                    // сразу же, без ожидания троттлинга — иначе только что добавленный контакт
+                    // мог надолго "зависать" с email вместо имени и серым цветом вместо аватарки.
                     if (!geEngine.ui._contactProfilesCache) geEngine.ui._contactProfilesCache = {};
                     const contactProfiles = geEngine.ui._contactProfilesCache;
                     const needsProfileSweep = (Date.now() - geEngine.ui._lastProfilesSweep) > 12000;
-                    if (needsProfileSweep) {
-                        geEngine.ui._lastProfilesSweep = Date.now();
-                        await Promise.all(filtered.filter(rid => rid.startsWith('private-')).map(async rid => {
+                    const privateRoomsToFetch = filtered.filter(rid => rid.startsWith('private-') && (needsProfileSweep || !contactProfiles[rid]));
+                    if (privateRoomsToFetch.length) {
+                        if (needsProfileSweep) geEngine.ui._lastProfilesSweep = Date.now();
+                        await Promise.all(privateRoomsToFetch.map(async rid => {
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                            const parts = rid.replace('private-', '').split('-');
-                            const otherSafe = parts.find(p => p !== myMailSafe);
+                            const otherSafe = otherPrivateSafe(rid, myMailSafe);
                             if (!otherSafe) return;
                             const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe);
                             if (!targetEmail) return;
@@ -3214,9 +3393,13 @@
                                 if (data.status === 'found') contactProfiles[rid] = data.profile || {};
                             } catch {}
                         }));
+                    }
 
-                        // Название, число участников и владелец для реальных групп (не general)
-                        await Promise.all(filtered.filter(rid => rid !== 'general' && !rid.startsWith('private-')).map(async rid => {
+                    {
+                        // Название, число участников и владелец для реальных групп (не general).
+                        // Новые группы (ещё нет в кэше) — сразу, известные — по троттлингу.
+                        const groupRoomsToFetch = filtered.filter(rid => rid !== 'general' && !rid.startsWith('private-') && (needsProfileSweep || !geEngine.state.groupProfiles[rid]));
+                        await Promise.all(groupRoomsToFetch.map(async rid => {
                             try {
                                 const res = await fetch(`/api/index?action=getGroupInfo&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(rid)}`);
                                 const data = await res.json();
@@ -3246,9 +3429,8 @@
                         let subtitle = isGroup ? 'Групповой канал' : 'Активный зашифрованный канал';
 
                         if (rid.startsWith('private-')) {
-                            const parts = rid.replace('private-', '').split('-');
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                            const otherMailSafePart = parts.find(p => p !== myMailSafe);
+                            const otherMailSafePart = otherPrivateSafe(rid, myMailSafe);
 
                             const profile = contactProfiles[rid];
                             if (profile && profile.name) {
@@ -3257,8 +3439,17 @@
                                 avImg = profile.avImg ? decodeURIComponent(profile.avImg) : null;
                             } else {
                                 const user = geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
-                                if (user) { displayName = user.name; avColor = user.avColor; }
-                                else if (otherMailSafePart) displayName = otherMailSafePart.split('gmailcom')[0] || otherMailSafePart;
+                                if (user) {
+                                    displayName = user.name; avColor = user.avColor;
+                                } else {
+                                    // Профиль ещё не подгружен (обычно на долю секунды для нового чата).
+                                    // Раньше тут пытались вырезать имя из "safe"-строки email грубым
+                                    // split('gmailcom'), что для не-gmail адресов показывало кашу
+                                    // вместо имени. Теперь честно показываем "Загрузка…" — реальное
+                                    // имя подставится, как только придёт ответ сервера.
+                                    const realEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
+                                    displayName = realEmail ? realEmail.split('@')[0] : 'Загрузка…';
+                                }
                             }
                         } else if (rid !== 'general') {
                             // Реальная группа — показываем название с сервера, а не сырой ID
@@ -3362,6 +3553,11 @@
                         // Пересчитываем время из ts под часовой пояс зрителя. Если у старого
                         // сообщения нет ts (отправлено до этого фикса) — используем сохранённую строку как запасной вариант.
                         const timeStr = m.ts ? geEngine.ui._fmtTime(m.ts) : (m.time || geEngine.ui._fmtTime(Date.now()));
+                        // Имя отправителя над сообщением. Для чужих сообщений — кликабельное,
+                        // открывает мини-профиль (аватар, имя, кнопки Чат/Звонок/Видео).
+                        const metaTopHtml = isMe
+                            ? 'Вы'
+                            : `<span class="ge-user-link" onclick="event.stopPropagation(); geEngine.ui.openUserProfile('${(m.email||'').replace(/'/g,"\\'")}', '${(m.username||'').replace(/'/g,"\\'")}')">${m.username}</span>`;
                         const uid = msgIdCounter++;
 
                         // СИСТЕМНОЕ СООБЩЕНИЕ (вступление/выход из группы и т.п.)
@@ -3380,7 +3576,7 @@
                                 ? `${isVideo ? 'Видеозвонок' : 'Аудиозвонок'} • ${Math.floor((m.duration||0)/60)}:${String((m.duration||0)%60).padStart(2,'0')}`
                                 : (m.status === 'declined' ? 'Звонок отклонён' : 'Пропущенный звонок');
                             return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'} ge-call-bubble ${missed ? 'missed' : ''}">
-                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
+                                <span class="ge-msg-meta-top">${metaTopHtml}</span>
                                 <div class="ge-call-bubble-row">
                                     <span class="ge-call-bubble-icon">${icon}</span>
                                     <span>${label}</span>
@@ -3397,7 +3593,7 @@
                             const mediaSrc = m.mediaData || (m.mediaKey ? localStorage.getItem(m.mediaKey) : null) || '';
                             if (!mediaSrc) return '';
                             return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}" style="padding:6px;">
-                                <span class="ge-msg-meta-top" style="padding:6px 8px 0;">${isMe ? 'Вы' : m.username}</span>
+                                <span class="ge-msg-meta-top" style="padding:6px 8px 0;">${metaTopHtml}</span>
                                 <img class="ge-msg-image" src="${mediaSrc}" onclick="window.open('${mediaSrc}', '_blank')" alt="Фото">
                                 <div class="ge-msg-status-line" style="padding:4px 8px 2px;">
                                     <span>${timeStr}</span>
@@ -3413,7 +3609,7 @@
                             const sizeStr = m.fileSize ? (m.fileSize > 1024*1024 ? (m.fileSize/1024/1024).toFixed(1)+' МБ' : Math.round(m.fileSize/1024)+' КБ') : '';
                             const fileIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`;
                             return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}">
-                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
+                                <span class="ge-msg-meta-top">${metaTopHtml}</span>
                                 <a class="ge-msg-file" href="${mediaSrc}" download="${m.fileName || 'файл'}">
                                     <span class="ge-msg-file-icon">${fileIcon}</span>
                                     <span class="ge-msg-file-info">
@@ -3439,7 +3635,7 @@
                             }).join('');
                             const playIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
                             return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}">
-                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
+                                <span class="ge-msg-meta-top">${metaTopHtml}</span>
                                 <audio id="va-${uid}" class="ge-voice-audio" src="${mediaSrc}" preload="metadata"></audio>
                                 <div class="ge-voice-msg">
                                     <button class="ge-play-btn" onclick="geEngine.media.toggleVoice(this,'va-${uid}')">${playIcon}</button>
@@ -3459,7 +3655,7 @@
                             if (!mediaSrc) return ''; // медиа не найдено на этом устройстве
                             const playIcon = `<svg width="36" height="36" viewBox="0 0 24 24" fill="white" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4))"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
                             return `<div class="ge-msg-bubble ge-bubble-circle ${isMe ? 'me' : 'them'}">
-                                <span class="ge-msg-meta-top" style="color:var(--text-secondary);padding-left:4px">${isMe ? 'Вы' : m.username}</span>
+                                <span class="ge-msg-meta-top" style="color:var(--text-secondary);padding-left:4px">${metaTopHtml}</span>
                                 <div class="ge-circle-wrap" onclick="geEngine.media.toggleCircle(this,'cv-${uid}')">
                                     <video id="cv-${uid}" src="${mediaSrc}" preload="metadata" playsinline></video>
                                     <div class="ge-circle-overlay">${playIcon}</div>
@@ -3473,7 +3669,7 @@
 
                         // ОБЫЧНОЕ СООБЩЕНИЕ
                         return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'}">
-                                <span class="ge-msg-meta-top">${isMe ? 'Вы' : m.username}</span>
+                                <span class="ge-msg-meta-top">${metaTopHtml}</span>
                                 <div class="ge-msg-text">${m.text}</div>
                                 <div class="ge-msg-status-line">
                                     <span>${timeStr}</span>
@@ -4095,8 +4291,15 @@
                     // старый ответ иногда перезаписывал более новый и список/сообщения дёргались.
                     if (geEngine.chat._isRefreshing) return;
                     geEngine.chat._isRefreshing = true;
+                    // Фиксируем, для какой комнаты именно делаем запрос. Если пока идёт fetch
+                    // пользователь успеет переключиться на другой чат, geEngine.state.activeRoom
+                    // изменится ДО того, как придёт ответ — а ответ при этом всё равно относится
+                    // к requestedRoom. Раньше это приводило к тому, что сообщения СТАРОЙ комнаты
+                    // ошибочно кэшировались и отрисовывались как будто это НОВАЯ ("интерфейс не
+                    // успевает за переключением").
+                    const requestedRoom = geEngine.state.activeRoom || 'general';
                     try {
-                        const url = `/api/index?room=${geEngine.state.activeRoom || 'general'}&user_email=${geEngine.state.session.email}`;
+                        const url = `/api/index?room=${requestedRoom}&user_email=${geEngine.state.session.email}`;
                         const res = await fetch(url);
                         const data = await res.json();
 
@@ -4119,13 +4322,25 @@
                             geEngine.groups._checkActiveGroupAlive(geEngine.state.activeRoom);
                         }
 
-                        if (geEngine.state.activeRoom && !geEngine.state.deletedRooms.includes(geEngine.state.activeRoom)) {
+                        if (requestedRoom && !geEngine.state.deletedRooms.includes(requestedRoom)) {
                             if(geEngine.state.activeTab !== 'calls') {
                                 // Учитываем и сами сообщения, и отметки прочтения — иначе двойная
                                 // галочка не появлялась бы, пока не изменится текст сообщений.
                                 const newMessages = JSON.stringify({ m: data.messages?.result, r: data.reads });
-                                // Не перерисовываем если сообщения не изменились
-                                if (newMessages !== geEngine.chat._lastMessages) {
+
+                                // Кэшируем ответ ПОД ТЕМ КЛЮЧОМ, к которому он реально относится
+                                // (requestedRoom), независимо от того, что открыто прямо сейчас —
+                                // это безопасно и полезно для мгновенного показа при следующем
+                                // открытии этого чата.
+                                if (!geEngine.state._msgCache) geEngine.state._msgCache = {};
+                                geEngine.state._msgCache[requestedRoom] = {
+                                    messages: data.messages?.result,
+                                    reads: data.reads || {},
+                                };
+
+                                // А вот НА ЭКРАН выводим только если пользователь всё ещё смотрит
+                                // именно эту комнату — иначе покажем чужие сообщения не в том чате.
+                                if (geEngine.state.activeRoom === requestedRoom && newMessages !== geEngine.chat._lastMessages) {
                                     // Не перерисовываем если играет аудио/видео, или если пользователь
                                     // сейчас проскроллил вверх и читает историю — иначе его вид "прыгал"
                                     // обратно к последнему сообщению на каждый тик опроса.
@@ -4136,13 +4351,6 @@
                                         geEngine.chat._lastMessages = newMessages;
                                         geEngine.state.currentRoomReads = data.reads || {};
                                         geEngine.ui.renderMessages(data.messages?.result);
-                                        // Кэшируем — чтобы при следующем открытии этого чата
-                                        // сообщения показались мгновенно, без "Загрузка...".
-                                        if (!geEngine.state._msgCache) geEngine.state._msgCache = {};
-                                        geEngine.state._msgCache[geEngine.state.activeRoom] = {
-                                            messages: data.messages?.result,
-                                            reads: data.reads || {},
-                                        };
                                     }
                                 }
                             }
@@ -4217,8 +4425,7 @@
                     // Если приватный чат — грузим профиль собеседника
                     if (id.startsWith('private-')) {
                         const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                        const parts = id.replace('private-', '').split('-');
-                        const otherSafe = parts.find(p => p !== myMailSafe);
+                        const otherSafe = otherPrivateSafe(id, myMailSafe);
                         const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe);
                         if (targetEmail) {
                             try {
@@ -4321,6 +4528,8 @@
                     }
                     localStorage.setItem('ge_pinned_rooms', JSON.stringify(geEngine.state.pinnedRooms));
                     geEngine.ui._lastChatList = null; // форсируем перерисовку списка
+                    // Перерисовываем сразу из кэша — не ждём сеть, чтобы порядок обновился мгновенно
+                    geEngine.ui.renderChatList(geEngine.state._lastAllRooms || []);
                     geEngine.chat.refresh();
                 },
 
@@ -5300,6 +5509,10 @@
         <button class="ge-popup-item" onclick="geEngine.profile.open()">
             <span class="ge-popup-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
             <span class="ge-popup-label">Профиль</span>
+        </button>
+        <button class="ge-popup-item" onclick="geEngine.ui.openDonate()">
+            <span class="ge-popup-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></span>
+            <span class="ge-popup-label">Поддержать проект</span>
         </button>
         <button class="ge-popup-item danger" onclick="geEngine.auth.deleteAccountFull()">
             <span class="ge-popup-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></span>
