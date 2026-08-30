@@ -194,6 +194,7 @@ export default async function handler(request, response) {
                     nickname: profile.nickname ?? '',
                     avColor:  profile.avColor  ?? 'var(--ge-accent-gradient)',
                     avImg:    profile.avImg     ?? null,
+                    bio:      profile.bio       ?? '',
                 },
             });
         }
@@ -207,12 +208,13 @@ export default async function handler(request, response) {
             const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
             if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
 
-            const { name, nickname, avColor, password, avImg } = request.body;
+            const { name, nickname, avColor, password, avImg, bio } = request.body;
             const fields = [];
 
             if (name)     fields.push('name',     name);
             if (avColor)  fields.push('avColor',  avColor);
             if (password) fields.push('password', await hashPassword(password));
+            if (bio !== undefined) fields.push('bio', (bio || '').toString().slice(0, 150));
 
             if (nickname) {
                 const nickLower = nickname.toLowerCase();
