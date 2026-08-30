@@ -231,6 +231,37 @@ export default async function handler(request, response) {
             return response.status(200).json({ status: 'ok' });
         }
 
+        // Полное удаление аккаунта — реально стирает данные пользователя (не косметика)
+        if (action === 'deleteAccount') {
+            const jwtEmail   = await tryAuth(request, env.jwt);
+            const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+            if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
+
+            // Отвязываемся от контактов — убираем себя из ЧУЖИХ списков контактов тоже
+            const myContacts = (await db('SMEMBERS', `contacts:${emailLower}`)) ?? [];
+            await Promise.all(myContacts.map(c => db('SREM', `contacts:${c}`, emailLower)));
+
+            // Выходим из всех групп, в которых состоим (участие, не владение — group: хэш не трогаем,
+            // это отдельный edge case для групп, которыми человек владел)
+            const myRooms = (await db('SMEMBERS', `user_rooms:${emailLower}`)) ?? [];
+            await Promise.all(
+                myRooms
+                    .filter(r => r !== 'general' && !r.startsWith('private-'))
+                    .map(r => db('SREM', `group_members:${r}`, emailLower))
+            );
+
+            // Освобождаем никнейм
+            const nickname = await db('HGET', `profile:${emailLower}`, 'nickname');
+            if (nickname) await db('DEL', `nick:${nickname}`);
+
+            await db('DEL', `contacts:${emailLower}`);
+            await db('DEL', `user_rooms:${emailLower}`);
+            await db('DEL', `profile:${emailLower}`);
+            await db('SREM', 'all_users', emailLower);
+
+            return response.status(200).json({ status: 'ok' });
+        }
+
         // ══════════════════════════════════════════════════════
         //  СОХРАНЕНИЕ ПРОФИЛЯ  — публичный (вызывается после OTP)
         // ══════════════════════════════════════════════════════
@@ -474,6 +505,29 @@ export default async function handler(request, response) {
         }
 
         // Покинуть группу (для участников, не владельца)
+        // Очистить чат: mode=me — только у себя (остальные видят историю как раньше),
+        // mode=all — стереть переписку полностью для обеих сторон (только приватные чаты)
+        if (action === 'clearChat' && room) {
+            const jwtEmail   = await tryAuth(request, env.jwt);
+            const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+            if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
+
+            const mode = (request.query.mode || 'me').toString();
+
+            if (mode === 'all') {
+                if (!room.startsWith('private-')) {
+                    return response.status(403).json({ status: 'error', message: 'Полная очистка доступна только для личных чатов' });
+                }
+                await db('DEL', `room:${room}`);
+                await db('DEL', `room_cleared:${room}`);
+                return response.status(200).json({ status: 'ok', mode: 'all' });
+            }
+
+            // mode 'me' — помечаем время, раньше которого сообщения скрываются только у нас
+            await db('HSET', `room_cleared:${room}`, emailLower, Date.now());
+            return response.status(200).json({ status: 'ok', mode: 'me' });
+        }
+
         if (action === 'leaveGroup' && request.query.groupId) {
             const jwtEmail   = await tryAuth(request, env.jwt);
             const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
@@ -603,7 +657,7 @@ export default async function handler(request, response) {
         const jwtEmail   = await tryAuth(request, env.jwt);
         const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
 
-        const messages = await db('LRANGE', `room:${room}`, 0, 50);
+        let messages = await db('LRANGE', `room:${room}`, 0, 50);
 
         let rooms    = { result: [] };
         let contacts = { result: [] };
@@ -618,14 +672,27 @@ export default async function handler(request, response) {
             // чтобы отправитель видел двойную галочку, когда получатель прочитал сообщение.
             await db('HSET', `room_reads:${room}`, emailLower, Date.now());
 
-            const [rawRooms, rawContacts, rawReads] = await Promise.all([
+            const [rawRooms, rawContacts, rawReads, clearedBefore] = await Promise.all([
                 db('SMEMBERS', `user_rooms:${emailLower}`),
                 db('SMEMBERS', `contacts:${emailLower}`),
                 db('HGETALL', `room_reads:${room}`),
+                db('HGET', `room_cleared:${room}`, emailLower),
             ]);
             rooms    = { result: rawRooms    ?? [] };
             contacts = { result: rawContacts ?? [] };
             reads    = parseHash(rawReads);
+
+            // "Очистить у себя" — скрываем всё, что было отправлено до этой отметки,
+            // только для нас; у остальных участников история остаётся как была.
+            if (clearedBefore) {
+                const cutoff = Number(clearedBefore);
+                messages = (messages ?? []).filter(raw => {
+                    try {
+                        const m = JSON.parse(decodeURIComponent(raw));
+                        return !m.ts || m.ts > cutoff;
+                    } catch { return true; }
+                });
+            }
         }
 
         return response.status(200).json({ messages: { result: messages ?? [] }, rooms, contacts, reads });
