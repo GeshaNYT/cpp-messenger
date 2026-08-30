@@ -2112,22 +2112,31 @@
             <h2 class="ge-group-modal-title">Поддержать GeLink</h2>
             <p class="ge-group-modal-sub">Проект развивается без рекламы и платных подписок — если он вам полезен, можно поддержать разработку</p>
 
-            <label class="ge-group-field-label" style="text-align:left;">Банковская карта</label>
+            <label class="ge-group-field-label" style="text-align:left;">Банковская карта (Россия)</label>
             <div style="display:flex; align-items:stretch; gap:8px; margin-bottom:14px;">
-                <div class="ge-group-id-box" id="ge-donate-card" style="flex:1; font-size:18px; letter-spacing:2px; margin-bottom:0;">0000 0000 0000 0000</div>
+                <div class="ge-group-id-box" id="ge-donate-card" style="flex:1; font-size:18px; letter-spacing:2px; margin-bottom:0;">2204 3206 2435 7135</div>
             </div>
             <button class="ge-group-copy-btn" style="margin-bottom:16px;" onclick="geEngine.groups.copyId(document.getElementById('ge-donate-card').innerText.replace(/\s/g,''), this)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 <span>Скопировать номер карты</span>
             </button>
 
-            <label class="ge-group-field-label" style="text-align:left;">Крипто-кошелёк (USDT, TRC-20)</label>
+            <label class="ge-group-field-label" style="text-align:left;">USDT (TRC-20)</label>
             <div style="display:flex; align-items:stretch; gap:8px; margin-bottom:14px;">
-                <div class="ge-group-id-box" id="ge-donate-crypto" style="flex:1; font-size:13px; letter-spacing:0; word-break:break-all; margin-bottom:0;">TXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</div>
+                <div class="ge-group-id-box" id="ge-donate-crypto-trc20" style="flex:1; font-size:13px; letter-spacing:0; word-break:break-all; margin-bottom:0;">TRh7BvEYqLbJC9tDKFa6D2a92dyKz51UJQ</div>
             </div>
-            <button class="ge-group-copy-btn" onclick="geEngine.groups.copyId(document.getElementById('ge-donate-crypto').innerText, this)">
+            <button class="ge-group-copy-btn" style="margin-bottom:16px;" onclick="geEngine.groups.copyId(document.getElementById('ge-donate-crypto-trc20').innerText, this)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span>Скопировать адрес кошелька</span>
+                <span>Скопировать адрес (TRC-20)</span>
+            </button>
+
+            <label class="ge-group-field-label" style="text-align:left;">USDT (ERC-20)</label>
+            <div style="display:flex; align-items:stretch; gap:8px; margin-bottom:14px;">
+                <div class="ge-group-id-box" id="ge-donate-crypto-erc20" style="flex:1; font-size:13px; letter-spacing:0; word-break:break-all; margin-bottom:0;">0x4053Aa9C4bF1e8eF7a9867083cB44D96ECd7BEb3</div>
+            </div>
+            <button class="ge-group-copy-btn" onclick="geEngine.groups.copyId(document.getElementById('ge-donate-crypto-erc20').innerText, this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>Скопировать адрес (ERC-20)</span>
             </button>
 
             <button class="ge-group-cancel-btn" style="margin-top:16px;" onclick="geEngine.ui.closeDonate()">Закрыть</button>
@@ -3058,8 +3067,11 @@
                             av.style.background = profile.avColor;
                         }
                         // bio хранится как есть (не URI-кодировано) — не декодируем, иначе "%"
-                        // в тексте пользователя может сломать decodeURIComponent
-                        if (profile.bio) {
+                        // в тексте пользователя может сломать decodeURIComponent.
+                        // Не показываем bio, если оно текстуально совпадает с именем — иначе
+                        // получается визуальный дубль ("Геша" / "Геша").
+                        const displayedName = (profile.name || name || '').trim();
+                        if (profile.bio && profile.bio.trim() && profile.bio.trim() !== displayedName) {
                             document.getElementById('ge-user-profile-bio').innerText = profile.bio;
                             document.getElementById('ge-user-profile-bio').classList.remove('ge-hidden');
                         }
@@ -4476,7 +4488,33 @@
 
                     const footer = document.querySelector('.ge-footer');
                     if (footer) footer.style.visibility = 'visible';
+
+                    // Загружаем сообщения именно этой комнаты напрямую, не полагаясь только на
+                    // общий фоновый refresh() — у него есть защита от параллельных запросов
+                    // (_isRefreshing), и если она в этот момент была "занята" предыдущим тиком
+                    // опроса, запрос на новый чат мог тихо пропускаться, и "Загрузка..." висела
+                    // до следующего тика (иногда заметно долго). Это гарантированный, независимый путь.
+                    geEngine.chat._loadRoomMessages(id);
                     geEngine.chat.refresh();
+                },
+                // Прямая, независимая от _isRefreshing загрузка сообщений конкретной комнаты.
+                // Используется при открытии чата, чтобы гарантированно не "зависнуть" на "Загрузка...".
+                async _loadRoomMessages(id) {
+                    try {
+                        const res = await fetch(`/api/index?room=${encodeURIComponent(id)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`);
+                        const data = await res.json();
+
+                        if (!geEngine.state._msgCache) geEngine.state._msgCache = {};
+                        geEngine.state._msgCache[id] = { messages: data.messages?.result, reads: data.reads || {} };
+                        if (data.contacts?.result) geEngine.state.serverContacts = data.contacts.result;
+
+                        // Отрисовываем только если пользователь всё ещё смотрит именно эту комнату
+                        if (geEngine.state.activeRoom === id) {
+                            geEngine.state.currentRoomReads = data.reads || {};
+                            geEngine.chat._lastMessages = JSON.stringify({ m: data.messages?.result, r: data.reads });
+                            geEngine.ui.renderMessages(data.messages?.result);
+                        }
+                    } catch (e) {}
                 },
                 // ── Очистка чата ──────────────────────────────────────────────
                 _clearChatTarget: null,
