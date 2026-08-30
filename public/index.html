@@ -2384,7 +2384,7 @@
                 <button class="ge-chat-back-btn" style="display:none" onclick="document.getElementById('ge-main-app').classList.remove('mobile-chat-open')">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                 </button>
-                <div style="display: flex; align-items: center; gap: 20px; cursor: pointer;" onclick="geEngine.groups.openInfo()">
+                <div style="display: flex; align-items: center; gap: 20px; cursor: pointer;" onclick="geEngine.ui.openChatHeaderInfo()">
                     <div class="ge-user-av" id="ge-active-av" style="width: 55px; height: 55px; background: #555;">#</div>
                     <div>
                         <b id="ge-active-name" style="font-size: 24px;">Выберите диалог</b>
@@ -3012,6 +3012,26 @@
                 // ── Красивые всплывающие уведомления (тосты) ─────────────────────
                 // ── Поиск по чатам, группам и уже загруженным сообщениям ──────
                 // ── Мини-профиль пользователя (клик по имени в сообщении) ────────
+                // Клик по шапке чата (аватар+имя вверху): для группы — "Информация о группе",
+                // для личного чата — мини-профиль собеседника (тот же, что при клике на ник
+                // в сообщении). Раньше для личных чатов клик по шапке ничего не делал.
+                openChatHeaderInfo() {
+                    const rid = geEngine.state.activeRoom;
+                    if (!rid) return;
+                    if (geEngine.groups._isRealGroup(rid)) {
+                        geEngine.groups.openInfo();
+                        return;
+                    }
+                    if (rid.startsWith('private-')) {
+                        const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                        const otherSafe = otherPrivateSafe(rid, myMailSafe);
+                        const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe)
+                            || geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherSafe)?.email;
+                        if (!targetEmail) return;
+                        const name = document.getElementById('ge-active-name').innerText;
+                        geEngine.ui.openUserProfile(targetEmail, name);
+                    }
+                },
                 _userProfileTarget: null,
                 async openUserProfile(email, name) {
                     if (!email || email === geEngine.state.session.email) return; // не показываем себя
