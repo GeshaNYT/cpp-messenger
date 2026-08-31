@@ -355,6 +355,41 @@
             background: var(--ge-primary-soft);
         }
 
+        .ge-notif-badge {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            min-width: 16px;
+            height: 16px;
+            padding: 0 4px;
+            border-radius: 999px;
+            background: var(--ge-error);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        .ge-request-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border-radius: var(--radius-sm);
+        }
+        .ge-request-item:hover { background: var(--bg-input); }
+        .ge-request-item-name { flex: 1; font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ge-request-action-btn {
+            width: 30px; height: 30px; border-radius: 50%; border: none;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+            transition: transform var(--t-fast) var(--ease);
+        }
+        .ge-request-action-btn:hover { transform: scale(1.1); }
+        .ge-request-action-btn.accept { background: var(--ge-success); color: #fff; }
+        .ge-request-action-btn.decline { background: var(--bg-input); color: var(--ge-error); }
+
         .ge-sidebar-settings-btn.active {
             background: var(--ge-primary-soft);
             transform: rotate(45deg);
@@ -2363,7 +2398,12 @@
                         </div>
                     </div>
                     
-                    <div style="position: relative; overflow: visible; z-index: 99999;">
+                    <div style="position: relative; overflow: visible; z-index: 99999; display:flex; gap:6px; align-items:center;">
+                        <button id="ge-notif-bell-btn" class="ge-sidebar-settings-btn" style="position:relative;" onclick="geEngine.contacts.toggleRequestsPopup(event)" title="Заявки в контакты">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                            <span id="ge-notif-badge" class="ge-notif-badge ge-hidden">0</span>
+                        </button>
+                        <div id="ge-requests-popup" class="ge-settings-popup" style="position:fixed; display:none; min-width:280px; max-width:320px;"></div>
                         <button id="ge-settings-gear-btn" class="ge-sidebar-settings-btn" onclick="geEngine.ui.toggleSettingsMenu(event)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
                     </div>
                 </div>
@@ -4702,7 +4742,8 @@
                             return alert("Нельзя добавить самого себя.");
                         }
 
-                        // Шаг 2: Добавляем контакт
+                        // Шаг 2: Отправляем заявку в контакты (или сразу соединяемся, если уже
+                        // в контактах друг у друга, или собеседник уже присылал нам заявку)
                         const addRes = await fetch(`/api/index?action=addContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(targetEmail)}`);
                         const addData = await addRes.json();
 
@@ -4712,6 +4753,8 @@
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                             alert(`${displayName} добавлен! Диалог появится у обоих.`);
                             geEngine.chat.open(roomId, displayName);
+                        } else if (addData.status === 'pending') {
+                            alert(`Заявка отправлена «${displayName}». Как только он её примет, диалог откроется у вас обоих.`);
                         } else {
                             alert("Не удалось добавить контакт. Попробуйте позже.");
                         }
@@ -4741,6 +4784,10 @@
                 // т.к. пользователь смотрит именно на этот чат прямо сейчас.
                 async _checkActiveGroupAlive(rid) {
                     if (geEngine.groups._checkingActive === rid) return; // уже проверяем
+                    // Лёгкий троттлинг — раз в ~6 секунд достаточно для быстрого обнаружения
+                    // удаления группы, и вдвое меньше сетевых запросов на каждый тик опроса.
+                    if (Date.now() - (geEngine.groups._lastActiveCheck || 0) < 6000) return;
+                    geEngine.groups._lastActiveCheck = Date.now();
                     geEngine.groups._checkingActive = rid;
                     try {
                         const res = await fetch(`/api/index?action=getGroupInfo&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(rid)}`);
@@ -5175,6 +5222,128 @@
                 },
             },
 
+            contacts: {
+                _pending: [],
+                _lastCheck: 0,
+
+                // Периодическая проверка новых заявок (вызывается нечасто, не на каждый тик
+                // основного опроса сообщений, чтобы не создавать лишнюю нагрузку)
+                async checkRequests() {
+                    if (!geEngine.state.session || !geEngine.state.session.email) return;
+                    try {
+                        const res = await fetch(`/api/index?action=getContactRequests&user_email=${encodeURIComponent(geEngine.state.session.email)}`);
+                        const data = await res.json();
+                        if (data.status !== 'ok') return;
+
+                        const prevCount = geEngine.contacts._pending.length;
+                        geEngine.contacts._pending = data.requests || [];
+                        const badge = document.getElementById('ge-notif-badge');
+                        if (badge) {
+                            const n = geEngine.contacts._pending.length;
+                            badge.innerText = n > 9 ? '9+' : n;
+                            badge.classList.toggle('ge-hidden', n === 0);
+                        }
+                        // Если появилась новая заявка (не просто открыли приложение) — уведомляем тостом
+                        if (geEngine.contacts._lastCheck && geEngine.contacts._pending.length > prevCount) {
+                            const newest = geEngine.contacts._pending[0];
+                            geEngine.ui.showToast(`${newest.name} хочет добавить вас в контакты`, 'info');
+                        }
+                        geEngine.contacts._lastCheck = Date.now();
+
+                        // Если попап открыт — обновляем его содержимое вживую
+                        const popup = document.getElementById('ge-requests-popup');
+                        if (popup && popup.style.display !== 'none') geEngine.contacts._renderPopup();
+                    } catch (e) {}
+                },
+
+                toggleRequestsPopup(e) {
+                    e.stopPropagation();
+                    const popup = document.getElementById('ge-requests-popup');
+                    const wasOpen = popup.style.display === 'flex';
+                    document.querySelectorAll('.ge-settings-popup.active').forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
+                    if (wasOpen) { popup.style.display = 'none'; return; }
+
+                    geEngine.contacts._renderPopup();
+                    popup.style.display = 'flex';
+                    popup.style.flexDirection = 'column';
+                    popup.classList.add('active');
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    popup.style.top = (rect.bottom + 10) + 'px';
+                    popup.style.left = rect.left + 'px';
+                    popup.style.right = 'auto';
+
+                    setTimeout(() => {
+                        document.addEventListener('click', function closeReq() {
+                            popup.classList.remove('active');
+                            popup.style.display = 'none';
+                            document.removeEventListener('click', closeReq);
+                        });
+                    }, 0);
+                },
+                _renderPopup() {
+                    const popup = document.getElementById('ge-requests-popup');
+                    if (!popup) return;
+                    const list = geEngine.contacts._pending;
+                    if (!list.length) {
+                        popup.innerHTML = `<div style="text-align:center;padding:16px 10px;opacity:0.6;font-size:13px;">Заявок пока нет</div>`;
+                        return;
+                    }
+                    popup.innerHTML = `<div style="padding:8px 10px 4px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-tertiary);letter-spacing:.4px;">Заявки в контакты</div>` +
+                        list.map(r => `
+                            <div class="ge-request-item">
+                                <div class="ge-user-av" style="width:36px;height:36px;font-size:14px;background:var(--ge-accent-gradient);flex-shrink:0;">${(r.name[0]||'#').toUpperCase()}</div>
+                                <span class="ge-request-item-name">${r.name}</span>
+                                <button class="ge-request-action-btn accept" title="Принять" onclick="event.stopPropagation(); geEngine.contacts.accept('${r.email.replace(/'/g,"\\'")}')">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                </button>
+                                <button class="ge-request-action-btn decline" title="Отклонить" onclick="event.stopPropagation(); geEngine.contacts.decline('${r.email.replace(/'/g,"\\'")}')">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                </button>
+                            </div>
+                        `).join('');
+                },
+                async accept(email) {
+                    try {
+                        const res = await fetch(`/api/index?action=acceptContactRequest&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(email)}`);
+                        const data = await res.json();
+                        if (data.status !== 'ok') { geEngine.ui.showToast(data.message || 'Не удалось принять заявку', 'error'); return; }
+
+                        geEngine.contacts._pending = geEngine.contacts._pending.filter(r => r.email !== email);
+                        geEngine.contacts._renderPopup();
+                        const badge = document.getElementById('ge-notif-badge');
+                        if (badge) {
+                            const n = geEngine.contacts._pending.length;
+                            badge.innerText = n > 9 ? '9+' : n;
+                            badge.classList.toggle('ge-hidden', n === 0);
+                        }
+
+                        geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== data.roomId);
+                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+                        if (!geEngine.state.localRooms.includes(data.roomId)) geEngine.state.localRooms.push(data.roomId);
+                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+
+                        geEngine.ui.showToast(`Вы теперь в контактах с ${data.name}`, 'success');
+                        geEngine.chat.open(data.roomId, data.name);
+                        geEngine.chat.refresh();
+                    } catch (e) {
+                        geEngine.ui.showToast('Ошибка соединения с сервером', 'error');
+                    }
+                },
+                async decline(email) {
+                    try {
+                        await fetch(`/api/index?action=declineContactRequest&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(email)}`);
+                    } catch (e) {}
+                    geEngine.contacts._pending = geEngine.contacts._pending.filter(r => r.email !== email);
+                    geEngine.contacts._renderPopup();
+                    const badge = document.getElementById('ge-notif-badge');
+                    if (badge) {
+                        const n = geEngine.contacts._pending.length;
+                        badge.innerText = n > 9 ? '9+' : n;
+                        badge.classList.toggle('ge-hidden', n === 0);
+                    }
+                },
+            },
+
             media: {
                 _mode: 'voice',       // 'voice' | 'circle'
                 _recording: false,
@@ -5487,6 +5656,8 @@
                 // (~12 сек) независимо от частоты этого тика.
                 setInterval(() => geEngine.chat.refresh(), 3000);
                 setInterval(() => geEngine.calls._pollSignals(), 2000);
+                geEngine.contacts.checkRequests();
+                setInterval(() => geEngine.contacts.checkRequests(), 10000);
                 geEngine.media.init();
             }
         };
