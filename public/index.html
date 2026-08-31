@@ -954,14 +954,15 @@
             animation: ge-msg-pop 0.4s var(--ease);
         }
 
-        .ge-call-bubble-row {
+        .ge-call-system-msg {
             display: flex;
             align-items: center;
             gap: 8px;
             font-weight: 600;
         }
         .ge-call-bubble-icon { display:flex; flex-shrink:0; color: var(--ge-success); }
-        .ge-call-bubble.missed .ge-call-bubble-icon { color: var(--ge-error); }
+        .ge-call-system-msg.missed .ge-call-bubble-icon { color: var(--ge-error); }
+        .ge-call-system-time { opacity: 0.6; font-weight: 500; }
 
         /* --- КЛИКАБЕЛЬНОЕ ИМЯ ОТПРАВИТЕЛЯ + МИНИ-ПРОФИЛЬ --- */
         .ge-user-link { cursor: pointer; }
@@ -3597,26 +3598,40 @@
                             return `<div class="ge-system-msg">${m.text}</div>`;
                         }
 
-                        // КАРТОЧКА ЗВОНКА (принят/пропущен/отклонён + длительность)
+                        // КАРТОЧКА ЗВОНКА — рендерится как системное сообщение (не от лица
+                        // конкретного человека), и текст считается ЗАНОВО для каждого зрителя:
+                        // тот, кто звонил, видит "Исходящий", тот кому звонили — "Входящий",
+                        // даже если запись в комнате всего одна и её отправил только один из них.
                         if (m.type === 'call') {
                             const isVideo = m.callType === 'video';
-                            const missed = m.status !== 'answered';
+                            const kind = isVideo ? 'видеозвонок' : 'аудиозвонок';
+                            const posterIsViewer = m.email === geEngine.state.session.email;
+                            // m.direction — направление с точки зрения того, кто ЗАПИСАЛ событие
+                            // (положил трубку/отклонил). Для второй стороны его нужно развернуть.
+                            const viewerDirection = posterIsViewer ? m.direction : (m.direction === 'outgoing' ? 'incoming' : 'outgoing');
+
+                            let text, missed;
+                            if (m.status === 'answered') {
+                                const durStr = `${Math.floor((m.duration||0)/60)}:${String((m.duration||0)%60).padStart(2,'0')}`;
+                                text = `${viewerDirection === 'outgoing' ? 'Исходящий' : 'Входящий'} ${kind} • ${durStr}`;
+                                missed = false;
+                            } else if (m.status === 'declined') {
+                                text = posterIsViewer ? 'Вы отклонили звонок' : 'Звонок отклонён';
+                                missed = true;
+                            } else {
+                                // missed — не дозвонились/не успели ответить
+                                text = viewerDirection === 'outgoing' ? 'Нет ответа' : 'Пропущенный звонок';
+                                missed = true;
+                            }
+
                             const icon = isVideo
-                                ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`
-                                : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.23h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6.29 6.29l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
-                            const label = m.status === 'answered'
-                                ? `${isVideo ? 'Видеозвонок' : 'Аудиозвонок'} • ${Math.floor((m.duration||0)/60)}:${String((m.duration||0)%60).padStart(2,'0')}`
-                                : (m.status === 'declined' ? 'Звонок отклонён' : 'Пропущенный звонок');
-                            return `<div class="ge-msg-bubble ${isMe ? 'me' : 'them'} ge-call-bubble ${missed ? 'missed' : ''}">
-                                <span class="ge-msg-meta-top">${metaTopHtml}</span>
-                                <div class="ge-call-bubble-row">
-                                    <span class="ge-call-bubble-icon">${icon}</span>
-                                    <span>${label}</span>
-                                </div>
-                                <div class="ge-msg-status-line">
-                                    <span>${timeStr}</span>
-                                    ${isMe ? `<span>${statusIcon}</span>` : ''}
-                                </div>
+                                ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`
+                                : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.23h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6.29 6.29l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
+
+                            return `<div class="ge-system-msg ge-call-system-msg ${missed ? 'missed' : ''}">
+                                <span class="ge-call-bubble-icon">${icon}</span>
+                                <span>${text}</span>
+                                <span class="ge-call-system-time">${timeStr}</span>
                             </div>`;
                         }
 
