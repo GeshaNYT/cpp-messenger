@@ -328,9 +328,65 @@ export default async function handler(request, response) {
         if (action === 'addContact' && target_email) {
             const jwtEmail   = await tryAuth(request, env.jwt);
             const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+            if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
 
             if (await db('SISMEMBER', 'all_users', target_email) !== 1)
                 return response.status(404).json({ status: 'error', message: 'User not found' });
+
+            const myId    = emailLower.replace(/[@.]/g, '').toLowerCase();
+            const otherId = target_email.replace(/[@.]/g, '').toLowerCase();
+            const roomId  = `private-${[myId, otherId].sort().join('-')}`;
+
+            // Уже в контактах друг у друга — ничего заново отправлять не нужно
+            const alreadyContacts = await db('SISMEMBER', `contacts:${emailLower}`, target_email);
+            if (alreadyContacts) {
+                await db('SADD', `user_rooms:${emailLower}`, roomId);
+                return response.status(200).json({ status: 'success', message: 'Contact added', roomId });
+            }
+
+            // Если собеседник уже прислал ЗАЯВКУ нам — считаем это взаимным согласием
+            // и сразу соединяем (как и во ВК: если оба отправили заявку друг другу)
+            const theyAlreadyRequestedMe = await db('HGET', `contact_requests:${emailLower}`, target_email);
+            if (theyAlreadyRequestedMe) {
+                await db('HDEL', `contact_requests:${emailLower}`, target_email);
+                await db('SADD', `contacts:${emailLower}`,   target_email);
+                await db('SADD', `user_rooms:${emailLower}`, roomId);
+                await db('SADD', `contacts:${target_email}`, emailLower);
+                await db('SADD', `user_rooms:${target_email}`, roomId);
+                return response.status(200).json({ status: 'success', message: 'Contact added', roomId });
+            }
+
+            // Иначе — отправляем заявку получателю, дожидаемся его подтверждения
+            await db('HSET', `contact_requests:${target_email}`, emailLower, Date.now());
+            return response.status(200).json({ status: 'pending', message: 'Заявка отправлена' });
+        }
+
+        // Список входящих заявок в контакты (для уведомления, "как во ВК")
+        if (action === 'getContactRequests') {
+            const jwtEmail   = await tryAuth(request, env.jwt);
+            const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+            if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
+
+            const raw = await db('HGETALL', `contact_requests:${emailLower}`);
+            const map = parseHash(raw);
+            const requests = await Promise.all(Object.entries(map).map(async ([fromEmail, ts]) => {
+                const name = await db('HGET', `profile:${fromEmail}`, 'name');
+                return { email: fromEmail, name: name || fromEmail, ts: Number(ts) };
+            }));
+            requests.sort((a, b) => b.ts - a.ts);
+            return response.status(200).json({ status: 'ok', requests });
+        }
+
+        // Принять заявку в контакты — только теперь оба становятся видны друг другу
+        if (action === 'acceptContactRequest' && target_email) {
+            const jwtEmail   = await tryAuth(request, env.jwt);
+            const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+            if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
+
+            const hasRequest = await db('HGET', `contact_requests:${emailLower}`, target_email);
+            if (!hasRequest) return response.status(404).json({ status: 'error', message: 'Заявка не найдена' });
+
+            await db('HDEL', `contact_requests:${emailLower}`, target_email);
 
             const myId    = emailLower.replace(/[@.]/g, '').toLowerCase();
             const otherId = target_email.replace(/[@.]/g, '').toLowerCase();
@@ -341,7 +397,19 @@ export default async function handler(request, response) {
             await db('SADD', `contacts:${target_email}`, emailLower);
             await db('SADD', `user_rooms:${target_email}`, roomId);
 
-            return response.status(200).json({ status: 'success', message: 'Contact added', roomId });
+            const name = await db('HGET', `profile:${target_email}`, 'name');
+            await pushSystemMessage(db, roomId, 'Заявка в контакты принята — теперь вы можете переписываться', emailLower);
+            return response.status(200).json({ status: 'ok', roomId, name: name || target_email });
+        }
+
+        // Отклонить заявку в контакты — просто удаляем её, диалог не создаётся
+        if (action === 'declineContactRequest' && target_email) {
+            const jwtEmail   = await tryAuth(request, env.jwt);
+            const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+            if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
+
+            await db('HDEL', `contact_requests:${emailLower}`, target_email);
+            return response.status(200).json({ status: 'ok' });
         }
 
         if (action === 'removeContact' && target_email) {
