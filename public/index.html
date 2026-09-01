@@ -1459,6 +1459,43 @@
             vertical-align: middle;
         }
 
+        /* --- РЕЖИМ ВЫБОРА (мультиселект чатов/групп/звонков) --- */
+        .ge-chat-item.select-mode { cursor: pointer; }
+        .ge-chat-item.selected { background: var(--ge-primary-soft); }
+        .ge-select-checkbox {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color, #ccc);
+            flex-shrink: 0;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+        .ge-select-checkbox.checked {
+            background: var(--ge-primary);
+            border-color: var(--ge-primary);
+        }
+        .ge-select-checkbox svg { opacity: 0; transform: scale(0.5); transition: all 0.15s ease; }
+        .ge-select-checkbox.checked svg { opacity: 1; transform: scale(1); }
+        .ge-select-toolbar-btn {
+            padding: 10px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            background: var(--bg-body);
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+        .ge-select-toolbar-btn.primary { background: var(--ge-primary); color: #fff; }
+        .ge-select-toolbar-btn.danger { background: rgba(250,62,62,0.12); color: var(--ge-error); }
+        .ge-select-toolbar-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .ge-select-count { font-size: 12px; font-weight: 800; color: var(--text-tertiary); margin-right: 2px; }
+
         /* --- МЕНЮ СКРЕПКИ (галерея/файл) --- */
         #ge-attach-btn { position: relative; }
         .ge-attach-menu {
@@ -2448,10 +2485,14 @@
                     <button id="nav-search" class="ge-nav-tab" onclick="geEngine.ui.setTab('search')">ПОИСК</button>
                 </div>
 
-                <div style="display: flex; gap: 12px;">
+                <div id="ge-header-actions-row" style="display: flex; gap: 12px;">
                     <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0;" onclick="geEngine.chat.addFriend()">+ ДОБАВИТЬ</button>
                     <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0; background: var(--bg-body); color: var(--text-primary); box-shadow: none;" onclick="geEngine.groups.openChoice()">+ ГРУППА</button>
+                    <button id="ge-select-toggle-btn" class="ge-sidebar-settings-btn" style="width:46px;height:46px;flex-shrink:0;" title="Выбрать несколько" onclick="geEngine.ui.toggleSelectMode()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    </button>
                 </div>
+                <div id="ge-select-toolbar" class="ge-hidden" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"></div>
             </header>
 
             <div id="ge-chat-list-scroller" class="ge-chat-list">
@@ -2574,6 +2615,8 @@
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 pinnedRooms: JSON.parse(localStorage.getItem('ge_pinned_rooms') || "[]"), // закреплённые чаты/группы, максимум 5
+                selectMode: false, // режим множественного выбора в списке (чаты/группы/звонки)
+                selectedIds: new Set(), // выбранные rid (для звонков — их ts)
                 groupProfiles: {},    // кэш {groupId: {name, memberCount, isOwner}}
                 usersDB: JSON.parse(localStorage.getItem('ge_users_db') || "[]"),
                 serverContacts: [],   // email-адреса контактов с сервера
@@ -3367,10 +3410,22 @@
                 },
                 setTab(tab) {
                     geEngine.state.activeTab = tab;
+                    // Переключение вкладки — сбрасываем режим выбора, т.к. набор id другой
+                    if (geEngine.state.selectMode) {
+                        geEngine.state.selectMode = false;
+                        geEngine.state.selectedIds = new Set();
+                        const row = document.getElementById('ge-header-actions-row');
+                        const bar = document.getElementById('ge-select-toolbar');
+                        if (row) row.classList.remove('ge-hidden');
+                        if (bar) { bar.classList.add('ge-hidden'); bar.innerHTML = ''; }
+                    }
                     ['chats', 'people', 'calls', 'search'].forEach(t => {
                         const el = document.getElementById('nav-' + t);
                         if(el) el.classList.toggle('active', tab === t);
                     });
+                    // На вкладке "Поиск" выбор чатов не имеет смысла — прячем кнопку
+                    const selectToggleBtn = document.getElementById('ge-select-toggle-btn');
+                    if (selectToggleBtn) selectToggleBtn.classList.toggle('ge-hidden', tab === 'search');
                     // Мгновенно показываем список из уже известных данных (без ожидания сети).
                     // Список звонков и так локальный (geEngine.state.historyCalls), а для
                     // чатов/групп используем последний полученный набор комнат.
@@ -3386,6 +3441,106 @@
                     const isActive = menu.classList.contains('active');
                     document.querySelectorAll('.ge-context-menu').forEach(m => m.classList.remove('active'));
                     if(!isActive) menu.classList.add('active');
+                },
+                // ── Режим множественного выбора (чаты/группы/звонки) ─────────────────
+                toggleSelectMode() {
+                    geEngine.state.selectMode = !geEngine.state.selectMode;
+                    geEngine.state.selectedIds = new Set();
+                    document.getElementById('ge-header-actions-row').classList.toggle('ge-hidden', geEngine.state.selectMode);
+                    document.getElementById('ge-select-toolbar').classList.toggle('ge-hidden', !geEngine.state.selectMode);
+                    geEngine.ui.renderSelectToolbar();
+                    geEngine.ui.renderChatList(geEngine.state._lastAllRooms || []);
+                },
+                toggleSelectItem(id) {
+                    const set = geEngine.state.selectedIds;
+                    if (set.has(id)) set.delete(id); else set.add(id);
+                    geEngine.ui.renderSelectToolbar();
+                    geEngine.ui.renderChatList(geEngine.state._lastAllRooms || []);
+                },
+                renderSelectToolbar() {
+                    const bar = document.getElementById('ge-select-toolbar');
+                    if (!bar) return;
+                    if (!geEngine.state.selectMode) { bar.innerHTML = ''; return; }
+
+                    const tab = geEngine.state.activeTab;
+                    const n = geEngine.state.selectedIds.size;
+                    const cancelBtn = `<button class="ge-select-toolbar-btn" onclick="geEngine.ui.toggleSelectMode()">Отмена</button>`;
+                    const countLabel = `<span class="ge-select-count">Выбрано: ${n}</span>`;
+
+                    if (tab === 'calls') {
+                        const allTs = geEngine.state.historyCalls.map(c => c.ts);
+                        const allSelected = allTs.length > 0 && allTs.every(ts => geEngine.state.selectedIds.has(ts));
+                        bar.innerHTML = `
+                            ${cancelBtn}
+                            <button class="ge-select-toolbar-btn" onclick="geEngine.ui.selectAllCalls()">${allSelected ? 'Снять всё' : 'Выбрать всё'}</button>
+                            <button class="ge-select-toolbar-btn danger" ${n === 0 ? 'disabled' : ''} onclick="geEngine.ui.bulkClearCalls()">Очистить (${n})</button>
+                            ${countLabel}
+                        `;
+                        return;
+                    }
+
+                    // chats / people (группы)
+                    const removeLabel = tab === 'people' ? 'Покинуть' : 'Удалить контакт';
+                    bar.innerHTML = `
+                        ${cancelBtn}
+                        <button class="ge-select-toolbar-btn" ${n === 0 ? 'disabled' : ''} onclick="geEngine.ui.bulkTogglePin()">Закрепить</button>
+                        <button class="ge-select-toolbar-btn" ${n === 0 ? 'disabled' : ''} onclick="geEngine.ui.bulkClearChat()">Очистить (${n})</button>
+                        <button class="ge-select-toolbar-btn danger" ${n === 0 ? 'disabled' : ''} onclick="geEngine.ui.bulkRemove()">${removeLabel} (${n})</button>
+                        ${countLabel}
+                    `;
+                },
+                selectAllCalls() {
+                    const allTs = geEngine.state.historyCalls.map(c => c.ts);
+                    const allSelected = allTs.length > 0 && allTs.every(ts => geEngine.state.selectedIds.has(ts));
+                    geEngine.state.selectedIds = allSelected ? new Set() : new Set(allTs);
+                    geEngine.ui.renderSelectToolbar();
+                    geEngine.ui.renderChatList(geEngine.state._lastAllRooms || []);
+                },
+                bulkClearCalls() {
+                    const ids = geEngine.state.selectedIds;
+                    if (ids.size === 0) return;
+                    if (!confirm(`Удалить ${ids.size} запис${ids.size === 1 ? 'ь' : 'и'} из истории звонков?`)) return;
+                    geEngine.state.historyCalls = geEngine.state.historyCalls.filter(c => !ids.has(c.ts));
+                    localStorage.setItem('ge_call_history', JSON.stringify(geEngine.state.historyCalls));
+                    geEngine.ui.showToast('История звонков очищена', 'success');
+                    geEngine.ui.toggleSelectMode();
+                },
+                bulkTogglePin() {
+                    const ids = [...geEngine.state.selectedIds];
+                    if (ids.length === 0) return;
+                    let skipped = 0;
+                    ids.forEach(rid => {
+                        const idx = geEngine.state.pinnedRooms.indexOf(rid);
+                        if (idx !== -1) {
+                            geEngine.state.pinnedRooms.splice(idx, 1);
+                        } else if (geEngine.state.pinnedRooms.length < 5) {
+                            geEngine.state.pinnedRooms.push(rid);
+                        } else {
+                            skipped++;
+                        }
+                    });
+                    localStorage.setItem('ge_pinned_rooms', JSON.stringify(geEngine.state.pinnedRooms));
+                    if (skipped > 0) geEngine.ui.showToast(`Можно закрепить не больше 5 чатов и групп — ${skipped} пропущено`, 'error');
+                    else geEngine.ui.showToast('Готово', 'success');
+                    geEngine.ui.toggleSelectMode();
+                    geEngine.chat.refresh();
+                },
+                bulkClearChat() {
+                    const ids = [...geEngine.state.selectedIds];
+                    if (ids.length === 0) return;
+                    geEngine.chat.openBulkClearChatModal(ids);
+                },
+                bulkRemove() {
+                    const ids = [...geEngine.state.selectedIds];
+                    if (ids.length === 0) return;
+                    const tab = geEngine.state.activeTab;
+                    const msg = tab === 'people'
+                        ? `Покинуть выбранные группы (${ids.length})?`
+                        : `Удалить выбранные контакты (${ids.length})?`;
+                    if (!confirm(msg)) return;
+                    ids.forEach(rid => geEngine.chat._removeRoomCore(rid));
+                    geEngine.ui.showToast('Готово', 'success');
+                    geEngine.ui.toggleSelectMode();
                 },
                 // Форматирует timestamp сообщения в локальное время ТОГО, кто сейчас смотрит экран.
                 // Именно поэтому нельзя хранить готовую строку времени — её нужно каждый раз
@@ -3419,8 +3574,18 @@
                     if (tab === 'calls') {
                         scroller.innerHTML = geEngine.state.historyCalls.length === 0
                             ? `<div style="text-align:center;padding:40px 20px;opacity:0.5;font-size:14px;">Звонков пока не было</div>`
-                            : geEngine.state.historyCalls.map(c => `
-                            <div class="ge-chat-item" ${c.roomId ? `onclick="geEngine.chat.open('${c.roomId}', '${(c.name||'').replace(/'/g, "\\'")}')"` : ''}>
+                            : geEngine.state.historyCalls.map(c => {
+                                const inSelectMode = geEngine.state.selectMode;
+                                const isSelected = geEngine.state.selectedIds.has(c.ts);
+                                const checkboxHtml = inSelectMode
+                                    ? `<div class="ge-select-checkbox ${isSelected ? 'checked' : ''}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>`
+                                    : '';
+                                const clickAttr = inSelectMode
+                                    ? `onclick="geEngine.ui.toggleSelectItem(${c.ts})"`
+                                    : (c.roomId ? `onclick="geEngine.chat.open('${c.roomId}', '${(c.name||'').replace(/'/g, "\\'")}')"` : '');
+                                return `
+                            <div class="ge-chat-item ${inSelectMode ? 'select-mode' : ''} ${isSelected ? 'selected' : ''}" ${clickAttr}>
+                                ${checkboxHtml}
                                 <div class="ge-user-av" style="width:50px; height:50px; background:#f5f5f5; color:#555;">${c.type === 'video'
                                     ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>'
                                     : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.23h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6.29 6.29l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
@@ -3430,7 +3595,8 @@
                                     <span style="color: ${c.status === 'Пропущенный' ? 'var(--ge-error)' : ''}">${c.status}${c.duration ? ' • ' + c.duration : ''} • ${c.time}</span>
                                 </div>
                             </div>
-                        `).join('');
+                        `;
+                            }).join('');
                         return;
                     }
 
@@ -3581,13 +3747,24 @@
                         const isPinned = geEngine.state.pinnedRooms.includes(rid);
                         const pinIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="transform:rotate(45deg);"><path d="M16 3l5 5-5.5 1.5L12 14l-2-2 4.5-4.5L16 3z"/><path d="M9 15l-6 6"/><path d="M12.5 8.5L9 12l3 3 3.5-3.5"/></svg>`;
 
+                        const inSelectMode = geEngine.state.selectMode;
+                        const isSelected = geEngine.state.selectedIds.has(rid);
+                        const checkboxHtml = inSelectMode
+                            ? `<div class="ge-select-checkbox ${isSelected ? 'checked' : ''}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>`
+                            : '';
+                        const itemClickAttr = inSelectMode
+                            ? `onclick="geEngine.ui.toggleSelectItem('${rid}')"`
+                            : `onclick="geEngine.chat.open('${rid}', '${displayName.replace(/'/g, "\'")}')"`;
+
                         return `
-                            <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''} ${isPinned ? 'pinned' : ''}" onclick="geEngine.chat.open('${rid}', '${displayName.replace(/'/g, "\'")}')">
+                            <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''} ${isPinned ? 'pinned' : ''} ${inSelectMode ? 'select-mode' : ''} ${isSelected ? 'selected' : ''}" ${itemClickAttr}>
+                                ${checkboxHtml}
                                 ${avHtml}
                                 <div class="ge-item-content">
                                     <b>${isPinned ? `<span class="ge-pin-badge">${pinIcon}</span>` : ''}${displayName}</b>
                                     <span>${subtitle}</span>
                                 </div>
+                                ${inSelectMode ? '' : `
                                 <div class="ge-item-dots" onclick="geEngine.ui.toggleMenu(event, '${rid}')">⋮</div>
                                 <div id="menu-${rid}" class="ge-context-menu">
                                     <button class="ge-menu-btn" onclick="event.stopPropagation(); geEngine.chat.togglePin(event, '${rid}')">
@@ -3605,6 +3782,7 @@
                                         </button>
                                     ` : ''}
                                 </div>
+                                `}
                             </div>
                         `;
                     }).join('');
@@ -4690,7 +4868,7 @@
                     // Закрываем открытое контекстное меню, если было
                     document.querySelectorAll('.ge-context-menu.active').forEach(m => m.classList.remove('active'));
 
-                    geEngine.chat._clearChatTarget = rid;
+                    geEngine.chat._clearChatTarget = [rid];
                     const isPrivate = rid.startsWith('private-');
                     const profile = geEngine.state.groupProfiles[rid];
                     const name = isPrivate
@@ -4705,35 +4883,45 @@
 
                     geEngine.ui._openModal('ge-modal-clear-chat');
                 },
+                // Массовая очистка нескольких выбранных чатов/групп сразу (режим выбора).
+                // "Очистить у всех" показываем, только если ВСЕ выбранные — приватные чаты
+                // (для групп сервер такой режим не разрешает — см. backend clearChat).
+                openBulkClearChatModal(ids) {
+                    geEngine.chat._clearChatTarget = ids;
+                    const allPrivate = ids.every(id => id.startsWith('private-'));
+                    document.getElementById('ge-clear-chat-sub').innerText = `Выбрано чатов: ${ids.length}. Выберите, как их очистить`;
+                    document.getElementById('ge-clear-chat-all-btn').classList.toggle('ge-hidden', !allPrivate);
+                    if (allPrivate) document.getElementById('ge-clear-chat-all-label').innerText = `Очистить у меня и у собеседников (${ids.length})`;
+                    geEngine.ui._openModal('ge-modal-clear-chat');
+                },
                 closeClearChatModal() {
                     geEngine.ui._closeModal('ge-modal-clear-chat');
                 },
                 async submitClearChat(mode) {
-                    const rid = geEngine.chat._clearChatTarget;
-                    if (!rid) return;
-                    if (mode === 'all' && !confirm('Переписка удалится безвозвратно у обеих сторон. Продолжить?')) return;
+                    const targets = geEngine.chat._clearChatTarget;
+                    if (!targets || !targets.length) return;
+                    if (mode === 'all' && !confirm(`Переписка удалится безвозвратно у обеих сторон${targets.length > 1 ? ` (${targets.length} чатов)` : ''}. Продолжить?`)) return;
 
-                    try {
-                        const res = await fetch(`/api/index?action=clearChat&room=${encodeURIComponent(rid)}&mode=${mode}&user_email=${encodeURIComponent(geEngine.state.session.email)}`);
-                        const data = await res.json();
-                        if (data.status !== 'ok') {
-                            geEngine.ui.showToast(data.message || 'Не удалось очистить чат', 'error');
-                            return;
+                    let failed = 0;
+                    for (const rid of targets) {
+                        try {
+                            const res = await fetch(`/api/index?action=clearChat&room=${encodeURIComponent(rid)}&mode=${mode}&user_email=${encodeURIComponent(geEngine.state.session.email)}`);
+                            const data = await res.json();
+                            if (data.status !== 'ok') { failed++; continue; }
+                        } catch (e) { failed++; continue; }
+
+                        // Чистим локальный кэш сообщений этой комнаты
+                        if (geEngine.state._msgCache) delete geEngine.state._msgCache[rid];
+                        if (geEngine.state.activeRoom === rid) {
+                            geEngine.chat._lastMessages = null;
+                            document.getElementById('ge-msg-container').innerHTML = '<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Здесь пока нет сообщений.</div>';
                         }
-                    } catch (e) {
-                        geEngine.ui.showToast('Ошибка соединения с сервером', 'error');
-                        return;
-                    }
-
-                    // Чистим локальный кэш сообщений этой комнаты
-                    if (geEngine.state._msgCache) delete geEngine.state._msgCache[rid];
-                    geEngine.chat._lastMessages = null;
-                    if (geEngine.state.activeRoom === rid) {
-                        document.getElementById('ge-msg-container').innerHTML = '<div style="text-align:center; padding: 20px; opacity:0.5; font-size:14px;">Здесь пока нет сообщений.</div>';
                     }
 
                     geEngine.chat.closeClearChatModal();
-                    geEngine.ui.showToast('Чат очищен', 'success');
+                    if (failed > 0) geEngine.ui.showToast(`Очищено, но ${failed} чат(ов) не удалось очистить`, 'error');
+                    else geEngine.ui.showToast(targets.length > 1 ? 'Чаты очищены' : 'Чат очищен', 'success');
+                    if (geEngine.state.selectMode) geEngine.ui.toggleSelectMode();
                     geEngine.chat.refresh();
                 },
 
@@ -4758,46 +4946,49 @@
                     geEngine.chat.refresh();
                 },
 
+                // Общее ядро удаления контакта / выхода из группы — без confirm() и без
+                // event.stopPropagation(), чтобы им мог пользоваться и одиночный removeRoom(),
+                // и массовое удаление из режима выбора.
+                _removeRoomCore(rid) {
+                    geEngine.state.deletedRooms.push(rid);
+                    localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
+
+                    // Если открыт этот чат — сбрасываем
+                    if (geEngine.state.activeRoom === rid) {
+                        geEngine.state.activeRoom = null;
+                        document.getElementById('ge-active-name').innerText = '';
+                        document.getElementById('ge-msg-container').innerHTML = '';
+                        const footer = document.querySelector('.ge-footer');
+                        if (footer) footer.style.visibility = 'hidden';
+                    }
+
+                    // Если приватная комната — удаляем с сервера (только у себя)
+                    if (rid.startsWith('private-')) {
+                        const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                        let targetEmail = null;
+                        const allCandidates = [
+                            ...geEngine.state.serverContacts,
+                            ...geEngine.state.usersDB.map(u => u.email)
+                        ];
+                        for (const email of allCandidates) {
+                            if (email === geEngine.state.session.email) continue;
+                            const safe = email.replace(/[@.]/g, '').toLowerCase();
+                            const expectedRoom = `private-${[myMailSafe, safe].sort().join('-')}`;
+                            if (expectedRoom === rid) { targetEmail = email; break; }
+                        }
+                        if (targetEmail) {
+                            fetch(`/api/index?action=removeContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(targetEmail)}`).catch(() => {});
+                        }
+                    } else if (geEngine.groups._isRealGroup(rid)) {
+                        // Настоящая группа — снимаем членство и на сервере, иначе она вернётся в списке
+                        geEngine.groups.leaveGroupNow(rid);
+                    }
+                },
                 removeRoom(e, rid) {
                     e.stopPropagation();
                     const msg = rid === 'general' ? 'Покинуть группу General?' : 'Удалить чат?';
-                    if(confirm(msg)) {
-                        geEngine.state.deletedRooms.push(rid);
-                        localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-
-                        // Если открыт этот чат — сбрасываем
-                        if (geEngine.state.activeRoom === rid) {
-                            geEngine.state.activeRoom = null;
-                            document.getElementById('ge-active-name').innerText = '';
-                            document.getElementById('ge-msg-container').innerHTML = '';
-                            const footer = document.querySelector('.ge-footer');
-                            if (footer) footer.style.visibility = 'hidden';
-                        }
-
-                        geEngine.chat.refresh();
-
-                        // Если приватная комната — удаляем с сервера (только у себя)
-                        if (rid.startsWith('private-')) {
-                            const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                            let targetEmail = null;
-                            const allCandidates = [
-                                ...geEngine.state.serverContacts,
-                                ...geEngine.state.usersDB.map(u => u.email)
-                            ];
-                            for (const email of allCandidates) {
-                                if (email === geEngine.state.session.email) continue;
-                                const safe = email.replace(/[@.]/g, '').toLowerCase();
-                                const expectedRoom = `private-${[myMailSafe, safe].sort().join('-')}`;
-                                if (expectedRoom === rid) { targetEmail = email; break; }
-                            }
-                            if (targetEmail) {
-                                fetch(`/api/index?action=removeContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(targetEmail)}`).catch(() => {});
-                            }
-                        } else if (geEngine.groups._isRealGroup(rid)) {
-                            // Настоящая группа — снимаем членство и на сервере, иначе она вернётся в списке
-                            geEngine.groups.leaveGroupNow(rid);
-                        }
-
+                    if (confirm(msg)) {
+                        geEngine.chat._removeRoomCore(rid);
                         geEngine.chat.refresh();
                     }
                 },
