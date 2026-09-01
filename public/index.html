@@ -2488,9 +2488,6 @@
                 <div id="ge-header-actions-row" style="display: flex; gap: 12px;">
                     <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0;" onclick="geEngine.chat.addFriend()">+ ДОБАВИТЬ</button>
                     <button class="ge-btn-submit" style="padding: 14px; font-size: 11px; margin: 0; background: var(--bg-body); color: var(--text-primary); box-shadow: none;" onclick="geEngine.groups.openChoice()">+ ГРУППА</button>
-                    <button id="ge-select-toggle-btn" class="ge-sidebar-settings-btn" style="width:46px;height:46px;flex-shrink:0;" title="Выбрать несколько" onclick="geEngine.ui.toggleSelectMode()">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                    </button>
                 </div>
                 <div id="ge-select-toolbar" class="ge-hidden" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"></div>
             </header>
@@ -2498,8 +2495,11 @@
             <div id="ge-chat-list-scroller" class="ge-chat-list">
                 </div>
 
-            <footer class="ge-sidebar-footer">
-                <button class="ge-logout-btn" onclick="geEngine.auth.exit()">ЗАВЕРШИТЬ СЕАНС</button>
+            <footer class="ge-sidebar-footer" style="display:flex; align-items:center; gap:8px;">
+                <button class="ge-logout-btn" style="flex:1;" onclick="geEngine.auth.exit()">ЗАВЕРШИТЬ СЕАНС</button>
+                <button id="ge-select-toggle-btn" class="ge-sidebar-settings-btn" style="width:34px;height:34px;flex-shrink:0;" title="Выбрать несколько" onclick="geEngine.ui.toggleSelectMode()">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                </button>
             </footer>
         </aside>
 
