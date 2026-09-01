@@ -256,6 +256,11 @@ export default async function handler(request, response) {
             const nickname = await db('HGET', `profile:${emailLower}`, 'nickname');
             if (nickname) await db('DEL', `nick:${nickname}`);
 
+            // Чистим заявки в контакты в обе стороны, чтобы после пересоздания
+            // аккаунта не оставалось "хвостов" от старого профиля
+            await db('DEL', `contact_requests:${emailLower}`);
+            await Promise.all(myContacts.map(c => db('HDEL', `contact_requests:${c}`, emailLower)));
+
             await db('DEL', `contacts:${emailLower}`);
             await db('DEL', `user_rooms:${emailLower}`);
             await db('DEL', `profile:${emailLower}`);
@@ -697,6 +702,19 @@ export default async function handler(request, response) {
             const jwtEmail   = await tryAuth(request, env.jwt);
             const emailLower = jwtEmail ?? user_email ?? (typeof body === 'object' ? body?.email : null) ?? '';
 
+            // Если это приватный чат — отправитель должен уже состоять в этой комнате
+            // (т.е. быть реальным контактом собеседника). private-комната добавляется в
+            // user_rooms только через addContact/acceptContactRequest, так что этой проверки
+            // достаточно, чтобы нельзя было слать сообщения (текст, фото, файлы, голосовые,
+            // видеосообщения — всё идёт через этот же путь) человеку, который не в контактах,
+            // в обход интерфейса (например, напрямую через API).
+            if (room.startsWith('private-') && emailLower) {
+                const isMember = await db('SISMEMBER', `user_rooms:${emailLower}`, room);
+                if (!isMember) {
+                    return response.status(403).json({ status: 'error', message: 'Нельзя писать пользователю, который не в контактах' });
+                }
+            }
+
             // Если это настоящая группа (не general, не приватный чат) — проверяем, что она
             // ещё существует. Иначе сообщение "воскрешало" удалённую группу: сервер молча
             // принимал его и заново добавлял комнату в user_rooms отправителя.
@@ -712,10 +730,19 @@ export default async function handler(request, response) {
             const bodyStr = typeof body === 'string' ? body : JSON.stringify(body);
             await db('LPUSH', `room:${room}`, encodeURIComponent(bodyStr));
 
+            // Добавляем в all_users/user_rooms ТОЛЬКО если профиль реально существует.
+            // Раньше это делалось безусловно для любого email, который пришёл в запросе —
+            // из-за этого удалённый аккаунт "воскресал": фоновый опрос/отправка сообщения,
+            // ушедшие в сеть ДО удаления, но обработанные сервером ПОСЛЕ, возвращали email
+            // обратно в all_users, и повторная регистрация с той же почтой блокировалась
+            // ("email уже зарегистрирован"), хотя профиль уже был стёрт.
             if (emailLower) {
-                await db('SADD', 'all_users', emailLower);
-                if (!room.startsWith('private-')) {
-                    await db('SADD', `user_rooms:${emailLower}`, room);
+                const profileExists = await db('EXISTS', `profile:${emailLower}`);
+                if (profileExists) {
+                    await db('SADD', 'all_users', emailLower);
+                    if (!room.startsWith('private-')) {
+                        await db('SADD', `user_rooms:${emailLower}`, room);
+                    }
                 }
             }
             return response.status(200).json({ status: 'ok' });
@@ -734,6 +761,11 @@ export default async function handler(request, response) {
         let reads    = {};
 
         if (emailLower) {
+            // Та же защита от "воскрешения" удалённого аккаунта, что и в обработчике
+            // отправки сообщений выше: не трогаем all_users/user_rooms, если профиля
+            // уже не существует (аккаунт был удалён).
+            const profileExists = await db('EXISTS', `profile:${emailLower}`);
+            if (profileExists) {
             await db('SADD', 'all_users', emailLower);
             await db('SADD', `user_rooms:${emailLower}`, 'general'); // всегда в general
 
@@ -762,6 +794,7 @@ export default async function handler(request, response) {
                         return !m.ts || m.ts > cutoff;
                     } catch { return true; }
                 });
+            }
             }
         }
 
