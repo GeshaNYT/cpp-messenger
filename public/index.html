@@ -838,6 +838,7 @@
         .ge-chat-list {
             flex: 1;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .ge-chat-item {
@@ -955,6 +956,7 @@
             flex: 1;
             padding: 40px 50px;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
             display: flex;
             flex-direction: column-reverse;
             gap: 20px;
@@ -1824,6 +1826,37 @@
             .ge-msg-bubble {
                 max-width: 85% !important;
             }
+
+            /* ── ОПТИМИЗАЦИЯ ПРОИЗВОДИТЕЛЬНОСТИ НА МОБИЛЬНЫХ ──────────────
+               backdrop-filter (размытие "жидкого стекла") очень дорого стоит
+               на мобильных GPU и вызывает подтормаживание при скролле/анимациях.
+               На мобильных экранах снижаем/убираем блюр, оставляя полупрозрачный
+               фон без реалтайм-размытия. Сам переключатель "Жидкое стекло"
+               продолжает работать, просто без live-blur. */
+            [data-glass="on"] .ge-sidebar,
+            [data-glass="on"] .ge-sidebar-header,
+            [data-glass="on"] .ge-sidebar-footer,
+            [data-glass="on"] .ge-view-header,
+            [data-glass="on"] .ge-footer,
+            [data-glass="on"] .ge-context-menu,
+            [data-glass="on"] .ge-auth-container,
+            [data-glass="on"] #ge-incoming-call,
+            [data-glass="on"] .ge-call-overlay,
+            [data-glass="on"] .ge-bubble-other,
+            [data-glass="on"] .ge-popup-item,
+            [data-glass="on"] .ge-auto-theme-row,
+            [data-glass="on"] .ge-modal-content {
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+            }
+
+            /* Упрощаем анимации попапов/пузырей/тостов — меньше нагрузки на композитор */
+            .ge-popup-item, .ge-auto-theme-row { transition: width 0.25s ease, box-shadow 0.15s ease, border-color 0.15s ease !important; }
+            .ge-msg-bubble { animation-duration: 0.15s !important; }
+            .ge-toast { animation-duration: 0.15s !important; }
+
+            /* Снег — красиво, но на мобильных телефонах реально подтормаживает */
+            #ge-snow-container { display: none !important; }
         }
     </style>
 </head>
@@ -2461,6 +2494,7 @@
                 </div>
 
             <footer class="ge-footer">
+                <div id="ge-composer-row" style="display:contents;">
                 <!-- Скрепка: прикрепить фото или файл -->
                 <button class="ge-media-btn" id="ge-attach-btn" title="Прикрепить" onclick="geEngine.media.toggleAttachMenu(event)">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2504,7 +2538,12 @@
                     <span class="ge-rec-label" id="ge-rec-label">Голосовое</span>
                     <span class="ge-rec-timer" id="ge-rec-timer">0:00</span>
                 </div>
+                </div>
 
+                <!-- Показывается вместо композера, когда открыт чат с человеком, который ещё не в контактах -->
+                <button id="ge-invite-bar" class="ge-hidden ge-btn-submit" style="width:100%;padding:14px;margin:0;font-size:13px;" onclick="geEngine.chat.sendInviteFromOpenChat()">
+                    Отправить приглашение в контакты
+                </button>
             </footer>
         </section>
     </main>
@@ -3109,10 +3148,10 @@
                         }
                         // bio хранится как есть (не URI-кодировано) — не декодируем, иначе "%"
                         // в тексте пользователя может сломать decodeURIComponent.
-                        // Не показываем bio, если оно текстуально совпадает с именем — иначе
-                        // получается визуальный дубль ("Геша" / "Геша").
-                        const displayedName = (profile.name || name || '').trim();
-                        if (profile.bio && profile.bio.trim() && profile.bio.trim() !== displayedName) {
+                        // Раньше bio не показывалось, если совпадало с именем — из-за этого
+                        // у части пользователей "О себе" вообще не отображалось, хотя было
+                        // заполнено. Теперь показываем всегда, если поле не пустое.
+                        if (profile.bio && profile.bio.trim()) {
                             document.getElementById('ge-user-profile-bio').innerText = profile.bio;
                             document.getElementById('ge-user-profile-bio').classList.remove('ge-hidden');
                         }
@@ -3133,7 +3172,7 @@
                     localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                     if (!geEngine.state.localRooms.includes(roomId)) geEngine.state.localRooms.push(roomId);
                     localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
-                    geEngine.chat.open(roomId, t.name || t.email);
+                    geEngine.chat.open(roomId, t.name || t.email, false, t.email);
                 },
                 userProfileCall(type) {
                     const t = geEngine.ui._userProfileTarget;
@@ -4134,6 +4173,14 @@
                     const targetEmail = this._getTargetEmail();
                     if (!targetEmail) return alert("Не удалось определить собеседника. Убедитесь что контакт добавлен через сервер.");
 
+                    // Звонить можно только тем, кто уже в контактах — иначе просто открываем
+                    // приглашение (та же кнопка, что и вместо композера при переписке).
+                    if (!geEngine.state.serverContacts.includes(targetEmail)) {
+                        geEngine.chat.open(room, document.getElementById('ge-active-name').innerText, false, targetEmail);
+                        geEngine.ui.showToast("Сначала нужно добавить человека в контакты", "error");
+                        return;
+                    }
+
                     this._targetEmail = targetEmail;
                     this._callType = type;
                     this._isOutgoing = true;
@@ -4352,6 +4399,9 @@
                     }
                 },
                 createSnowflake() {
+                    // На мобильных снег скрыт через CSS (ради производительности) —
+                    // не тратим CPU на создание невидимых узлов.
+                    if (window.innerWidth <= 768) return;
                     const container = document.getElementById('ge-snow-container');
                     const flake = document.createElement('div');
                     const size = Math.random() * 5 + 2 + 'px';
@@ -4481,7 +4531,39 @@
                     } catch (e) {}
                     geEngine.chat.refresh();
                 },
-                async open(id, prettyName, knownEmpty) {
+                // Кнопка "Отправить приглашение в контакты" в открытом чате с человеком,
+                // который ещё не в контактах (композер в этот момент скрыт).
+                async sendInviteFromOpenChat() {
+                    const targetEmail = geEngine.chat._openChatTargetEmail;
+                    if (!targetEmail) return;
+                    const inviteBar = document.getElementById('ge-invite-bar');
+                    if (inviteBar) { inviteBar.disabled = true; inviteBar.innerText = 'Отправляем...'; }
+                    try {
+                        const res = await fetch(`/api/index?action=addContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(targetEmail)}`);
+                        const data = await res.json();
+                        if (data.status === 'success') {
+                            // Уже взаимно — контакты соединены сразу, показываем обычный композер
+                            geEngine.ui.showToast('Контакт добавлен, теперь можно переписываться', 'success');
+                            const composerRow = document.getElementById('ge-composer-row');
+                            if (composerRow) composerRow.style.display = 'contents';
+                            if (inviteBar) inviteBar.classList.add('ge-hidden');
+                            geEngine.chat.refresh();
+                        } else if (data.status === 'pending') {
+                            const sent = JSON.parse(localStorage.getItem('ge_sent_invites') || '[]');
+                            if (!sent.includes(targetEmail)) { sent.push(targetEmail); localStorage.setItem('ge_sent_invites', JSON.stringify(sent)); }
+                            geEngine.ui.showToast('Приглашение отправлено', 'success');
+                            if (inviteBar) { inviteBar.innerText = 'Заявка отправлена — ждём ответа'; inviteBar.style.opacity = '0.6'; }
+                        } else {
+                            if (inviteBar) { inviteBar.disabled = false; inviteBar.innerText = 'Отправить приглашение в контакты'; }
+                            geEngine.ui.showToast(data.message || 'Не удалось отправить приглашение', 'error');
+                        }
+                    } catch (e) {
+                        if (inviteBar) { inviteBar.disabled = false; inviteBar.innerText = 'Отправить приглашение в контакты'; }
+                        geEngine.ui.showToast('Ошибка соединения с сервером', 'error');
+                    }
+                },
+                _openChatTargetEmail: null,
+                async open(id, prettyName, knownEmpty, explicitTargetEmail) {
                     geEngine.state.activeRoom = id;
                     geEngine.chat._lastMessages = null; // сбрасываем кэш сравнения, чтобы фоновый refresh точно перерисовал актуальные данные
                     document.getElementById('ge-active-name').innerText = prettyName || id;
@@ -4513,7 +4595,27 @@
                     if (id.startsWith('private-')) {
                         const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                         const otherSafe = otherPrivateSafe(id, myMailSafe);
-                        const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe);
+                        const targetEmail = explicitTargetEmail
+                            || geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe);
+
+                        // Если собеседник ещё не в контактах — прячем композер и показываем
+                        // кнопку "Отправить приглашение" вместо него. Если targetEmail неизвестен
+                        // (например, старый локальный чат) — ничего не трогаем, показываем композер.
+                        geEngine.chat._openChatTargetEmail = targetEmail || null;
+                        const isContact = !targetEmail || geEngine.state.serverContacts.includes(targetEmail);
+                        const composerRow = document.getElementById('ge-composer-row');
+                        const inviteBar = document.getElementById('ge-invite-bar');
+                        if (composerRow && inviteBar) {
+                            composerRow.style.display = isContact ? 'contents' : 'none';
+                            inviteBar.classList.toggle('ge-hidden', isContact);
+                            if (!isContact) {
+                                const alreadySent = (JSON.parse(localStorage.getItem('ge_sent_invites') || '[]')).includes(targetEmail);
+                                inviteBar.innerText = alreadySent ? 'Заявка отправлена — ждём ответа' : 'Отправить приглашение в контакты';
+                                inviteBar.disabled = alreadySent;
+                                inviteBar.style.opacity = alreadySent ? '0.6' : '1';
+                            }
+                        }
+
                         if (targetEmail) {
                             try {
                                 const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
@@ -4532,12 +4634,22 @@
                                 }
                             } catch {}
                         }
-                    } else if (geEngine.groups._isRealGroup(id)) {
-                        // Групповой чат — если аватар уже есть в кэше, показываем сразу
-                        const cached = geEngine.state.groupProfiles[id];
-                        if (cached && cached.avImg) {
-                            activeAv.style.background = '';
-                            activeAv.innerHTML = `<img src="${cached.avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
+                    } else {
+                        // Общая комната / группа — приглашение тут не применимо, композер всегда виден
+                        geEngine.chat._openChatTargetEmail = null;
+                        const composerRow = document.getElementById('ge-composer-row');
+                        const inviteBar = document.getElementById('ge-invite-bar');
+                        if (composerRow && inviteBar) {
+                            composerRow.style.display = 'contents';
+                            inviteBar.classList.add('ge-hidden');
+                        }
+                        if (geEngine.groups._isRealGroup(id)) {
+                            // Групповой чат — если аватар уже есть в кэше, показываем сразу
+                            const cached = geEngine.state.groupProfiles[id];
+                            if (cached && cached.avImg) {
+                                activeAv.style.background = '';
+                                activeAv.innerHTML = `<img src="${cached.avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
+                            }
                         }
                     }
 
@@ -4726,7 +4838,7 @@
                             const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                            geEngine.chat.open(roomId, localUser.name);
+                            geEngine.chat.open(roomId, localUser.name, false, localUser.email);
                             return;
                         }
 
@@ -4751,10 +4863,19 @@
                             const roomId = addData.roomId;
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                            alert(`${displayName} добавлен! Диалог появится у обоих.`);
-                            geEngine.chat.open(roomId, displayName);
+                            geEngine.ui.showToast(`${displayName} добавлен в контакты`, 'success');
+                            geEngine.chat.open(roomId, displayName, true);
                         } else if (addData.status === 'pending') {
-                            alert(`Заявка отправлена «${displayName}». Как только он её примет, диалог откроется у вас обоих.`);
+                            // Заявка уже отправлена этим же запросом — открываем чат сразу,
+                            // как при клике из мини-профиля: композер скрыт, вместо него кнопка
+                            // "Заявка отправлена — ждём ответа" (переиспользуем ту же логику).
+                            const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                            const otherMailSafe = targetEmail.replace(/[@.]/g, '').toLowerCase();
+                            const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
+                            const sent = JSON.parse(localStorage.getItem('ge_sent_invites') || '[]');
+                            if (!sent.includes(targetEmail)) { sent.push(targetEmail); localStorage.setItem('ge_sent_invites', JSON.stringify(sent)); }
+                            geEngine.ui.showToast(`Приглашение отправлено «${displayName}»`, 'success');
+                            geEngine.chat.open(roomId, displayName, true, targetEmail);
                         } else {
                             alert("Не удалось добавить контакт. Попробуйте позже.");
                         }
@@ -5225,6 +5346,21 @@
             contacts: {
                 _pending: [],
                 _lastCheck: 0,
+                // Прочитанные заявки — ключ "email:ts". Если заявку отклонили/забыли, а потом
+                // прислали новую — у неё будет новый ts, и она снова станет непрочитанной,
+                // а не тихо сольётся со старой "уже прочитанной" записью по одному email.
+                _readSet: new Set(JSON.parse(localStorage.getItem('ge_read_requests') || '[]')),
+                _reqKey(r) { return r.email + ':' + r.ts; },
+                _saveReadSet() {
+                    localStorage.setItem('ge_read_requests', JSON.stringify([...geEngine.contacts._readSet]));
+                },
+                _updateBadge() {
+                    const badge = document.getElementById('ge-notif-badge');
+                    if (!badge) return;
+                    const unread = geEngine.contacts._pending.filter(r => !geEngine.contacts._readSet.has(geEngine.contacts._reqKey(r))).length;
+                    badge.innerText = unread > 9 ? '9+' : unread;
+                    badge.classList.toggle('ge-hidden', unread === 0);
+                },
 
                 // Периодическая проверка новых заявок (вызывается нечасто, не на каждый тик
                 // основного опроса сообщений, чтобы не создавать лишнюю нагрузку)
@@ -5237,12 +5373,7 @@
 
                         const prevCount = geEngine.contacts._pending.length;
                         geEngine.contacts._pending = data.requests || [];
-                        const badge = document.getElementById('ge-notif-badge');
-                        if (badge) {
-                            const n = geEngine.contacts._pending.length;
-                            badge.innerText = n > 9 ? '9+' : n;
-                            badge.classList.toggle('ge-hidden', n === 0);
-                        }
+                        geEngine.contacts._updateBadge();
                         // Если появилась новая заявка (не просто открыли приложение) — уведомляем тостом
                         if (geEngine.contacts._lastCheck && geEngine.contacts._pending.length > prevCount) {
                             const newest = geEngine.contacts._pending[0];
@@ -5264,6 +5395,11 @@
                     if (wasOpen) { popup.style.display = 'none'; return; }
 
                     geEngine.contacts._renderPopup();
+                    // Открыли список — заявки считаются прочитанными (бейдж гаснет), но сами
+                    // заявки остаются в списке, пока их явно не примут или не отклонят.
+                    geEngine.contacts._pending.forEach(r => geEngine.contacts._readSet.add(geEngine.contacts._reqKey(r)));
+                    geEngine.contacts._saveReadSet();
+                    geEngine.contacts._updateBadge();
                     popup.style.display = 'flex';
                     popup.style.flexDirection = 'column';
                     popup.classList.add('active');
@@ -5289,10 +5425,12 @@
                         return;
                     }
                     popup.innerHTML = `<div style="padding:8px 10px 4px;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--text-tertiary);letter-spacing:.4px;">Заявки в контакты</div>` +
-                        list.map(r => `
+                        list.map(r => {
+                            const isUnread = !geEngine.contacts._readSet.has(geEngine.contacts._reqKey(r));
+                            return `
                             <div class="ge-request-item">
-                                <div class="ge-user-av" style="width:36px;height:36px;font-size:14px;background:var(--ge-accent-gradient);flex-shrink:0;">${(r.name[0]||'#').toUpperCase()}</div>
-                                <span class="ge-request-item-name">${r.name}</span>
+                                <div class="ge-user-av" style="width:36px;height:36px;font-size:14px;background:var(--ge-accent-gradient);flex-shrink:0;position:relative;">${(r.name[0]||'#').toUpperCase()}${isUnread ? '<span style="position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:#ff4757;border:2px solid var(--bg-elevated,#fff);"></span>' : ''}</div>
+                                <span class="ge-request-item-name" style="${isUnread ? 'font-weight:700;' : 'opacity:0.7;'}">${r.name}</span>
                                 <button class="ge-request-action-btn accept" title="Принять" onclick="event.stopPropagation(); geEngine.contacts.accept('${r.email.replace(/'/g,"\\'")}')">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                 </button>
@@ -5300,7 +5438,8 @@
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                 </button>
                             </div>
-                        `).join('');
+                        `;
+                        }).join('');
                 },
                 async accept(email) {
                     try {
@@ -5310,12 +5449,7 @@
 
                         geEngine.contacts._pending = geEngine.contacts._pending.filter(r => r.email !== email);
                         geEngine.contacts._renderPopup();
-                        const badge = document.getElementById('ge-notif-badge');
-                        if (badge) {
-                            const n = geEngine.contacts._pending.length;
-                            badge.innerText = n > 9 ? '9+' : n;
-                            badge.classList.toggle('ge-hidden', n === 0);
-                        }
+                        geEngine.contacts._updateBadge();
 
                         geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== data.roomId);
                         localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
@@ -5323,7 +5457,7 @@
                         localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
 
                         geEngine.ui.showToast(`Вы теперь в контактах с ${data.name}`, 'success');
-                        geEngine.chat.open(data.roomId, data.name);
+                        geEngine.chat.open(data.roomId, data.name, true);
                         geEngine.chat.refresh();
                     } catch (e) {
                         geEngine.ui.showToast('Ошибка соединения с сервером', 'error');
@@ -5335,12 +5469,7 @@
                     } catch (e) {}
                     geEngine.contacts._pending = geEngine.contacts._pending.filter(r => r.email !== email);
                     geEngine.contacts._renderPopup();
-                    const badge = document.getElementById('ge-notif-badge');
-                    if (badge) {
-                        const n = geEngine.contacts._pending.length;
-                        badge.innerText = n > 9 ? '9+' : n;
-                        badge.classList.toggle('ge-hidden', n === 0);
-                    }
+                    geEngine.contacts._updateBadge();
                 },
             },
 
@@ -5654,10 +5783,13 @@
                 // приходят быстрее. Это безопасно: тяжёлые фоновые проверки (сверка списка
                 // чатов, профили групп) не участятся — они защищены собственным троттлингом
                 // (~12 сек) независимо от частоты этого тика.
-                setInterval(() => geEngine.chat.refresh(), 3000);
-                setInterval(() => geEngine.calls._pollSignals(), 2000);
+                // document.hidden — не гоняем опрос, пока приложение свёрнуто/в фоне
+                // (экономит CPU/батарею на мобильных и убирает подтормаживание
+                // при возврате в приложение, когда накопившиеся тики выстреливают разом)
+                setInterval(() => { if (!document.hidden) geEngine.chat.refresh(); }, 3000);
+                setInterval(() => { if (!document.hidden) geEngine.calls._pollSignals(); }, 2000);
                 geEngine.contacts.checkRequests();
-                setInterval(() => geEngine.contacts.checkRequests(), 10000);
+                setInterval(() => { if (!document.hidden) geEngine.contacts.checkRequests(); }, 10000);
                 geEngine.media.init();
             }
         };
