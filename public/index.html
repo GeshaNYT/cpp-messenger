@@ -3473,6 +3473,17 @@
                             document.addEventListener('click', function closeCtxMenu() {
                                 menu.classList.remove('active');
                                 document.removeEventListener('click', closeCtxMenu);
+                                // Пока меню было открыто, список чатов мог накопить непоказанное
+                                // обновление (см. renderChatList) — применяем его сейчас.
+                                if (geEngine.ui._pendingChatListHtml != null) {
+                                    const scroller = document.getElementById('ge-chat-list-scroller');
+                                    if (scroller) {
+                                        const prevScroll = scroller.scrollTop;
+                                        scroller.innerHTML = geEngine.ui._pendingChatListHtml;
+                                        scroller.scrollTop = prevScroll;
+                                    }
+                                    geEngine.ui._pendingChatListHtml = null;
+                                }
                             });
                         }, 0);
                     }
@@ -5053,6 +5064,7 @@
                 },
                 removeRoom(e, rid) {
                     e.stopPropagation();
+                    document.querySelectorAll('.ge-context-menu.active').forEach(m => m.classList.remove('active'));
                     const isGroup = rid === 'general' || (!rid.startsWith('private-') && geEngine.groups._isRealGroup(rid));
                     const msg = rid === 'general' ? 'Покинуть группу General?' : (isGroup ? 'Покинуть группу?' : 'Удалить контакт?');
                     if (confirm(msg)) {
@@ -5561,6 +5573,7 @@
                     await geEngine.groups.deleteGroupById(rid);
                 },
                 async deleteGroupById(rid) {
+                    document.querySelectorAll('.ge-context-menu.active').forEach(m => m.classList.remove('active'));
                     if (!confirm('Удалить группу навсегда? Будут удалены все сообщения и участники, а ID освободится.')) return;
                     try {
                         const res = await fetch(`/api/index?action=deleteGroup&user_email=${encodeURIComponent(geEngine.state.session.email)}&groupId=${encodeURIComponent(rid)}`);
