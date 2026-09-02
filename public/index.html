@@ -2551,6 +2551,8 @@
             <div id="ge-msg-container" class="ge-messages-area">
                 </div>
 
+            <div id="ge-pending-attachment" class="ge-hidden" style="display:flex; align-items:center; gap:10px; padding:10px 20px; background:var(--bg-panel); border-top:1px solid var(--border-base);"></div>
+
             <footer class="ge-footer">
                 <div id="ge-composer-row" style="display:contents;">
                 <!-- Скрепка: прикрепить фото или файл -->
@@ -4755,6 +4757,22 @@
                 async broadcast() {
                     const input = document.getElementById('ge-main-input');
                     const text = input.value.trim();
+                    const pending = geEngine.media._pendingAttachment;
+
+                    // Если прикреплено фото/файл — отправляем именно по нажатию сюда, а не
+                    // автоматически при выборе файла. Текст (набранный хоть до, хоть после
+                    // прикрепления) идёт подписью к этому же сообщению.
+                    if (pending) {
+                        if (!geEngine.state.activeRoom) return;
+                        input.value = '';
+                        geEngine.media.clearPendingAttachment();
+                        const extra = pending.mediaType === 'image'
+                            ? { maxSize: 900 * 1024, caption: text }
+                            : { maxSize: 900 * 1024, fileName: pending.fileName, fileSize: pending.fileSize, caption: text };
+                        geEngine.media._sendMediaMessage(pending.blob, pending.mediaType, 0, extra);
+                        return;
+                    }
+
                     if (!text || !geEngine.state.activeRoom) return;
                     const targetRoom = geEngine.state.activeRoom;
                     const nowTs = Date.now();
@@ -4820,6 +4838,7 @@
                 },
                 _openChatTargetEmail: null,
                 async open(id, prettyName, knownEmpty, explicitTargetEmail) {
+                    geEngine.media.clearPendingAttachment(); // не тащим незаконченное вложение в другой чат
                     geEngine.state.activeRoom = id;
                     geEngine.chat._lastMessages = null; // сбрасываем кэш сравнения, чтобы фоновый refresh точно перерисовал актуальные данные
                     document.getElementById('ge-active-name').innerText = prettyName || id;
@@ -5800,13 +5819,13 @@
                     if (!geEngine.state.activeRoom) { alert('Сначала выберите чат.'); return; }
                     document.getElementById('ge-attach-file-input').click();
                 },
+                // Вложение, ожидающее отправки: пользователь прикрепил фото/файл, но ещё
+                // не нажал "отправить" — может сначала дописать текст (до или после).
+                _pendingAttachment: null,
                 handleImageAttach(input) {
                     const file = input.files[0];
                     input.value = '';
                     if (!file || !geEngine.state.activeRoom) return;
-                    // Текст, уже набранный в поле ввода — станет подписью к фото
-                    const captionInput = document.getElementById('ge-main-input');
-                    const caption = captionInput ? captionInput.value.trim() : '';
                     const reader = new FileReader();
                     reader.onload = (e) => {
                         const img = new Image();
@@ -5823,33 +5842,59 @@
                             canvas.width = width; canvas.height = height;
                             canvas.getContext('2d').drawImage(img, 0, 0, width, height);
                             canvas.toBlob(blob => {
-                                geEngine.media._sendMediaMessage(blob, 'image', 0, {
-                                    maxSize: 900 * 1024,
-                                    tooLargeMsg: 'Фото слишком большое даже после сжатия. Попробуйте другое изображение.',
-                                    caption,
-                                });
+                                const maxSize = 900 * 1024;
+                                if (blob.size > maxSize) {
+                                    alert('Фото слишком большое даже после сжатия. Попробуйте другое изображение.');
+                                    return;
+                                }
+                                geEngine.media._setPendingAttachment({ blob, mediaType: 'image', previewSrc: e.target.result });
                             }, 'image/jpeg', 0.75);
                         };
                         img.src = e.target.result;
                     };
                     reader.readAsDataURL(file);
-                    if (captionInput && caption) captionInput.value = '';
                 },
                 handleFileAttach(input) {
                     const file = input.files[0];
                     input.value = '';
                     if (!file || !geEngine.state.activeRoom) return;
-                    const captionInput = document.getElementById('ge-main-input');
-                    const caption = captionInput ? captionInput.value.trim() : '';
-                    geEngine.media._sendMediaMessage(file, 'file', 0, {
-                        maxSize: 900 * 1024,
-                        tooLargeMsg: `Файл слишком большой (${(file.size/1024).toFixed(0)}KB). Максимум ~900KB.`,
-                        fileName: file.name,
-                        fileSize: file.size,
-                        caption,
-                    });
-                    if (captionInput && caption) captionInput.value = '';
+                    const maxSize = 900 * 1024;
+                    if (file.size > maxSize) {
+                        alert(`Файл слишком большой (${(file.size/1024).toFixed(0)}KB). Максимум ~900KB.`);
+                        return;
+                    }
+                    geEngine.media._setPendingAttachment({ blob: file, mediaType: 'file', fileName: file.name, fileSize: file.size });
                 },
+                // Показывает полоску предпросмотра над полем ввода. Ничего никуда не
+                // отправляется — только когда пользователь сам нажмёт "отправить".
+                _setPendingAttachment(att) {
+                    geEngine.media._pendingAttachment = att;
+                    const bar = document.getElementById('ge-pending-attachment');
+                    if (!bar) return;
+                    const removeBtn = `<button onclick="geEngine.media.clearPendingAttachment()" title="Убрать" style="background:none;border:none;cursor:pointer;color:var(--text-tertiary);width:22px;height:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+                    if (att.mediaType === 'image') {
+                        bar.innerHTML = `
+                            <img src="${att.previewSrc}" style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;">
+                            <span style="flex:1;font-size:13px;color:var(--text-secondary);">Фото готово — допишите текст и нажмите отправить</span>
+                            ${removeBtn}
+                        `;
+                    } else {
+                        const fileIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`;
+                        bar.innerHTML = `
+                            <span style="width:40px;height:40px;border-radius:8px;background:var(--bg-body);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--ge-primary);">${fileIcon}</span>
+                            <span style="flex:1;font-size:13px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${att.fileName}</span>
+                            ${removeBtn}
+                        `;
+                    }
+                    bar.classList.remove('ge-hidden');
+                    document.getElementById('ge-main-input')?.focus();
+                },
+                clearPendingAttachment() {
+                    geEngine.media._pendingAttachment = null;
+                    const bar = document.getElementById('ge-pending-attachment');
+                    if (bar) { bar.classList.add('ge-hidden'); bar.innerHTML = ''; }
+                },
+
 
                 _micSVG: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`,
                 _circleSVG: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>`,
