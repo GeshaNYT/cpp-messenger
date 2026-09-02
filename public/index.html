@@ -5151,7 +5151,7 @@
                 // Запоминаем, что мы отправили приглашение в контакты — комната остаётся
                 // видна в СВОЁМ списке чатов (с пометкой "ждём ответа"), а не пропадает
                 // бесследно, пока собеседник не примет её.
-                _rememberPendingInvite(roomId, targetEmail, displayName) {
+                async _rememberPendingInvite(roomId, targetEmail, displayName) {
                     if (!geEngine.state.localRooms.includes(roomId)) {
                         geEngine.state.localRooms.push(roomId);
                         localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
@@ -5167,6 +5167,29 @@
                     if (!geEngine.state._lastAllRooms.includes(roomId)) geEngine.state._lastAllRooms.push(roomId);
                     geEngine.ui._lastChatList = null;
                     geEngine.ui.renderChatList(geEngine.state._lastAllRooms);
+
+                    // Пока приглашение не принято, обычный фоновый sweep профилей эту комнату
+                    // не трогает (он ищет собеседника среди СВОИХ контактов, а до принятия
+                    // человек контактом ещё не стал) — из-за этого аватарка навсегда оставалась
+                    // серой заглушкой, даже если у человека своя фотография. Раз email уже
+                    // точно известен, подтягиваем его настоящий профиль прямо сейчас через
+                    // findUser — это не требует, чтобы он уже был в контактах.
+                    try {
+                        const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
+                        const data = await res.json();
+                        if (data.status === 'found' && geEngine.ui._contactProfilesCache[roomId]?._pendingTarget === targetEmail) {
+                            const p = data.profile || {};
+                            geEngine.ui._contactProfilesCache[roomId] = {
+                                name: p.name || displayName,
+                                avColor: p.avColor,
+                                avImg: p.avImg,
+                                _pendingInvite: true,
+                                _pendingTarget: targetEmail,
+                            };
+                            geEngine.ui._lastChatList = null;
+                            geEngine.ui.renderChatList(geEngine.state._lastAllRooms || []);
+                        }
+                    } catch {}
                 },
                 joinGeneral() {
                     geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== 'general');
