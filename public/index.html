@@ -4694,10 +4694,20 @@
                                 const p = geEngine.ui._contactProfilesCache[rid];
                                 if (p && p._pendingInvite && geEngine.state.serverContacts.includes(p._pendingTarget)) {
                                     delete geEngine.ui._contactProfilesCache[rid]; // форсируем свежий findUser-профиль
-                                    const sent = JSON.parse(localStorage.getItem('ge_sent_invites') || '[]');
-                                    localStorage.setItem('ge_sent_invites', JSON.stringify(sent.filter(e => e !== p._pendingTarget)));
                                 }
                             });
+                        }
+                        // Прямая сверка списка "отправленных приглашений" с реальными контактами —
+                        // не полагаемся только на кэш профиля выше (он в памяти и теряется при
+                        // перезагрузке страницы), иначе email мог навсегда "застревать" помеченным
+                        // как "приглашение уже отправлено", даже после того как контакт был принят
+                        // и потом удалён.
+                        {
+                            const sent = JSON.parse(localStorage.getItem('ge_sent_invites') || '[]');
+                            const stillPending = sent.filter(e => !geEngine.state.serverContacts.includes(e));
+                            if (stillPending.length !== sent.length) {
+                                localStorage.setItem('ge_sent_invites', JSON.stringify(stillPending));
+                            }
                         }
 
                         // Объединяем серверные комнаты с локальными (группы)
@@ -5050,6 +5060,22 @@
                     geEngine.state.deletedRooms.push(rid);
                     localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
 
+                    // Чистим локальный кэш профиля/пометки "приглашение отправлено" для этой
+                    // комнаты — иначе при повторном добавлении того же человека карточка
+                    // навсегда помнила старое состояние (и застревала на "Загрузка…").
+                    if (geEngine.ui._contactProfilesCache && geEngine.ui._contactProfilesCache[rid]) {
+                        const stalePendingEmail = geEngine.ui._contactProfilesCache[rid]._pendingTarget;
+                        delete geEngine.ui._contactProfilesCache[rid];
+                        if (stalePendingEmail) {
+                            const sent = JSON.parse(localStorage.getItem('ge_sent_invites') || '[]');
+                            localStorage.setItem('ge_sent_invites', JSON.stringify(sent.filter(e => e !== stalePendingEmail)));
+                        }
+                    }
+                    if (rid.startsWith('private-')) {
+                        geEngine.state.localRooms = geEngine.state.localRooms.filter(id => id !== rid);
+                        localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
+                    }
+
                     // Если открыт этот чат — сбрасываем
                     if (geEngine.state.activeRoom === rid) {
                         geEngine.state.activeRoom = null;
@@ -5075,6 +5101,14 @@
                         }
                         if (targetEmail) {
                             fetch(`/api/index?action=removeContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(targetEmail)}`).catch(() => {});
+                            // На случай, если пометка "приглашение отправлено" осталась в
+                            // localStorage с прошлого раза (например, после перезагрузки
+                            // страницы до принятия заявки) — чистим по email напрямую, не
+                            // полагаясь только на кэш профиля выше.
+                            const sent = JSON.parse(localStorage.getItem('ge_sent_invites') || '[]');
+                            if (sent.includes(targetEmail)) {
+                                localStorage.setItem('ge_sent_invites', JSON.stringify(sent.filter(e => e !== targetEmail)));
+                            }
                         }
                     } else if (geEngine.groups._isRealGroup(rid)) {
                         // Настоящая группа — снимаем членство и на сервере, иначе она вернётся в списке
