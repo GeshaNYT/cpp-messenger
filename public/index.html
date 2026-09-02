@@ -2956,9 +2956,22 @@
                         const c2 = confirm("Это действие сотрет ваши данные из системы GeLink навсегда. Вы уверены?");
                         if(c2) {
                             const currentEmail = geEngine.state.session.email;
+                            // Раньше ошибка сервера тут молча проглатывалась, и пользователю
+                            // ВСЕГДА показывалось "аккаунт удалён", даже если на сервере что-то
+                            // упало и профиль/email на самом деле остались в базе — из-за этого
+                            // повторная регистрация той же почтой продолжала писать "уже занята".
+                            // Теперь явно проверяем ответ сервера.
+                            let ok = false;
                             try {
-                                await fetch(`/api/index?action=deleteAccount&user_email=${encodeURIComponent(currentEmail)}`);
-                            } catch (e) {}
+                                const res = await fetch(`/api/index?action=deleteAccount&user_email=${encodeURIComponent(currentEmail)}`);
+                                const data = await res.json();
+                                ok = res.ok && data.status === 'ok';
+                            } catch (e) { ok = false; }
+
+                            if (!ok) {
+                                alert("Не удалось удалить аккаунт — проблема на сервере. Попробуйте ещё раз через минуту.");
+                                return;
+                            }
                             localStorage.removeItem('ge_v9_token');
                             alert("Ваш аккаунт был полностью удален.");
                             location.reload();
@@ -3301,7 +3314,7 @@
                         html += `<div class="ge-search-section-label">Чаты и группы</div>`;
                         html += chatMatches.map(c => `
                             <div class="ge-chat-item" onclick="geEngine.chat.open('${c.rid}', '${c.name.replace(/'/g, "\\'")}')">
-                                <div class="ge-user-av" style="width:44px;height:44px;font-size:16px;background:${c.isGroup ? 'var(--ge-accent-gradient)' : '#444'};">${(c.name[0] || '#').toUpperCase()}</div>
+                                <div class="ge-user-av" style="width:44px;height:44px;font-size:16px;background:var(--ge-accent-gradient);">${(c.name[0] || '#').toUpperCase()}</div>
                                 <div class="ge-item-content"><b>${c.name}</b></div>
                             </div>
                         `).join('');
@@ -3747,8 +3760,9 @@
 
                     let html = filtered.map(rid => {
                         let displayName = rid;
+                        let resolvedTargetEmail = '';
                         let isGroup = rid === 'general' || !rid.startsWith('private-');
-                        let avColor = isGroup ? 'var(--ge-accent-gradient)' : '#444';
+                        let avColor = 'var(--ge-accent-gradient)'; // тот же голубой градиент, что и в шапке открытого чата (раньше у личных чатов был серый #444)
                         let avImg = null;
                         const groupProfile = geEngine.state.groupProfiles[rid];
                         const isCreator = groupProfile ? !!groupProfile.isOwner : geEngine.state.createdRooms.includes(rid);
@@ -3757,15 +3771,24 @@
                         if (rid.startsWith('private-')) {
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherMailSafePart = otherPrivateSafe(rid, myMailSafe);
+                            resolvedTargetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart) || '';
 
                             const profile = contactProfiles[rid];
                             if (profile && profile.name) {
                                 displayName = safeDecodeURIComponent(profile.name);
-                                avColor = profile.avColor ? safeDecodeURIComponent(profile.avColor) : '#444';
+                                avColor = profile.avColor ? safeDecodeURIComponent(profile.avColor) : 'var(--ge-accent-gradient)';
                                 avImg = profile.avImg ? safeDecodeURIComponent(profile.avImg) : null;
                                 // Приглашение, которое мы сами отправили и ещё ждём ответа —
                                 // помечаем явно, чтобы чат не пропадал бесследно из списка.
-                                if (profile._pendingInvite) subtitle = 'Приглашение отправлено • ждём ответа';
+                                if (profile._pendingInvite) {
+                                    subtitle = 'Приглашение отправлено • ждём ответа';
+                                    // Раньше при повторном открытии ЭТОГО чата из списка (клик по
+                                    // самому элементу, а не через мини-профиль) email собеседника
+                                    // не передавался явно — из-за этого проверка "уже контакт?"
+                                    // не могла его найти и ОШИБОЧНО открывала обычный композер,
+                                    // хотя приглашение ещё не приняли. Явно используем email отсюда.
+                                    resolvedTargetEmail = profile._pendingTarget || resolvedTargetEmail;
+                                }
                             } else {
                                 const user = geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
                                 if (user) {
@@ -3805,7 +3828,7 @@
                             : '';
                         const itemClickAttr = inSelectMode
                             ? `onclick="geEngine.ui.toggleSelectItem('${rid}')"`
-                            : `onclick="geEngine.chat.open('${rid}', '${displayName.replace(/'/g, "\'")}')"`;
+                            : `onclick="geEngine.chat.open('${rid}', '${displayName.replace(/'/g, "\'")}', false, '${resolvedTargetEmail || ''}')"`;
 
                         return `
                             <div class="ge-chat-item ${rid === geEngine.state.activeRoom ? 'active' : ''} ${isPinned ? 'pinned' : ''} ${inSelectMode ? 'select-mode' : ''} ${isSelected ? 'selected' : ''}" ${itemClickAttr}>
@@ -5137,8 +5160,13 @@
                     localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                     if (!geEngine.ui._contactProfilesCache) geEngine.ui._contactProfilesCache = {};
                     geEngine.ui._contactProfilesCache[roomId] = { name: displayName, _pendingInvite: true, _pendingTarget: targetEmail };
+                    // Гарантируем, что комната попадёт в СЕЙЧАСНЫЙ рендер, а не будет ждать
+                    // следующего тика опроса (~3 сек) — раньше из-за этого имя на пару секунд
+                    // показывалось как "Загрузка…", хотя мы уже точно знаем, кому пишем.
+                    if (!geEngine.state._lastAllRooms) geEngine.state._lastAllRooms = [];
+                    if (!geEngine.state._lastAllRooms.includes(roomId)) geEngine.state._lastAllRooms.push(roomId);
                     geEngine.ui._lastChatList = null;
-                    geEngine.ui.renderChatList(geEngine.state._lastAllRooms || []);
+                    geEngine.ui.renderChatList(geEngine.state._lastAllRooms);
                 },
                 joinGeneral() {
                     geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== 'general');
@@ -5732,7 +5760,10 @@
                     e.stopPropagation();
                     const popup = document.getElementById('ge-requests-popup');
                     const wasOpen = popup.style.display === 'flex';
-                    document.querySelectorAll('.ge-settings-popup.active').forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
+                    // Раньше тут закрывали попап настроек напрямую, не трогая саму кнопку-
+                    // шестерёнку — она оставалась повёрнутой и подсвеченной. Используем общую
+                    // функцию, которая корректно сбрасывает и кнопку тоже.
+                    geEngine.ui.closeSettingsPopup();
                     if (wasOpen) { popup.style.display = 'none'; return; }
 
                     geEngine.contacts._renderPopup();
