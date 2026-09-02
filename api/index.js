@@ -239,42 +239,58 @@ export default async function handler(request, response) {
             const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
             if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
 
+            // ВАЖНО: всё, что ниже до финального блока — это best-effort уборка (чужие
+            // контакты, уведомления групп и т.п.). Раньше, если тут что-то падало
+            // с ошибкой, весь обработчик прерывался ДО того, как реально стереть профиль
+            // и email из all_users — аккаунт оставался "наполовину удалённым", и повторная
+            // регистрация с той же почтой вечно говорила "уже зарегистрирован". Теперь
+            // каждый необязательный шаг обёрнут отдельно и не может заблокировать финал.
+
             // Отвязываемся от контактов — убираем себя из ЧУЖИХ списков контактов тоже,
             // и, что важно, убираем сам приватный чат из их списка комнат — иначе удалённый
             // аккаунт продолжал "висеть" у контакта в списке чатов вечно.
-            const myContacts = (await db('SMEMBERS', `contacts:${emailLower}`)) ?? [];
-            const myMailSafe = emailLower.replace(/[@.]/g, '');
-            await Promise.all(myContacts.map(async c => {
-                await db('SREM', `contacts:${c}`, emailLower);
-                const otherSafe = c.replace(/[@.]/g, '');
-                const roomId = `private-${[myMailSafe, otherSafe].sort().join('-')}`;
-                await db('SREM', `user_rooms:${c}`, roomId);
-            }));
+            try {
+                const myContacts = (await db('SMEMBERS', `contacts:${emailLower}`)) ?? [];
+                const myMailSafe = emailLower.replace(/[@.]/g, '');
+                await Promise.all(myContacts.map(async c => {
+                    try {
+                        await db('SREM', `contacts:${c}`, emailLower);
+                        const otherSafe = c.replace(/[@.]/g, '');
+                        const roomId = `private-${[myMailSafe, otherSafe].sort().join('-')}`;
+                        await db('SREM', `user_rooms:${c}`, roomId);
+                        await db('HDEL', `contact_requests:${c}`, emailLower);
+                    } catch {}
+                }));
+            } catch {}
 
-            // Выходим из всех групп, в которых состоим, и уведомляем остальных участников,
-            // чтобы список участников и системный чат обновились сразу, а не выглядели так,
-            // будто удалённый аккаунт всё ещё состоит в группе.
-            const myName = (await db('HGET', `profile:${emailLower}`, 'name')) || emailLower;
-            const myRooms = (await db('SMEMBERS', `user_rooms:${emailLower}`)) ?? [];
-            await Promise.all(
-                myRooms
-                    .filter(r => r !== 'general' && !r.startsWith('private-'))
-                    .map(async r => {
-                        await db('SREM', `group_members:${r}`, emailLower);
-                        const stillExists = await db('EXISTS', `group:${r}`);
-                        if (stillExists) await pushSystemMessage(db, r, `${myName} покинул(а) группу (аккаунт удалён)`, emailLower);
-                    })
-            );
+            // Выходим из всех групп, в которых состоим, и уведомляем остальных участников
+            try {
+                const myName = (await db('HGET', `profile:${emailLower}`, 'name')) || emailLower;
+                const myRooms = (await db('SMEMBERS', `user_rooms:${emailLower}`)) ?? [];
+                await Promise.all(
+                    myRooms
+                        .filter(r => r !== 'general' && !r.startsWith('private-'))
+                        .map(async r => {
+                            try {
+                                await db('SREM', `group_members:${r}`, emailLower);
+                                const stillExists = await db('EXISTS', `group:${r}`);
+                                if (stillExists) await pushSystemMessage(db, r, `${myName} покинул(а) группу (аккаунт удалён)`, emailLower);
+                            } catch {}
+                        })
+                );
+            } catch {}
 
             // Освобождаем никнейм
-            const nickname = await db('HGET', `profile:${emailLower}`, 'nickname');
-            if (nickname) await db('DEL', `nick:${nickname}`);
+            try {
+                const nickname = await db('HGET', `profile:${emailLower}`, 'nickname');
+                if (nickname) await db('DEL', `nick:${nickname}`);
+            } catch {}
 
-            // Чистим заявки в контакты в обе стороны, чтобы после пересоздания
-            // аккаунта не оставалось "хвостов" от старого профиля
-            await db('DEL', `contact_requests:${emailLower}`);
-            await Promise.all(myContacts.map(c => db('HDEL', `contact_requests:${c}`, emailLower)));
+            try {
+                await db('DEL', `contact_requests:${emailLower}`);
+            } catch {}
 
+            // ── КРИТИЧНАЯ ЧАСТЬ — должна выполниться, что бы ни случилось выше ──
             await db('DEL', `contacts:${emailLower}`);
             await db('DEL', `user_rooms:${emailLower}`);
             await db('DEL', `profile:${emailLower}`);
