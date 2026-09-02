@@ -239,17 +239,31 @@ export default async function handler(request, response) {
             const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
             if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
 
-            // Отвязываемся от контактов — убираем себя из ЧУЖИХ списков контактов тоже
+            // Отвязываемся от контактов — убираем себя из ЧУЖИХ списков контактов тоже,
+            // и, что важно, убираем сам приватный чат из их списка комнат — иначе удалённый
+            // аккаунт продолжал "висеть" у контакта в списке чатов вечно.
             const myContacts = (await db('SMEMBERS', `contacts:${emailLower}`)) ?? [];
-            await Promise.all(myContacts.map(c => db('SREM', `contacts:${c}`, emailLower)));
+            const myMailSafe = emailLower.replace(/[@.]/g, '');
+            await Promise.all(myContacts.map(async c => {
+                await db('SREM', `contacts:${c}`, emailLower);
+                const otherSafe = c.replace(/[@.]/g, '');
+                const roomId = `private-${[myMailSafe, otherSafe].sort().join('-')}`;
+                await db('SREM', `user_rooms:${c}`, roomId);
+            }));
 
-            // Выходим из всех групп, в которых состоим (участие, не владение — group: хэш не трогаем,
-            // это отдельный edge case для групп, которыми человек владел)
+            // Выходим из всех групп, в которых состоим, и уведомляем остальных участников,
+            // чтобы список участников и системный чат обновились сразу, а не выглядели так,
+            // будто удалённый аккаунт всё ещё состоит в группе.
+            const myName = (await db('HGET', `profile:${emailLower}`, 'name')) || emailLower;
             const myRooms = (await db('SMEMBERS', `user_rooms:${emailLower}`)) ?? [];
             await Promise.all(
                 myRooms
                     .filter(r => r !== 'general' && !r.startsWith('private-'))
-                    .map(r => db('SREM', `group_members:${r}`, emailLower))
+                    .map(async r => {
+                        await db('SREM', `group_members:${r}`, emailLower);
+                        const stillExists = await db('EXISTS', `group:${r}`);
+                        if (stillExists) await pushSystemMessage(db, r, `${myName} покинул(а) группу (аккаунт удалён)`, emailLower);
+                    })
             );
 
             // Освобождаем никнейм
@@ -425,8 +439,13 @@ export default async function handler(request, response) {
             const otherId = target_email.replace(/[@.]/g, '').toLowerCase();
             const roomId  = `private-${[myId, otherId].sort().join('-')}`;
 
+            // Раньше удаляли контакт только у себя — собеседник продолжал считать нас
+            // контактом (у него оставались и contacts, и user_rooms), и мог писать напрямую,
+            // хотя должен был снова увидеть "отправить приглашение". Удаляем с обеих сторон.
             await db('SREM', `contacts:${emailLower}`,   target_email);
             await db('SREM', `user_rooms:${emailLower}`, roomId);
+            await db('SREM', `contacts:${target_email}`, emailLower);
+            await db('SREM', `user_rooms:${target_email}`, roomId);
             return response.status(200).json({ status: 'success', message: 'Contact removed' });
         }
 
