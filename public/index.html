@@ -3783,7 +3783,8 @@
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherSafe = otherPrivateSafe(rid, myMailSafe);
                             if (!otherSafe) return;
-                            const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe);
+                            const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe)
+                                || geEngine.state.roomEmailMap[rid];
                             if (!targetEmail) return;
                             try {
                                 const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
@@ -3861,7 +3862,8 @@
                                     // split('gmailcom'), что для не-gmail адресов показывало кашу
                                     // вместо имени. Теперь честно показываем "Загрузка…" — реальное
                                     // имя подставится, как только придёт ответ сервера.
-                                    const realEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
+                                    const realEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart)
+                                        || geEngine.state.roomEmailMap[rid];
                                     displayName = realEmail ? realEmail.split('@')[0] : 'Загрузка…';
                                 }
                             }
