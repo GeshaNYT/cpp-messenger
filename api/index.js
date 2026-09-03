@@ -119,7 +119,35 @@ export default async function handler(request, response) {
     try {
 
         // ══════════════════════════════════════════════════════
-        //  РЕГИСТРАЦИЯ  — публичный эндпоинт
+        //  ПРОВЕРКА ДОСТУПНОСТИ email/никнейма — публичный, НИЧЕГО НЕ ПИШЕТ.
+        //  Вызывается ДО отправки OTP-письма, чтобы дать быструю обратную связь,
+        //  не резервируя при этом email/ник за незавершённой регистрацией.
+        // ══════════════════════════════════════════════════════
+        if (action === 'checkAvailable' && request.method === 'POST') {
+            const { email, nickname } = request.body;
+            if (!email || !nickname)
+                return response.status(400).json({ status: 'error', message: 'Заполните все поля' });
+
+            const emailLower = email.trim().toLowerCase();
+            const nickLower  = nickname.trim().toLowerCase();
+
+            if (await db('SISMEMBER', 'all_users', emailLower) === 1)
+                return response.status(400).json({ status: 'error', message: 'Этот email уже зарегистрирован' });
+
+            if (await db('GET', `nick:${nickLower}`))
+                return response.status(400).json({ status: 'error', message: 'Этот никнейм уже занят' });
+
+            return response.status(200).json({ status: 'ok' });
+        }
+
+        // ══════════════════════════════════════════════════════
+        //  РЕГИСТРАЦИЯ  — публичный эндпоинт.
+        //  ВАЖНО: реально пишет в базу (резервирует email и ник) и должна
+        //  вызываться фронтом ТОЛЬКО ПОСЛЕ успешной проверки OTP-кода.
+        //  Если писать сюда до отправки/подтверждения письма, то при сбое
+        //  отправки (EmailJS упал/нет сети) email и ник останутся навечно
+        //  "заняты" незавершённой регистрацией, и повторная попытка будет
+        //  падать с "email уже зарегистрирован" / "никнейм уже занят".
         // ══════════════════════════════════════════════════════
         if (action === 'register' && request.method === 'POST') {
             const { email, password, name, nickname, avColor } = request.body;
