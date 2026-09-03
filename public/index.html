@@ -4760,6 +4760,22 @@
                         // Сохраняем серверные контакты для звонков
                         geEngine.state.serverContacts = data.contacts?.result || [];
 
+                        // Если сейчас открыт именно тот приватный чат, где мы ждём принятия
+                        // заявки — кнопку "Заявка отправлена — ждём ответа" и композер нужно
+                        // обновить СРАЗУ здесь же, а не только в списке чатов слева. Раньше это
+                        // не делалось, и открытый чат вечно показывал "ждём ответа" даже после
+                        // того, как собеседник заявку принял — пропадало только после перезагрузки
+                        // страницы (когда chat.open() пересчитывал isContact заново).
+                        if (geEngine.chat._openChatTargetEmail && geEngine.state.serverContacts.includes(geEngine.chat._openChatTargetEmail)) {
+                            geEngine.chat._openChatTargetEmail = null;
+                            const composerRow = document.getElementById('ge-composer-row');
+                            const inviteBar = document.getElementById('ge-invite-bar');
+                            if (composerRow && inviteBar) {
+                                composerRow.style.display = 'contents';
+                                inviteBar.classList.add('ge-hidden');
+                            }
+                        }
+
                         // Если приглашение, которое мы отправили, приняли — собеседник теперь
                         // в serverContacts, и пометку "ждём ответа" пора снять (а не показывать
                         // её вечно на уже активном чате).
