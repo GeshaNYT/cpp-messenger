@@ -1267,6 +1267,13 @@
             box-shadow: var(--shadow-xl);
             padding: 40px;
             animation: ge-slide-up 0.4s var(--ease);
+            /* Раньше при переполнении (много полей в настройках профиля, длинное описание
+               группы и т.п.) контент просто обрезался снизу без возможности прокрутить —
+               кнопки "Сохранить"/"Отмена" оставались недоступны. Теперь модалка сама
+               ограничена по высоте и скроллится, если содержимое не помещается. */
+            max-height: 85vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         /* ── Плавное закрытие модалок (групп и т.д.) ────────────── */
@@ -1839,6 +1846,8 @@
                 border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
                 max-width: 100% !important;
                 margin-top: auto !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch !important;
             }
             .ge-modal-overlay {
                 align-items: flex-end !important;
