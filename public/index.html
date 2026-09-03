@@ -2655,6 +2655,13 @@
                 snowInterval: null,
                 localStream: null,
                 localRooms: JSON.parse(localStorage.getItem('ge_local_rooms') || "[]"),
+                // roomId -> email собеседника. Раньше email для приватного чата искался
+                // ТОЛЬКО среди ТЕКУЩИХ контактов (serverContacts). Если контакт удалён (с любой
+                // стороны), поиск переставал находить email, и код ошибочно считал это "всё ещё
+                // контакт" (просто не смог проверить) — композер показывался как обычно, а кнопка
+                // "Отправить приглашение в контакты" не появлялась вообще. Эта карта хранит email
+                // независимо от текущего статуса контакта, чтобы его всегда можно было найти.
+                roomEmailMap: JSON.parse(localStorage.getItem('ge_room_email_map') || "{}"),
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 pinnedRooms: JSON.parse(localStorage.getItem('ge_pinned_rooms') || "[]"), // закреплённые чаты/группы, максимум 5
@@ -3249,7 +3256,8 @@
                         const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                         const otherSafe = otherPrivateSafe(rid, myMailSafe);
                         const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe)
-                            || geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherSafe)?.email;
+                            || geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherSafe)?.email
+                            || geEngine.state.roomEmailMap[rid];
                         if (!targetEmail) return;
                         const name = document.getElementById('ge-active-name').innerText;
                         geEngine.ui.openUserProfile(targetEmail, name);
@@ -3822,7 +3830,9 @@
                         if (rid.startsWith('private-')) {
                             const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                             const otherMailSafePart = otherPrivateSafe(rid, myMailSafe);
-                            resolvedTargetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart) || '';
+                            resolvedTargetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart)
+                                || geEngine.state.roomEmailMap[rid] || '';
+                            if (resolvedTargetEmail) geEngine.chat._rememberRoomEmail(rid, resolvedTargetEmail);
 
                             const profile = contactProfiles[rid];
                             if (profile && profile.name) {
@@ -3839,6 +3849,7 @@
                                     // не могла его найти и ОШИБОЧНО открывала обычный композер,
                                     // хотя приглашение ещё не приняли. Явно используем email отсюда.
                                     resolvedTargetEmail = profile._pendingTarget || resolvedTargetEmail;
+                                    if (resolvedTargetEmail) geEngine.chat._rememberRoomEmail(rid, resolvedTargetEmail);
                                 }
                             } else {
                                 const user = geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
@@ -4936,6 +4947,14 @@
                         geEngine.ui.showToast('Ошибка соединения с сервером', 'error');
                     }
                 },
+                // Запоминаем email собеседника для комнаты навсегда (не зависит от того,
+                // остаётся ли он контактом сейчас) — см. state.roomEmailMap.
+                _rememberRoomEmail(roomId, email) {
+                    if (!roomId || !email) return;
+                    if (geEngine.state.roomEmailMap[roomId] === email) return;
+                    geEngine.state.roomEmailMap[roomId] = email;
+                    localStorage.setItem('ge_room_email_map', JSON.stringify(geEngine.state.roomEmailMap));
+                },
                 _openChatTargetEmail: null,
                 async open(id, prettyName, knownEmpty, explicitTargetEmail) {
                     geEngine.media.clearPendingAttachment(); // не тащим незаконченное вложение в другой чат
@@ -4971,7 +4990,9 @@
                         const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
                         const otherSafe = otherPrivateSafe(id, myMailSafe);
                         const targetEmail = explicitTargetEmail
-                            || geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe);
+                            || geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe)
+                            || geEngine.state.roomEmailMap[id] || null;
+                        if (targetEmail) geEngine.chat._rememberRoomEmail(id, targetEmail);
 
                         // Если собеседник ещё не в контактах — прячем композер и показываем
                         // кнопку "Отправить приглашение" вместо него. Если targetEmail неизвестен
@@ -5219,6 +5240,7 @@
                 // видна в СВОЁМ списке чатов (с пометкой "ждём ответа"), а не пропадает
                 // бесследно, пока собеседник не примет её.
                 async _rememberPendingInvite(roomId, targetEmail, displayName) {
+                    geEngine.chat._rememberRoomEmail(roomId, targetEmail);
                     if (!geEngine.state.localRooms.includes(roomId)) {
                         geEngine.state.localRooms.push(roomId);
                         localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
@@ -6314,6 +6336,20 @@
                 setInterval(() => { if (!document.hidden) geEngine.calls._pollSignals(); }, 2000);
                 geEngine.contacts.checkRequests();
                 setInterval(() => { if (!document.hidden) geEngine.contacts.checkRequests(); }, 10000);
+
+                // На мобильных при сворачивании приложения (блокировка экрана, переключение
+                // на другое приложение) фоновые таймеры браузер сильно замедляет или совсем
+                // приостанавливает — из-за этого после возврата в приложение обновление могло
+                // подтягиваться далеко не сразу (создавая впечатление, что "не обновилось само",
+                // пока не перезагрузишь страницу). Форсируем мгновенный опрос в момент, когда
+                // вкладка/приложение снова становится видимой, не дожидаясь следующего тика.
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden) {
+                        geEngine.chat.refresh();
+                        geEngine.contacts.checkRequests();
+                    }
+                });
+
                 geEngine.media.init();
             }
         };
