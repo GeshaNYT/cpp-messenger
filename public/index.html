@@ -2675,6 +2675,10 @@
                 // "Отправить приглашение в контакты" не появлялась вообще. Эта карта хранит email
                 // независимо от текущего статуса контакта, чтобы его всегда можно было найти.
                 roomEmailMap: JSON.parse(localStorage.getItem('ge_room_email_map') || "{}"),
+                // email -> true, если findUser вернул признак "аккаунт удалён" — кэш в
+                // памяти (не переживает перезагрузку страницы, что нормально: просто
+                // перепроверим один раз при следующем открытии чата).
+                deletedAccountsCache: {},
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 pinnedRooms: JSON.parse(localStorage.getItem('ge_pinned_rooms') || "[]"), // закреплённые чаты/группы, максимум 5
@@ -2866,7 +2870,14 @@
                             bio: user.bio || ''
                         };
                         localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
-                        
+
+                        // Пароль нужен для E2E-ключей (создать/восстановить резервную копию) —
+                        // берём его, пока он ещё доступен: при регистрации он есть в pendingUser,
+                        // при входе поле пароля просто скрыто (не очищено), значение всё ещё там.
+                        const passwordForE2E = type === 'reg'
+                            ? (user.password || '')
+                            : (document.getElementById('in-pass')?.value || '');
+
                         geEngine.state.currentOTP = null;
                         geEngine.state.pendingUser = null;
 
@@ -2877,7 +2888,7 @@
                             body: JSON.stringify({ name: user.name, nickname: user.nickname })
                         }).catch(() => {});
 
-                        geEngine.init();
+                        geEngine.init(passwordForE2E);
                     } else {
                         alert("Неверный код подтверждения!");
                     }
@@ -2947,6 +2958,20 @@
                         });
                         const data = await res.json();
                         if (data.status === 'error') return alert(data.message);
+
+                        // Если E2E-ключ для этого аккаунта уже есть на ЭТОМ устройстве —
+                        // переиздаём резервную копию новым паролем, чтобы она осталась рабочей
+                        // для восстановления на других устройствах. Если ключа тут нет (сброс
+                        // пароля идёт с устройства, где переписку никогда не открывали) —
+                        // ничего сделать нельзя: старая резервная копия останется зашифрована
+                        // забытым паролем, и на новых устройствах E2E-переписка начнётся заново.
+                        try {
+                            const stored = JSON.parse(localStorage.getItem(`ge_e2e_keys_${geEngine.state.forgotEmail}`) || 'null');
+                            if (stored?.priv && stored?.pub) {
+                                await geEngine.e2e._createBackup(geEngine.state.forgotEmail, pass, stored);
+                            }
+                        } catch {}
+
                         alert('✅ Пароль успешно изменён! Теперь войдите в аккаунт.');
                         geEngine.state.forgotEmail = null;
                         geEngine.state.forgotName = null;
@@ -3043,6 +3068,19 @@
                                 alert("Не удалось удалить аккаунт — проблема на сервере. Попробуйте ещё раз через минуту.");
                                 return;
                             }
+                            // Раньше тут чистился только токен сессии — все остальные ключи
+                            // (список локальных комнат/групп, закреплённые чаты, кэш email->room
+                            // и т.д.) оставались в localStorage навсегда. При регистрации НОВОГО
+                            // аккаунта на этом же устройстве (даже с той же самой почтой) эти
+                            // старые записи подмешивались в список чатов как ни в чём не бывало —
+                            // старые чаты и группы "воскресали", хотя на сервере их уже не было.
+                            [
+                                'ge_local_rooms', 'ge_created_rooms', 'ge_deleted_rooms',
+                                'ge_pinned_rooms', 'ge_room_times', 'ge_room_email_map',
+                                'ge_sent_invites', 'ge_call_history', 'ge_users_db',
+                                'ge_read_requests', `ge_e2e_keys_${currentEmail}`,
+                                `ge_e2e_backup_done_${currentEmail}`,
+                            ].forEach(k => localStorage.removeItem(k));
                             localStorage.removeItem('ge_v9_token');
                             alert("Ваш аккаунт был полностью удален.");
                             location.reload();
@@ -3202,6 +3240,16 @@
                     if (avImg !== null) geEngine.state.session.avImg = avImg || null;
                     localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
 
+                    // Пароль сменился — переиздаём резервную копию E2E-ключа новым паролем,
+                    // иначе она навсегда останется зашифрована СТАРЫМ паролем и перестанет
+                    // быть полезной для восстановления на новом устройстве.
+                    if (newPass && geEngine.e2e._keyPair?.privateJwk) {
+                        geEngine.e2e._createBackup(email, newPass, {
+                            priv: geEngine.e2e._keyPair.privateJwk,
+                            pub: geEngine.e2e._keyPair.publicJwk,
+                        }).catch(() => {});
+                    }
+
                     // Обновляем свой аватар в сайдбаре
                     geEngine.profile._applyMyAv(document.getElementById('ge-my-av'), newName, avColor, geEngine.state.session.avImg);
 
@@ -3352,13 +3400,26 @@
                     const chatMatches = [];
                     allRooms.forEach(rid => {
                         if (geEngine.state.deletedRooms.includes(rid)) return;
-                        let name = rid, isGroup = rid === 'general' || !rid.startsWith('private-');
+                        let name, isGroup = rid === 'general' || !rid.startsWith('private-');
                         if (rid.startsWith('private-')) {
                             const profile = geEngine.ui._contactProfilesCache && geEngine.ui._contactProfilesCache[rid];
-                            name = profile && profile.name ? safeDecodeURIComponent(profile.name) : rid;
+                            if (profile && profile.name) {
+                                name = safeDecodeURIComponent(profile.name);
+                            } else {
+                                // Профиль ещё не подгружен — НЕ показываем сырой roomId (в нём
+                                // куски email обеих сторон, выглядит как мусор). Пробуем хотя бы
+                                // email через уже известные источники, иначе честное "Загрузка…".
+                                const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                                const otherSafe = otherPrivateSafe(rid, myMailSafe);
+                                const realEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe)
+                                    || geEngine.state.roomEmailMap[rid];
+                                name = realEmail ? realEmail.split('@')[0] : 'Загрузка…';
+                            }
                         } else if (rid !== 'general') {
                             const gp = geEngine.state.groupProfiles[rid];
-                            name = (gp && gp.name) || rid;
+                            // Раньше тут падало обратно на сырой rid (это ID группы — 8-значный
+                            // код), что выглядело как случайный набор символов вместо названия.
+                            name = (gp && gp.name) || 'Загрузка…';
                         } else {
                             name = 'general';
                         }
@@ -3802,7 +3863,10 @@
                             try {
                                 const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
                                 const data = await res.json();
-                                if (data.status === 'found') contactProfiles[rid] = data.profile || {};
+                                if (data.status === 'found') {
+                                    contactProfiles[rid] = data.profile || {};
+                                    if (data.profile?.deleted) geEngine.state.deletedAccountsCache[targetEmail] = true;
+                                }
                             } catch {}
                         }));
                     }
@@ -3849,7 +3913,11 @@
                             if (resolvedTargetEmail) geEngine.chat._rememberRoomEmail(rid, resolvedTargetEmail);
 
                             const profile = contactProfiles[rid];
-                            if (profile && profile.name) {
+                            if (profile && profile.deleted) {
+                                displayName = 'Аккаунт удалён';
+                                subtitle = 'Пользователь удалил аккаунт';
+                                avColor = 'var(--bg-input)';
+                            } else if (profile && profile.name) {
                                 displayName = safeDecodeURIComponent(profile.name);
                                 avColor = profile.avColor ? safeDecodeURIComponent(profile.avColor) : 'var(--ge-accent-gradient)';
                                 avImg = profile.avImg ? safeDecodeURIComponent(profile.avImg) : null;
@@ -4795,10 +4863,15 @@
                         // это перепроверялось только при закрытии/повторном открытии чата.
                         if (geEngine.chat._openChatTargetEmail) {
                             const targetEmail = geEngine.chat._openChatTargetEmail;
-                            const isContact = geEngine.state.serverContacts.includes(targetEmail);
                             const composerRow = document.getElementById('ge-composer-row');
                             const inviteBar = document.getElementById('ge-invite-bar');
-                            if (composerRow && inviteBar) {
+                            if (geEngine.state.deletedAccountsCache[targetEmail]) {
+                                // Собеседник удалил аккаунт — держим соответствующую плашку,
+                                // не даём обычной логике "контакт/не контакт" перезаписать её
+                                // обратно на "Отправить приглашение".
+                                geEngine.chat._applyDeletedAccountUI(composerRow, inviteBar, document.getElementById('ge-active-name'), document.getElementById('ge-active-av'), '');
+                            } else if (composerRow && inviteBar) {
+                                const isContact = geEngine.state.serverContacts.includes(targetEmail);
                                 composerRow.style.display = isContact ? 'contents' : 'none';
                                 inviteBar.classList.toggle('ge-hidden', isContact);
                                 if (!isContact) {
@@ -4806,6 +4879,7 @@
                                     inviteBar.innerText = alreadySent ? 'Заявка отправлена — ждём ответа' : 'Отправить приглашение в контакты';
                                     inviteBar.disabled = alreadySent;
                                     inviteBar.style.opacity = alreadySent ? '0.6' : '1';
+                                    inviteBar.onclick = geEngine.chat.sendInviteFromOpenChat;
                                 }
                             }
                         }
@@ -4856,13 +4930,19 @@
                                 // галочка не появлялась бы, пока не изменится текст сообщений.
                                 const newMessages = JSON.stringify({ m: data.messages?.result, r: data.reads });
 
+                                // E2E: расшифровываем СРАЗУ после получения с сервера, один раз —
+                                // дальше и кэш, и сама отрисовка работают с уже открытым текстом,
+                                // в точности как раньше (renderMessages() не менялся). Для групп/
+                                // general resolveForRoom просто возвращает данные как есть.
+                                const resolvedMessages = await geEngine.e2e.resolveForRoom(requestedRoom, data.messages?.result);
+
                                 // Кэшируем ответ ПОД ТЕМ КЛЮЧОМ, к которому он реально относится
                                 // (requestedRoom), независимо от того, что открыто прямо сейчас —
                                 // это безопасно и полезно для мгновенного показа при следующем
                                 // открытии этого чата.
                                 if (!geEngine.state._msgCache) geEngine.state._msgCache = {};
                                 geEngine.state._msgCache[requestedRoom] = {
-                                    messages: data.messages?.result,
+                                    messages: resolvedMessages,
                                     reads: data.reads || {},
                                 };
 
@@ -4878,7 +4958,7 @@
                                     if (!hasPlaying && !geEngine.chat._isUserInteracting) {
                                         geEngine.chat._lastMessages = newMessages;
                                         geEngine.state.currentRoomReads = data.reads || {};
-                                        geEngine.ui.renderMessages(data.messages?.result);
+                                        geEngine.ui.renderMessages(resolvedMessages);
                                     }
                                 }
                             }
@@ -4915,12 +4995,29 @@
                         ts: nowTs,
                         time: new Date(nowTs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), status: 'sent' 
                     };
-                    const payload = JSON.stringify(msgObj);
                     input.value = '';
 
                     // Показываем сообщение сразу же, не дожидаясь ответа сервера
                     // или следующего опроса — это и вызывало задержку, особенно на телефоне.
+                    // Локальный пузырёк всегда строим из ОТКРЫТОГО текста (msgObj) — у самого
+                    // отправителя текст и так есть в оригинале, шифровать для себя незачем.
                     const bubble = geEngine.ui.appendSentBubble(msgObj);
+
+                    // E2E: для личных чатов шифруем текст перед отправкой на сервер общим
+                    // ключом (ECDH) — сервер видит только шифротекст. Если у собеседника ещё
+                    // нет опубликованного публичного ключа (старая сессия) — отправляем как
+                    // раньше, открытым текстом, чтобы переписка не сломалась.
+                    let wireMsgObj = msgObj;
+                    if (targetRoom.startsWith('private-')) {
+                        const peerEmail = geEngine.e2e._peerEmailForRoom(targetRoom);
+                        const sharedKey = peerEmail && await geEngine.e2e.getSharedKeyForPeer(peerEmail);
+                        if (sharedKey) {
+                            const textEnc = await geEngine.e2e.encryptField(sharedKey, text);
+                            wireMsgObj = { ...msgObj, e2e: true, textEnc };
+                            delete wireMsgObj.text;
+                        }
+                    }
+                    const payload = JSON.stringify(wireMsgObj);
 
                     // Обновляем время комнаты при отправке (оптимистично, для мгновенного отклика в UI)
                     if (!geEngine.state.roomLastTime) geEngine.state.roomLastTime = {};
@@ -4978,6 +5075,24 @@
                     geEngine.state.roomEmailMap[roomId] = email;
                     localStorage.setItem('ge_room_email_map', JSON.stringify(geEngine.state.roomEmailMap));
                 },
+                // Показывает "Аккаунт удалён" вместо композера/кнопки приглашения, когда
+                // выясняется, что собеседник удалил свой аккаунт — вместо того, чтобы чат
+                // молча зависал на "Загрузка…" или продолжал предлагать "написать".
+                _applyDeletedAccountUI(composerRow, inviteBar, nameEl, avatarEl, fallbackName) {
+                    if (composerRow) composerRow.style.display = 'none';
+                    if (inviteBar) {
+                        inviteBar.classList.remove('ge-hidden');
+                        inviteBar.innerText = 'Пользователь удалил аккаунт';
+                        inviteBar.disabled = true;
+                        inviteBar.style.opacity = '0.55';
+                        inviteBar.onclick = null; // отправлять приглашение некому
+                    }
+                    if (nameEl) nameEl.innerText = 'Аккаунт удалён';
+                    if (avatarEl) {
+                        avatarEl.style.background = 'var(--bg-input)';
+                        avatarEl.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary)"><circle cx="12" cy="12" r="10"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="16" y1="8" x2="8" y2="16"/></svg>`;
+                    }
+                },
                 _openChatTargetEmail: null,
                 async open(id, prettyName, knownEmpty, explicitTargetEmail) {
                     geEngine.media.clearPendingAttachment(); // не тащим незаконченное вложение в другой чат
@@ -5024,7 +5139,10 @@
                         const isContact = !targetEmail || geEngine.state.serverContacts.includes(targetEmail);
                         const composerRow = document.getElementById('ge-composer-row');
                         const inviteBar = document.getElementById('ge-invite-bar');
-                        if (composerRow && inviteBar) {
+                        const isKnownDeleted = targetEmail && geEngine.state.deletedAccountsCache[targetEmail];
+                        if (isKnownDeleted) {
+                            geEngine.chat._applyDeletedAccountUI(composerRow, inviteBar, document.getElementById('ge-active-name'), activeAv, prettyName || id);
+                        } else if (composerRow && inviteBar) {
                             composerRow.style.display = isContact ? 'contents' : 'none';
                             inviteBar.classList.toggle('ge-hidden', isContact);
                             if (!isContact) {
@@ -5032,14 +5150,20 @@
                                 inviteBar.innerText = alreadySent ? 'Заявка отправлена — ждём ответа' : 'Отправить приглашение в контакты';
                                 inviteBar.disabled = alreadySent;
                                 inviteBar.style.opacity = alreadySent ? '0.6' : '1';
+                                inviteBar.onclick = geEngine.chat.sendInviteFromOpenChat;
                             }
                         }
 
-                        if (targetEmail) {
+                        if (targetEmail && !isKnownDeleted) {
                             try {
                                 const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
                                 const data = await res.json();
-                                if (data.status === 'found' && data.profile) {
+                                if (data.status === 'found' && data.profile?.deleted) {
+                                    // Собеседник удалил аккаунт — сообщаем об этом явно вместо
+                                    // того, чтобы чат вечно висел на "Загрузка…"/пустом профиле.
+                                    geEngine.state.deletedAccountsCache[targetEmail] = true;
+                                    geEngine.chat._applyDeletedAccountUI(composerRow, inviteBar, document.getElementById('ge-active-name'), activeAv, prettyName || id);
+                                } else if (data.status === 'found' && data.profile) {
                                     const p = data.profile;
                                     const img = p.avImg ? safeDecodeURIComponent(p.avImg) : null;
                                     const color = p.avColor ? safeDecodeURIComponent(p.avColor) : 'var(--ge-accent-gradient)';
@@ -5090,15 +5214,19 @@
                         const res = await fetch(`/api/index?room=${encodeURIComponent(id)}&user_email=${encodeURIComponent(geEngine.state.session.email)}`);
                         const data = await res.json();
 
+                        // E2E: расшифровываем один раз сразу после получения — см. пояснение
+                        // в chat.refresh().
+                        const resolvedMessages = await geEngine.e2e.resolveForRoom(id, data.messages?.result);
+
                         if (!geEngine.state._msgCache) geEngine.state._msgCache = {};
-                        geEngine.state._msgCache[id] = { messages: data.messages?.result, reads: data.reads || {} };
+                        geEngine.state._msgCache[id] = { messages: resolvedMessages, reads: data.reads || {} };
                         if (data.contacts?.result) geEngine.state.serverContacts = data.contacts.result;
 
                         // Отрисовываем только если пользователь всё ещё смотрит именно эту комнату
                         if (geEngine.state.activeRoom === id) {
                             geEngine.state.currentRoomReads = data.reads || {};
                             geEngine.chat._lastMessages = JSON.stringify({ m: data.messages?.result, r: data.reads });
-                            geEngine.ui.renderMessages(data.messages?.result);
+                            geEngine.ui.renderMessages(resolvedMessages);
                         }
                     } catch (e) {}
                 },
@@ -5847,6 +5975,287 @@
                 },
             },
 
+            // ══════════════════════════════════════════════════════════════
+            //  E2E — сквозное шифрование ЛИЧНЫХ (private-) чатов.
+            //
+            //  Схема: у каждого пользователя есть пара ключей ECDH (P-256),
+            //  генерируется в браузере при первом входе на устройстве. Приватный
+            //  ключ НИКОГДА не покидает устройство (лежит только в localStorage).
+            //  Публичный ключ отправляется на сервер и виден всем — это нормально,
+            //  публичный ключ не секрет.
+            //
+            //  Чтобы зашифровать сообщение для собеседника, оба участника выводят
+            //  ОДИНАКОВЫЙ общий AES-256 ключ через ECDH (мой приватный + его
+            //  публичный = его приватный + мой публичный = один и тот же секрет).
+            //  Сервер видит только шифротекст и никогда не видит ни один приватный
+            //  ключ — то есть даже с полным доступом к базе прочитать текст/медиа
+            //  таких сообщений невозможно.
+            //
+            //  ВАЖНО (ограничения этой реализации):
+            //  - Работает только для личных чатов (private-*). Группы и general
+            //    по-прежнему защищены только серверным шифрованием "в покое"
+            //    (AES-256-GCM на бэкенде) — полноценный E2E для групп требует
+            //    отдельного группового ключа с переизданием при смене состава
+            //    участников, это отдельная, более крупная задача.
+            //  - Приватный ключ живёт только в localStorage ЭТОГО устройства/браузера.
+            //    Если очистить localStorage или зайти с нового устройства без
+            //    переноса ключа — старая переписка на этом устройстве не расшифруется
+            //    (это неотъемлемое свойство настоящего E2E: сервер восстановить
+            //    ключ не может, у него его никогда и не было).
+            //  - Полнотекстовый поиск (runSearch) при этом продолжает работать,
+            //    т.к. ищет по уже расшифрованному локальному кэшу сообщений.
+            // ══════════════════════════════════════════════════════════════
+            e2e: {
+                _keyPair: null,       // { privateKey: CryptoKey, publicJwk, privateJwk } для ТЕКУЩЕГО пользователя
+                _myEmail: null,
+                _sharedKeyCache: {},  // peerEmail -> CryptoKey (выведенный AES-ключ на пару)
+                _peerPubKeys: {},     // peerEmail -> JSON-строка публичного ключа (кэш из findUser)
+
+                // Гарантирует, что для текущего пользователя есть ключевая пара:
+                // 1) загружает существующую с этого устройства, если есть;
+                // 2) иначе, если знаем пароль — пробует восстановить её из резервной
+                //    копии на сервере (зашифрована этим же паролем, см. _createBackup) —
+                //    это и позволяет переписке "переехать" на новое устройство, как в
+                //    Signal/WhatsApp;
+                // 3) иначе генерирует новую пару (старая переписка на ЭТОМ устройстве
+                //    останется нечитаемой — расшифровать её могло бы только старое
+                //    устройство или успешное восстановление бэкапа).
+                async ensureKeys(passwordForBackup) {
+                    const email = geEngine.state.session?.email;
+                    if (!email) return;
+                    if (this._keyPair && this._myEmail === email) return; // уже готово в этой сессии
+                    this._myEmail = email;
+
+                    const storageKey = `ge_e2e_keys_${email}`;
+                    let stored = null;
+                    try { stored = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch {}
+
+                    if (stored && stored.priv && stored.pub) {
+                        try {
+                            const priv = await crypto.subtle.importKey('jwk', stored.priv, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveKey']);
+                            this._keyPair = { privateKey: priv, publicJwk: stored.pub, privateJwk: stored.priv };
+                            // На случай, если ключ был восстановлен из бэкапа localStorage,
+                            // а на сервере публичного ключа ещё нет — переиздаём молча.
+                            this._publishPublicKey(stored.pub).catch(() => {});
+                            // И на случай, если резервной копии для этого ключа ещё нет на
+                            // сервере (например, обновились со старой версии этого фикса) —
+                            // создаём её, раз пароль известен.
+                            if (passwordForBackup) this._ensureBackupExists(email, passwordForBackup, stored).catch(() => {});
+                            return;
+                        } catch (e) { /* ключ повреждён — попробуем восстановить/сгенерировать ниже */ }
+                    }
+
+                    // Локального ключа нет. Единственный случай, когда мы попадаем сюда без
+                    // пароля под рукой — это сессия, восстановленная из сохранённого токена
+                    // (обычный перезаход), у которой почему-то нет локального ключа
+                    // (например, почистили localStorage, а токен входа — нет). Специально для
+                    // этого редкого случая явно спрашиваем пароль, чтобы попытаться
+                    // восстановить старую переписку, а не молча начинать с нуля.
+                    let password = passwordForBackup;
+                    if (!password) {
+                        password = prompt(`Чтобы восстановить доступ к зашифрованной переписке на этом устройстве, введите пароль от аккаунта ${email}:`) || '';
+                    }
+
+                    if (password) {
+                        const restored = await this._tryRestoreFromBackup(email, password);
+                        if (restored) {
+                            try { localStorage.setItem(storageKey, JSON.stringify(restored)); } catch {}
+                            const priv = await crypto.subtle.importKey('jwk', restored.priv, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveKey']);
+                            this._keyPair = { privateKey: priv, publicJwk: restored.pub, privateJwk: restored.priv };
+                            this._publishPublicKey(restored.pub).catch(() => {});
+                            return;
+                        }
+                    }
+
+                    // Резервной копии нет, не удалось восстановить (например, пароль сброшен
+                    // через "забыли пароль" — тогда старую копию расшифровать нечем), либо это
+                    // вообще первый вход — генерируем новую пару.
+                    const pair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
+                    const [privJwk, pubJwk] = await Promise.all([
+                        crypto.subtle.exportKey('jwk', pair.privateKey),
+                        crypto.subtle.exportKey('jwk', pair.publicKey),
+                    ]);
+                    try { localStorage.setItem(storageKey, JSON.stringify({ priv: privJwk, pub: pubJwk })); } catch {}
+                    this._keyPair = { privateKey: pair.privateKey, publicJwk: pubJwk, privateJwk: privJwk };
+                    await this._publishPublicKey(pubJwk);
+
+                    if (password) {
+                        await this._createBackup(email, password, { priv: privJwk, pub: pubJwk }).catch(() => {});
+                    }
+                },
+
+                // ── Резервная копия приватного ключа, зашифрованная паролем аккаунта ──
+                // Ключ шифрования бэкапа выводится из пароля через PBKDF2 (150 000 итераций,
+                // SHA-256) — сервер хранит только СОЛЬ и ШИФРОТЕКСТ, вывести из них исходный
+                // пароль или ключ он не может (у него есть только ХЕШ пароля для входа, а не
+                // сам пароль). Расшифровать бэкап способен только тот, кто знает пароль.
+                async _deriveBackupKey(password, saltBytes) {
+                    const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+                    return crypto.subtle.deriveKey(
+                        { name: 'PBKDF2', salt: saltBytes, iterations: 150000, hash: 'SHA-256' },
+                        baseKey,
+                        { name: 'AES-GCM', length: 256 },
+                        false,
+                        ['encrypt', 'decrypt']
+                    );
+                },
+                async _createBackup(email, password, keysObj) {
+                    const salt = crypto.getRandomValues(new Uint8Array(16));
+                    const backupKey = await this._deriveBackupKey(password, salt);
+                    const iv = crypto.getRandomValues(new Uint8Array(12));
+                    const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, backupKey, new TextEncoder().encode(JSON.stringify(keysObj)));
+                    const backupBlob = {
+                        salt: btoa(String.fromCharCode(...salt)),
+                        iv: btoa(String.fromCharCode(...iv)),
+                        c: btoa(String.fromCharCode(...new Uint8Array(cipherBuf))),
+                    };
+                    await fetch(`/api/index?action=updateProfile&user_email=${encodeURIComponent(email)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ e2eBackup: JSON.stringify(backupBlob) }),
+                    });
+                    localStorage.setItem(`ge_e2e_backup_done_${email}`, '1');
+                },
+                async _ensureBackupExists(email, password, existingKeys) {
+                    const doneFlag = `ge_e2e_backup_done_${email}`;
+                    if (localStorage.getItem(doneFlag) === '1') return;
+                    try {
+                        const res = await fetch(`/api/index?action=getE2EBackup&query=${encodeURIComponent(email)}&user_email=${encodeURIComponent(email)}`);
+                        const data = await res.json();
+                        if (data.e2eBackup) { localStorage.setItem(doneFlag, '1'); return; }
+                    } catch { return; }
+                    await this._createBackup(email, password, existingKeys);
+                },
+                async _tryRestoreFromBackup(email, password) {
+                    try {
+                        const res = await fetch(`/api/index?action=getE2EBackup&query=${encodeURIComponent(email)}&user_email=${encodeURIComponent(email)}`);
+                        const data = await res.json();
+                        const backupStr = data.e2eBackup;
+                        if (!backupStr) return null; // бэкапа ещё не было создано (очень старый ключ)
+                        const backup = JSON.parse(backupStr);
+                        const salt = Uint8Array.from(atob(backup.salt), c => c.charCodeAt(0));
+                        const iv = Uint8Array.from(atob(backup.iv), c => c.charCodeAt(0));
+                        const cipherBytes = Uint8Array.from(atob(backup.c), c => c.charCodeAt(0));
+                        const backupKey = await this._deriveBackupKey(password, salt);
+                        const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, backupKey, cipherBytes);
+                        return JSON.parse(new TextDecoder().decode(plainBuf)); // { priv, pub }
+                    } catch (e) {
+                        return null; // неверный пароль (например, после сброса) или бэкап повреждён
+                    }
+                },
+
+                async _publishPublicKey(pubJwk) {
+                    try {
+                        await fetch(`/api/index?action=updateProfile&user_email=${encodeURIComponent(geEngine.state.session.email)}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ pubKey: JSON.stringify(pubJwk) }),
+                        });
+                    } catch {}
+                },
+
+                cachePeerPubKey(email, pubKeyStr) {
+                    if (email && pubKeyStr) this._peerPubKeys[email] = pubKeyStr;
+                },
+
+                // Возвращает общий AES-ключ для переписки с peerEmail, либо null если
+                // у собеседника ещё нет публичного ключа (старая сессия / не заходил
+                // после обновления) — в этом случае сообщение уйдёт как раньше, без E2E.
+                async getSharedKeyForPeer(peerEmail) {
+                    if (!peerEmail) return null;
+                    await this.ensureKeys();
+                    if (!this._keyPair) return null;
+                    if (this._sharedKeyCache[peerEmail]) return this._sharedKeyCache[peerEmail];
+
+                    let pubKeyStr = this._peerPubKeys[peerEmail];
+                    if (!pubKeyStr) {
+                        try {
+                            const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(peerEmail)}`);
+                            const data = await res.json();
+                            if (data.status === 'found' && data.profile?.pubKey) {
+                                pubKeyStr = data.profile.pubKey;
+                                this._peerPubKeys[peerEmail] = pubKeyStr;
+                            }
+                        } catch {}
+                    }
+                    if (!pubKeyStr) return null;
+
+                    try {
+                        const peerJwk = JSON.parse(pubKeyStr);
+                        const peerPublicKey = await crypto.subtle.importKey('jwk', peerJwk, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+                        const sharedKey = await crypto.subtle.deriveKey(
+                            { name: 'ECDH', public: peerPublicKey },
+                            this._keyPair.privateKey,
+                            { name: 'AES-GCM', length: 256 },
+                            false,
+                            ['encrypt', 'decrypt']
+                        );
+                        this._sharedKeyCache[peerEmail] = sharedKey;
+                        return sharedKey;
+                    } catch (e) { return null; }
+                },
+
+                async encryptField(key, plainText) {
+                    if (plainText === undefined || plainText === null || plainText === '') return null;
+                    const iv = crypto.getRandomValues(new Uint8Array(12));
+                    const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(String(plainText)));
+                    return {
+                        iv: btoa(String.fromCharCode(...iv)),
+                        c: btoa(String.fromCharCode(...new Uint8Array(cipherBuf))),
+                    };
+                },
+
+                async decryptField(key, enc) {
+                    if (!enc || !enc.iv || !enc.c) return '';
+                    try {
+                        const iv = Uint8Array.from(atob(enc.iv), c => c.charCodeAt(0));
+                        const cipherBytes = Uint8Array.from(atob(enc.c), c => c.charCodeAt(0));
+                        const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBytes);
+                        return new TextDecoder().decode(plainBuf);
+                    } catch (e) {
+                        return '🔒 Не удалось расшифровать (сообщение с другого устройства?)';
+                    }
+                },
+
+                // email собеседника для приватной комнаты — переиспользует ту же логику
+                // (текущие контакты -> постоянная карта roomEmailMap), что и остальной код.
+                _peerEmailForRoom(rid) {
+                    if (!rid || !rid.startsWith('private-') || !geEngine.state.session) return null;
+                    const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
+                    const otherSafe = otherPrivateSafe(rid, myMailSafe);
+                    if (!otherSafe) return null;
+                    return geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe)
+                        || geEngine.state.roomEmailMap[rid] || null;
+                },
+
+                // Расшифровывает входящий массив сообщений комнаты, сохраняя ТУ ЖЕ
+                // обёртку (encodeURIComponent от JSON), которую renderMessages() всегда
+                // ожидал — поэтому сам renderMessages() и вся отрисовка меняться не должны.
+                async resolveForRoom(rid, rawMessages) {
+                    if (!rawMessages || !rawMessages.length) return rawMessages;
+                    const peerEmail = this._peerEmailForRoom(rid);
+                    if (!peerEmail) return rawMessages; // группа/general — E2E тут не применяется
+
+                    const sharedKey = await this.getSharedKeyForPeer(peerEmail);
+
+                    return Promise.all(rawMessages.map(async raw => {
+                        try {
+                            let m = typeof raw === 'string' ? JSON.parse(decodeURIComponent(raw)) : raw;
+                            if (m.e2e) {
+                                if (sharedKey) {
+                                    if (m.textEnc)      m.text      = await this.decryptField(sharedKey, m.textEnc);
+                                    if (m.mediaDataEnc) m.mediaData = await this.decryptField(sharedKey, m.mediaDataEnc);
+                                    if (m.fileNameEnc)  m.fileName  = await this.decryptField(sharedKey, m.fileNameEnc);
+                                } else {
+                                    m.text = '🔒 Зашифрованное сообщение (нет ключа собеседника)';
+                                }
+                            }
+                            return encodeURIComponent(JSON.stringify(m));
+                        } catch (e) { return raw; }
+                    }));
+                },
+            },
+
             contacts: {
                 _pending: [],
                 _lastCheck: 0,
@@ -6250,7 +6659,8 @@
                     const reader = new FileReader();
                     reader.onload = async () => {
                         const base64 = reader.result;
-                        // Сохраняем локально для себя
+                        // Сохраняем локально для себя (открытым текстом — это лишь локальный
+                        // кэш на СВОЁМ устройстве, за пределы браузера он не уходит)
                         const mediaKey = `ge_media_${Date.now()}_${Math.random().toString(36).slice(2)}`;
                         try { localStorage.setItem(mediaKey, base64); } catch(e) {
                             Object.keys(localStorage).filter(k => k.startsWith('ge_media_')).slice(0, 10).forEach(k => localStorage.removeItem(k));
@@ -6258,7 +6668,8 @@
                         }
                         // Отправляем mediaData inline чтобы собеседник тоже видел
                         const mediaTs = Date.now();
-                        const payload = JSON.stringify({
+                        const targetRoom = geEngine.state.activeRoom;
+                        const msgObj = {
                             username: geEngine.state.session.name,
                             email: geEngine.state.session.email,
                             text: extra.caption || '',
@@ -6271,7 +6682,29 @@
                             ts: mediaTs,
                             time: new Date(mediaTs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             status: 'sent'
-                        });
+                        };
+
+                        // E2E: в личных чатах шифруем текст-подпись и само медиа общим ключом
+                        // (ECDH) перед отправкой на сервер — так же, как обычные текстовые
+                        // сообщения (см. chat.broadcast()). Если у собеседника ещё нет
+                        // опубликованного публичного ключа — отправляем как раньше, открыто.
+                        let wireMsgObj = msgObj;
+                        if (targetRoom && targetRoom.startsWith('private-')) {
+                            const peerEmail = geEngine.e2e._peerEmailForRoom(targetRoom);
+                            const sharedKey = peerEmail && await geEngine.e2e.getSharedKeyForPeer(peerEmail);
+                            if (sharedKey) {
+                                const [textEnc, mediaDataEnc, fileNameEnc] = await Promise.all([
+                                    geEngine.e2e.encryptField(sharedKey, msgObj.text),
+                                    geEngine.e2e.encryptField(sharedKey, msgObj.mediaData),
+                                    geEngine.e2e.encryptField(sharedKey, msgObj.fileName),
+                                ]);
+                                wireMsgObj = { ...msgObj, e2e: true, textEnc, mediaDataEnc, fileNameEnc };
+                                delete wireMsgObj.text;
+                                delete wireMsgObj.mediaData;
+                                if (fileNameEnc) delete wireMsgObj.fileName;
+                            }
+                        }
+                        const payload = JSON.stringify(wireMsgObj);
                         if (!geEngine.state.roomLastTime) geEngine.state.roomLastTime = {};
                         geEngine.state.roomLastTime[geEngine.state.activeRoom] = mediaTs;
                         localStorage.setItem('ge_room_times', JSON.stringify(geEngine.state.roomLastTime));
@@ -6336,7 +6769,7 @@
 
 
 
-            init() {
+            init(passwordForE2E) {
                 document.getElementById('ge-auth-layer').classList.add('ge-hidden');
                 document.getElementById('ge-main-app').classList.add('ge-flex');
                 const session = geEngine.state.session;
@@ -6347,6 +6780,11 @@
                     session.avColor,
                     session.avImg
                 );
+                // Готовим ключи E2E-шифрования: загружаем существующие с этого устройства,
+                // либо восстанавливаем из резервной копии на сервере (если знаем пароль —
+                // передан из auth.verifyOTP при свежем входе/регистрации), либо генерируем
+                // новые. Не блокируем остальную загрузку приложения, если что-то пошло не так.
+                geEngine.e2e.ensureKeys(passwordForE2E).catch(() => {});
                 geEngine.chat.refresh();
                 // Опрос сервера — раз в 3 секунды вместо 6, сообщения и список чатов
                 // приходят быстрее. Это безопасно: тяжёлые фоновые проверки (сверка списка
