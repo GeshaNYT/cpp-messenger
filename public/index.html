@@ -820,6 +820,12 @@
             border-radius: 50%;
         }
 
+        /* Аватар удалённого аккаунта — без зелёной точки "онлайн" (кто-то, кого
+           больше не существует, не может быть "в сети") и с приглушённой иконкой
+           вместо буквы/фото. */
+        .ge-user-av.ge-av-deleted { background: var(--bg-input) !important; color: var(--text-tertiary); }
+        .ge-user-av.ge-av-deleted::after { display: none; }
+
         .ge-sidebar-nav {
             display: flex;
             background: var(--bg-body);
@@ -2289,11 +2295,11 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
                     <span>Чат</span>
                 </button>
-                <button class="ge-user-profile-tile" onclick="geEngine.ui.userProfileCall('audio')">
+                <button class="ge-user-profile-tile" id="ge-user-profile-call-btn" onclick="geEngine.ui.userProfileCall('audio')">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.23h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6.29 6.29l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                     <span>Звонок</span>
                 </button>
-                <button class="ge-user-profile-tile" onclick="geEngine.ui.userProfileCall('video')">
+                <button class="ge-user-profile-tile" id="ge-user-profile-video-btn" onclick="geEngine.ui.userProfileCall('video')">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                     <span>Видео</span>
                 </button>
@@ -2657,6 +2663,17 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
+        }
+
+        // Единая иконка "аккаунт удалён" — используется везде: в списке чатов, в шапке
+        // открытого чата, в мини-профиле и рядом с именем отправителя в сообщениях.
+        // Один источник правды, чтобы иконка выглядела одинаково по всему приложению.
+        function deletedAccountIconSvg(px) {
+            return `<svg width="${px}" height="${px}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="16" y1="8" x2="8" y2="16"/></svg>`;
+        }
+        function deletedAccountAvatarHtml(sizePx, extraStyle) {
+            const iconPx = Math.round(sizePx * 0.45);
+            return `<div class="ge-user-av ge-av-deleted" style="width:${sizePx}px;height:${sizePx}px;${extraStyle || ''}">${deletedAccountIconSvg(iconPx)}</div>`;
         }
 
         const geEngine = {
@@ -3329,11 +3346,15 @@
                     if (!email || email === geEngine.state.session.email) return; // не показываем себя
                     geEngine.ui._userProfileTarget = { email, name };
 
-                    document.getElementById('ge-user-profile-name').innerText = name || email;
                     const av = document.getElementById('ge-user-profile-av');
+                    av.classList.remove('ge-av-deleted');
+                    document.getElementById('ge-user-profile-name').innerText = name || email;
                     av.innerHTML = ((name && name[0]) || '?').toUpperCase();
                     av.style.background = 'var(--ge-accent-gradient)';
                     document.getElementById('ge-user-profile-bio').classList.add('ge-hidden');
+                    // Пока не знаем точно — звонки доступны, поправим ниже если аккаунт удалён
+                    document.getElementById('ge-user-profile-call-btn')?.classList.remove('ge-hidden');
+                    document.getElementById('ge-user-profile-video-btn')?.classList.remove('ge-hidden');
 
                     geEngine.ui._openModal('ge-modal-user-profile');
 
@@ -3343,6 +3364,21 @@
                         // Модалка могла закрыться/смениться пока шёл запрос
                         if (!(data.status === 'found' && geEngine.ui._userProfileTarget && geEngine.ui._userProfileTarget.email === email)) return;
                         const profile = data.profile || {};
+
+                        if (profile.deleted) {
+                            // Аккаунт удалён — звонить/приглашать некого, показываем понятную
+                            // иконку и имя вместо стандартного профиля.
+                            geEngine.state.deletedAccountsCache[email] = true;
+                            document.getElementById('ge-user-profile-name').innerText = 'Аккаунт удалён';
+                            av.classList.add('ge-av-deleted');
+                            av.style.background = '';
+                            av.innerHTML = deletedAccountIconSvg(30);
+                            document.getElementById('ge-user-profile-call-btn')?.classList.add('ge-hidden');
+                            document.getElementById('ge-user-profile-video-btn')?.classList.add('ge-hidden');
+                            return;
+                        }
+                        delete geEngine.state.deletedAccountsCache[email];
+
                         if (profile.avImg) {
                             av.style.background = '';
                             av.innerHTML = `<img src="${profile.avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
@@ -3866,6 +3902,7 @@
                                 if (data.status === 'found') {
                                     contactProfiles[rid] = data.profile || {};
                                     if (data.profile?.deleted) geEngine.state.deletedAccountsCache[targetEmail] = true;
+                                    else delete geEngine.state.deletedAccountsCache[targetEmail];
                                 }
                             } catch {}
                         }));
@@ -3901,6 +3938,7 @@
                         let isGroup = rid === 'general' || !rid.startsWith('private-');
                         let avColor = 'var(--ge-accent-gradient)'; // тот же голубой градиент, что и в шапке открытого чата (раньше у личных чатов был серый #444)
                         let avImg = null;
+                        let isDeletedProfile = false;
                         const groupProfile = geEngine.state.groupProfiles[rid];
                         const isCreator = groupProfile ? !!groupProfile.isOwner : geEngine.state.createdRooms.includes(rid);
                         let subtitle = isGroup ? 'Групповой канал' : 'Активный зашифрованный канал';
@@ -3916,7 +3954,7 @@
                             if (profile && profile.deleted) {
                                 displayName = 'Аккаунт удалён';
                                 subtitle = 'Пользователь удалил аккаунт';
-                                avColor = 'var(--bg-input)';
+                                isDeletedProfile = true;
                             } else if (profile && profile.name) {
                                 displayName = safeDecodeURIComponent(profile.name);
                                 avColor = profile.avColor ? safeDecodeURIComponent(profile.avColor) : 'var(--ge-accent-gradient)';
@@ -3959,9 +3997,11 @@
                             }
                         }
 
-                        const avHtml = avImg
-                            ? `<div class="ge-user-av" style="width:50px;height:50px;overflow:hidden;padding:0;"><img src="${avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" /></div>`
-                            : `<div class="ge-user-av" style="width:50px;height:50px;font-size:18px;background:${avColor};">${displayName[0].toUpperCase()}</div>`;
+                        const avHtml = isDeletedProfile
+                            ? deletedAccountAvatarHtml(50, 'font-size:18px;')
+                            : avImg
+                                ? `<div class="ge-user-av" style="width:50px;height:50px;overflow:hidden;padding:0;"><img src="${avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" /></div>`
+                                : `<div class="ge-user-av" style="width:50px;height:50px;font-size:18px;background:${avColor};">${displayName[0].toUpperCase()}</div>`;
 
                         const isPinned = geEngine.state.pinnedRooms.includes(rid);
                         const pinIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="transform:rotate(45deg);"><path d="M16 3l5 5-5.5 1.5L12 14l-2-2 4.5-4.5L16 3z"/><path d="M9 15l-6 6"/><path d="M12.5 8.5L9 12l3 3 3.5-3.5"/></svg>`;
@@ -4075,10 +4115,13 @@
                         // сообщения нет ts (отправлено до этого фикса) — используем сохранённую строку как запасной вариант.
                         const timeStr = m.ts ? geEngine.ui._fmtTime(m.ts) : (m.time || geEngine.ui._fmtTime(Date.now()));
                         // Имя отправителя над сообщением. Для чужих сообщений — кликабельное,
-                        // открывает мини-профиль (аватар, имя, кнопки Чат/Звонок/Видео).
+                        // открывает мини-профиль (аватар, имя, кнопки Чат/Звонок/Видео). Если
+                        // аккаунт отправителя с тех пор удалили — показываем ту же иконку рядом
+                        // с именем, чтобы это было видно прямо в переписке, а не только в шапке.
+                        const isSenderDeleted = !isMe && geEngine.state.deletedAccountsCache[m.email];
                         const metaTopHtml = isMe
                             ? 'Вы'
-                            : `<span class="ge-user-link" onclick="event.stopPropagation(); geEngine.ui.openUserProfile('${(m.email||'').replace(/'/g,"\\'")}', '${(m.username||'').replace(/'/g,"\\'")}')">${escapeHtml(m.username)}</span>`;
+                            : `<span class="ge-user-link" onclick="event.stopPropagation(); geEngine.ui.openUserProfile('${(m.email||'').replace(/'/g,"\\'")}', '${(m.username||'').replace(/'/g,"\\'")}')">${isSenderDeleted ? `<span style="display:inline-flex;vertical-align:middle;margin-right:3px;opacity:0.7;">${deletedAccountIconSvg(12)}</span>` : ''}${escapeHtml(m.username)}</span>`;
                         const uid = msgIdCounter++;
 
                         // СИСТЕМНОЕ СООБЩЕНИЕ (вступление/выход из группы и т.п.)
@@ -4866,6 +4909,19 @@
                             const composerRow = document.getElementById('ge-composer-row');
                             const inviteBar = document.getElementById('ge-invite-bar');
                             if (geEngine.state.deletedAccountsCache[targetEmail]) {
+                                // Пока считаем аккаунт удалённым — но перепроверяем на каждый
+                                // тик, вдруг ту же почту зарегистрировали заново. Раньше эта
+                                // пометка никогда не перепроверялась, и чат навсегда застревал
+                                // на "Аккаунт удалён", даже после появления нового профиля.
+                                try {
+                                    const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
+                                    const data = await res.json();
+                                    if (data.status === 'found' && !data.profile?.deleted) {
+                                        delete geEngine.state.deletedAccountsCache[targetEmail];
+                                    }
+                                } catch {}
+                            }
+                            if (geEngine.state.deletedAccountsCache[targetEmail]) {
                                 // Собеседник удалил аккаунт — держим соответствующую плашку,
                                 // не даём обычной логике "контакт/не контакт" перезаписать её
                                 // обратно на "Отправить приглашение".
@@ -5089,8 +5145,9 @@
                     }
                     if (nameEl) nameEl.innerText = 'Аккаунт удалён';
                     if (avatarEl) {
-                        avatarEl.style.background = 'var(--bg-input)';
-                        avatarEl.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary)"><circle cx="12" cy="12" r="10"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="16" y1="8" x2="8" y2="16"/></svg>`;
+                        avatarEl.classList.add('ge-av-deleted');
+                        avatarEl.style.background = '';
+                        avatarEl.innerHTML = deletedAccountIconSvg(24);
                     }
                 },
                 _openChatTargetEmail: null,
@@ -5119,7 +5176,9 @@
                         document.getElementById('ge-main-app').classList.add('mobile-chat-open');
                     }
                     const activeAv = document.getElementById('ge-active-av');
-                    // Сброс к букве пока грузим
+                    // Сброс к букве пока грузим (и снимаем возможный класс "удалён" с
+                    // прошлого открытия другого чата — иначе бы залипал)
+                    activeAv.classList.remove('ge-av-deleted');
                     activeAv.innerHTML = (prettyName || id)[0].toUpperCase();
                     activeAv.style.background = 'var(--ge-accent-gradient)';
 
@@ -5139,10 +5198,10 @@
                         const isContact = !targetEmail || geEngine.state.serverContacts.includes(targetEmail);
                         const composerRow = document.getElementById('ge-composer-row');
                         const inviteBar = document.getElementById('ge-invite-bar');
-                        const isKnownDeleted = targetEmail && geEngine.state.deletedAccountsCache[targetEmail];
-                        if (isKnownDeleted) {
-                            geEngine.chat._applyDeletedAccountUI(composerRow, inviteBar, document.getElementById('ge-active-name'), activeAv, prettyName || id);
-                        } else if (composerRow && inviteBar) {
+                        const nameEl = document.getElementById('ge-active-name');
+
+                        const applyNormalComposerState = () => {
+                            if (!composerRow || !inviteBar) return;
                             composerRow.style.display = isContact ? 'contents' : 'none';
                             inviteBar.classList.toggle('ge-hidden', isContact);
                             if (!isContact) {
@@ -5152,9 +5211,21 @@
                                 inviteBar.style.opacity = alreadySent ? '0.6' : '1';
                                 inviteBar.onclick = geEngine.chat.sendInviteFromOpenChat;
                             }
+                        };
+
+                        // Мгновенно (не дожидаясь сети) показываем то, что УЖЕ знаем из кэша —
+                        // но ниже ВСЕГДА перепроверяем через сервер и поправляем, если нужно.
+                        // Раньше кэш "аккаунт удалён" ставился один раз и никогда не
+                        // перепроверялся — если человек удалял аккаунт и потом регистрировал
+                        // ту же почту заново, чат навсегда застревал на "Аккаунт удалён", хотя
+                        // на сервере уже был свежий, живой профиль.
+                        if (targetEmail && geEngine.state.deletedAccountsCache[targetEmail]) {
+                            geEngine.chat._applyDeletedAccountUI(composerRow, inviteBar, nameEl, activeAv, prettyName || id);
+                        } else {
+                            applyNormalComposerState();
                         }
 
-                        if (targetEmail && !isKnownDeleted) {
+                        if (targetEmail) {
                             try {
                                 const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
                                 const data = await res.json();
@@ -5162,8 +5233,15 @@
                                     // Собеседник удалил аккаунт — сообщаем об этом явно вместо
                                     // того, чтобы чат вечно висел на "Загрузка…"/пустом профиле.
                                     geEngine.state.deletedAccountsCache[targetEmail] = true;
-                                    geEngine.chat._applyDeletedAccountUI(composerRow, inviteBar, document.getElementById('ge-active-name'), activeAv, prettyName || id);
+                                    geEngine.chat._applyDeletedAccountUI(composerRow, inviteBar, nameEl, activeAv, prettyName || id);
                                 } else if (data.status === 'found' && data.profile) {
+                                    // Аккаунт живой (в том числе мог быть пересоздан заново той же
+                                    // почтой) — снимаем возможную старую пометку "удалён" и
+                                    // восстанавливаем нормальный вид композера/имени/аватарки.
+                                    delete geEngine.state.deletedAccountsCache[targetEmail];
+                                    applyNormalComposerState();
+                                    if (nameEl) nameEl.innerText = prettyName || id;
+                                    activeAv.classList.remove('ge-av-deleted');
                                     const p = data.profile;
                                     const img = p.avImg ? safeDecodeURIComponent(p.avImg) : null;
                                     const color = p.avColor ? safeDecodeURIComponent(p.avColor) : 'var(--ge-accent-gradient)';
