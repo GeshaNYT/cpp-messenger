@@ -10,12 +10,96 @@ const JWT_ALG = 'HS256';
 const JWT_TTL = '7d';
 
 // ── SHA-256 хеш пароля ───────────────────────────────────────
-async function hashPassword(password) {
-    const data = new TextEncoder().encode(password);
+// sha256Hex — низкоуровневый хелпер БЕЗ соли. Это ровно тот формат, что
+// использовался раньше (до этого обновления) — оставляем его как есть, чтобы
+// не ломать уже сохранённые в базе хеши старых аккаунтов.
+async function sha256Hex(str) {
+    const data = new TextEncoder().encode(str);
     const buf  = await crypto.subtle.digest('SHA-256', data);
     return Array.from(new Uint8Array(buf))
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
+}
+
+// hashPassword — НОВЫЙ формат (с солью), используется для всех регистраций и
+// смен пароля начиная с этого обновления. Соль хранится рядом в поле "salt"
+// каждого профиля и делает хеш уникальным для каждого пользователя — без неё
+// одинаковые пароли у разных людей давали бы совершенно одинаковый хеш, и
+// заранее просчитанные "радужные таблицы" могли бы вскрыть пароль мгновенно.
+async function hashPassword(password, salt) {
+    return sha256Hex(`${salt}:${password}`);
+}
+
+// Случайная соль на аккаунт (16 байт = 32 hex-символа)
+function generateSalt() {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ── Шифрование сообщений "в покое" (at rest) ─────────────────────────────
+// Раньше сообщения (текст, фото/файлы в base64, голосовые и т.д.) писались в
+// Redis обычным JSON-текстом — то есть при прямом доступе к базе (утечка
+// креденшлов Upstash, дамп базы и т.п.) их мог прочитать кто угодно, хотя в
+// политике конфиденциальности заявлено "храним сообщения в зашифрованном
+// виде". Теперь тело каждого сообщения шифруется AES-256-GCM ключом,
+// производным от секрета сервера, перед записью в Redis, и расшифровывается
+// сразу после чтения — сам формат данных, который видит фронт, не меняется.
+//
+// Это шифрование "в покое" (защищает от чтения базы напрямую), а не полное
+// end-to-end шифрование (когда даже сервер не может прочитать сообщение) —
+// для настоящего E2E нужны были бы ключи на стороне каждого клиента и обмен
+// ими, что требует отдельной, более крупной переработки.
+let _cachedMsgKey = null;
+async function getMessageKey(env) {
+    if (_cachedMsgKey) return _cachedMsgKey;
+    // Если отдельный MESSAGE_ENCRYPTION_KEY не задан — используем JWT-секрет
+    // (плюс фиксированную соль-разделитель), чтобы шифрование работало из
+    // коробки. Рекомендуется всё же задать отдельный секрет в переменных
+    // окружения — тогда компрометация одного секрета не затронет второй.
+    const secret = env.msgSecret || `${env.jwt}::gelink-message-key`;
+    const keyMaterial = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(secret));
+    _cachedMsgKey = await crypto.subtle.importKey('raw', keyMaterial, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    return _cachedMsgKey;
+}
+
+function bytesToBase64(bytes) {
+    let bin = '';
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return btoa(bin);
+}
+function base64ToBytes(b64) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+}
+
+// Шифрует произвольную строку (обычно JSON.stringify(msg)) для хранения в Redis.
+// Формат: "enc:<iv в base64>:<шифротекст в base64>"
+async function encryptForStorage(plainText, env) {
+    const key = await getMessageKey(env);
+    const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-бит nonce, стандарт для AES-GCM
+    const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plainText));
+    return `enc:${bytesToBase64(iv)}:${bytesToBase64(new Uint8Array(cipherBuf))}`;
+}
+
+// Расшифровывает запись из Redis обратно в ту же обёртку (encodeURIComponent от
+// JSON), что фронт всегда ожидал получить — благодаря этому клиентский код
+// вообще не нужно менять. Записи в СТАРОМ (нешифрованном) формате, оставшиеся
+// с более ранних версий, просто возвращаются как есть — обратная совместимость.
+async function decryptStoredMessage(raw, env) {
+    if (typeof raw !== 'string' || !raw.startsWith('enc:')) return raw;
+    try {
+        const [, ivB64, cipherB64] = raw.split(':');
+        const key = await getMessageKey(env);
+        const iv = base64ToBytes(ivB64);
+        const cipherBytes = base64ToBytes(cipherB64);
+        const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBytes);
+        return encodeURIComponent(new TextDecoder().decode(plainBuf));
+    } catch (e) {
+        // Не роняем всю загрузку истории из-за одной повреждённой записи
+        return raw;
+    }
 }
 
 // ── Единый Redis-клиент (тело запроса, не URL) ───────────────
@@ -92,7 +176,7 @@ async function generateUniqueGroupId(db) {
 }
 
 // Публикует системное сообщение в чат группы (о вступлении/выходе участника)
-async function pushSystemMessage(db, roomId, text, email) {
+async function pushSystemMessage(db, roomId, text, email, env) {
     const msg = {
         type: 'system',
         text,
@@ -100,13 +184,14 @@ async function pushSystemMessage(db, roomId, text, email) {
         username: 'System',
         email: email || '',
     };
-    await db('LPUSH', `room:${roomId}`, encodeURIComponent(JSON.stringify(msg)));
+    await db('LPUSH', `room:${roomId}`, await encryptForStorage(JSON.stringify(msg), env));
 }
 export default async function handler(request, response) {
     const env = {
-        url:   process.env.UPSTASH_URL,
-        token: process.env.UPSTASH_TOKEN,
-        jwt:   process.env.JWT_SECRET,
+        url:       process.env.UPSTASH_URL,
+        token:     process.env.UPSTASH_TOKEN,
+        jwt:       process.env.JWT_SECRET,
+        msgSecret: process.env.MESSAGE_ENCRYPTION_KEY, // отдельный секрет для шифрования сообщений (опционально, см. getMessageKey)
     };
 
     if (!env.url || !env.token || !env.jwt) {
@@ -164,13 +249,19 @@ export default async function handler(request, response) {
                 return response.status(400).json({ status: 'error', message: 'Этот никнейм уже занят' });
 
             await db('SADD', 'all_users', emailLower);
+            const salt = generateSalt();
             await db('HSET', `profile:${emailLower}`,
                 'name',     name,
                 'nickname', nickLower,
                 'avColor',  avColor || 'var(--ge-accent-gradient)',
-                'password', await hashPassword(password),
+                'password', await hashPassword(password, salt),
+                'salt',     salt,
             );
             await db('SET', `nick:${nickLower}`, emailLower);
+            // Снимаем "надгробную метку", если этот email раньше уже был удалён —
+            // иначе новый аккаунт с той же почтой у старых контактов до сих пор
+            // показывался бы как "Аккаунт удалён".
+            await db('SREM', 'deleted_users', emailLower);
 
             return response.status(200).json({ status: 'ok' });
         }
@@ -190,22 +281,36 @@ export default async function handler(request, response) {
 
             const profile    = parseHash(await db('HGETALL', `profile:${emailLower}`));
             const storedPass = profile.password;
+            const storedSalt = profile.salt || '';
             if (!storedPass)
                 return response.status(401).json({ status: 'error', message: 'Неверный email или пароль' });
 
-            const passHash = await hashPassword(password);
-            const isLegacy = storedPass.length !== 64 || !/^[0-9a-f]+$/.test(storedPass);
+            const isLegacyBase64 = storedPass.length !== 64 || !/^[0-9a-f]+$/.test(storedPass);
             let ok = false;
 
-            if (isLegacy) {
+            if (isLegacyBase64) {
+                // Самый старый формат — пароль просто в base64, без хеширования вообще.
                 let legacy;
                 try { legacy = Buffer.from(password).toString('base64'); }
                 catch { legacy = btoa(unescape(encodeURIComponent(password))); }
                 const decoded = storedPass.startsWith('%') ? decodeURIComponent(storedPass) : storedPass;
                 ok = decoded === legacy;
-                if (ok) await db('HSET', `profile:${emailLower}`, 'password', passHash);
+                if (ok) {
+                    // Мигрируем сразу на SHA-256 С солью, минуя промежуточный этап без соли.
+                    const newSalt = generateSalt();
+                    await db('HSET', `profile:${emailLower}`, 'password', await hashPassword(password, newSalt), 'salt', newSalt);
+                }
+            } else if (storedSalt) {
+                // Текущая схема — SHA-256 с солью.
+                ok = storedPass === await hashPassword(password, storedSalt);
             } else {
-                ok = storedPass === passHash;
+                // Аккаунт создан ДО внедрения соли — хеш SHA-256, но без неё.
+                // Сверяем по старой формуле и, если совпало, тут же добавляем соль.
+                ok = storedPass === await sha256Hex(password);
+                if (ok) {
+                    const newSalt = generateSalt();
+                    await db('HSET', `profile:${emailLower}`, 'password', await hashPassword(password, newSalt), 'salt', newSalt);
+                }
             }
 
             if (!ok)
@@ -223,6 +328,7 @@ export default async function handler(request, response) {
                     avColor:  profile.avColor  ?? 'var(--ge-accent-gradient)',
                     avImg:    profile.avImg     ?? null,
                     bio:      profile.bio       ?? '',
+                    pubKey:   profile.pubKey    ?? null, // публичный ключ E2E — фронт сверяет со своим локальным
                 },
             });
         }
@@ -236,12 +342,17 @@ export default async function handler(request, response) {
             const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
             if (!emailLower) return response.status(400).json({ status: 'error', message: 'Не указан email' });
 
-            const { name, nickname, avColor, password, avImg, bio } = request.body;
+            const { name, nickname, avColor, password, avImg, bio, pubKey, e2eBackup } = request.body;
             const fields = [];
 
             if (name)     fields.push('name',     name);
             if (avColor)  fields.push('avColor',  avColor);
-            if (password) fields.push('password', await hashPassword(password));
+            if (pubKey)   fields.push('pubKey',   pubKey); // публичный ключ E2E-шифрования (можно переиздавать)
+            if (e2eBackup) fields.push('e2eBackup', e2eBackup); // резервная копия приватного ключа, зашифрованная паролем — сервер расшифровать её не может
+            if (password) {
+                const newSalt = generateSalt();
+                fields.push('password', await hashPassword(password, newSalt), 'salt', newSalt);
+            }
             if (bio !== undefined) fields.push('bio', (bio || '').toString().slice(0, 150));
 
             if (nickname) {
@@ -302,7 +413,7 @@ export default async function handler(request, response) {
                             try {
                                 await db('SREM', `group_members:${r}`, emailLower);
                                 const stillExists = await db('EXISTS', `group:${r}`);
-                                if (stillExists) await pushSystemMessage(db, r, `${myName} покинул(а) группу (аккаунт удалён)`, emailLower);
+                                if (stillExists) await pushSystemMessage(db, r, `${myName} покинул(а) группу (аккаунт удалён)`, emailLower, env);
                             } catch {}
                         })
                 );
@@ -323,6 +434,10 @@ export default async function handler(request, response) {
             await db('DEL', `user_rooms:${emailLower}`);
             await db('DEL', `profile:${emailLower}`);
             await db('SREM', 'all_users', emailLower);
+            // "Надгробная метка" — позволяет findUser сказать контактам "Аккаунт удалён"
+            // вместо того, чтобы чат просто зависал без объяснений. Снимается автоматически
+            // при повторной регистрации той же почты (см. action=register).
+            await db('SADD', 'deleted_users', emailLower);
 
             return response.status(200).json({ status: 'ok' });
         }
@@ -331,10 +446,11 @@ export default async function handler(request, response) {
         //  СОХРАНЕНИЕ ПРОФИЛЯ  — публичный (вызывается после OTP)
         // ══════════════════════════════════════════════════════
         if (action === 'saveProfile' && user_email && request.method === 'POST') {
-            const { nickname, name } = request.body;
+            const { nickname, name, pubKey } = request.body;
             await db('SADD', 'all_users', user_email);
             await db('SADD', `user_rooms:${user_email}`, 'general'); // добавляем в general
             if (name)     await db('HSET', `profile:${user_email}`, 'name', name);
+            if (pubKey)   await db('HSET', `profile:${user_email}`, 'pubKey', pubKey);
             if (nickname) {
                 const nickLower = nickname.toLowerCase();
                 await db('HSET', `profile:${user_email}`, 'nickname', nickLower);
@@ -375,14 +491,42 @@ export default async function handler(request, response) {
             const q = request.query.query.trim().toLowerCase();
 
             const byEmail = await db('SISMEMBER', 'all_users', q);
-            const foundEmail = byEmail === 1 ? q : await db('GET', `nick:${q}`);
+            if (byEmail === 1) {
+                const profile = parseHash(await db('HGETALL', `profile:${q}`));
+                delete profile.password;
+                delete profile.e2eBackup;
+                return response.status(200).json({ status: 'found', email: q, profile });
+            }
 
+            // Аккаунт мог быть удалён владельцем — отдаём явный признак "deleted",
+            // чтобы у контактов чат не зависал вечно на "Загрузка…"/пустом профиле,
+            // а сразу показывал понятное "Аккаунт удалён".
+            if (await db('SISMEMBER', 'deleted_users', q) === 1) {
+                return response.status(200).json({ status: 'found', email: q, profile: { deleted: '1' } });
+            }
+
+            // Раз не email — возможно, это никнейм
+            const foundEmail = await db('GET', `nick:${q}`);
             if (!foundEmail)
                 return response.status(404).json({ status: 'error', message: 'User not found' });
 
             const profile = parseHash(await db('HGETALL', `profile:${foundEmail}`));
             delete profile.password;
+            delete profile.e2eBackup;
             return response.status(200).json({ status: 'found', email: foundEmail, profile });
+        }
+
+        // Резервная копия приватного E2E-ключа — доступна ТОЛЬКО самому владельцу
+        // (проверяем, что запрашивающий — это тот же email, что и цель запроса).
+        if (action === 'getE2EBackup' && request.query.query) {
+            const jwtEmail = await tryAuth(request, env.jwt);
+            const requesterEmail = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
+            const targetEmail = request.query.query.trim().toLowerCase();
+            if (!requesterEmail || requesterEmail !== targetEmail)
+                return response.status(403).json({ status: 'error', message: 'Доступ запрещён' });
+
+            const e2eBackup = await db('HGET', `profile:${targetEmail}`, 'e2eBackup');
+            return response.status(200).json({ status: 'ok', e2eBackup: e2eBackup || null });
         }
 
         // ══════════════════════════════════════════════════════
@@ -461,7 +605,7 @@ export default async function handler(request, response) {
             await db('SADD', `user_rooms:${target_email}`, roomId);
 
             const name = await db('HGET', `profile:${target_email}`, 'name');
-            await pushSystemMessage(db, roomId, 'Заявка в контакты принята — теперь вы можете переписываться', emailLower);
+            await pushSystemMessage(db, roomId, 'Заявка в контакты принята — теперь вы можете переписываться', emailLower, env);
             return response.status(200).json({ status: 'ok', roomId, name: name || target_email });
         }
 
@@ -596,7 +740,7 @@ export default async function handler(request, response) {
 
             if (!wasAlreadyMember) {
                 const myName = (await db('HGET', `profile:${emailLower}`, 'name')) || emailLower;
-                await pushSystemMessage(db, groupId, `${myName} вступил(а) в группу`, emailLower);
+                await pushSystemMessage(db, groupId, `${myName} вступил(а) в группу`, emailLower, env);
             }
 
             const memberCount = await db('SCARD', `group_members:${groupId}`);
@@ -683,7 +827,7 @@ export default async function handler(request, response) {
                 const stillExists = await db('EXISTS', `group:${groupId}`);
                 if (stillExists) {
                     const myName = (await db('HGET', `profile:${emailLower}`, 'name')) || emailLower;
-                    await pushSystemMessage(db, groupId, `${myName} покинул(а) группу`, emailLower);
+                    await pushSystemMessage(db, groupId, `${myName} покинул(а) группу`, emailLower, env);
                 }
             }
 
@@ -791,7 +935,7 @@ export default async function handler(request, response) {
 
             // body может прийти как строка (старый фронт) или объект (новый)
             const bodyStr = typeof body === 'string' ? body : JSON.stringify(body);
-            await db('LPUSH', `room:${room}`, encodeURIComponent(bodyStr));
+            await db('LPUSH', `room:${room}`, await encryptForStorage(bodyStr, env));
 
             // Добавляем в all_users/user_rooms ТОЛЬКО если профиль реально существует.
             // Раньше это делалось безусловно для любого email, который пришёл в запросе —
@@ -818,6 +962,12 @@ export default async function handler(request, response) {
         const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
 
         let messages = await db('LRANGE', `room:${room}`, 0, 50);
+        // Расшифровываем сразу после чтения — дальше по коду (фильтр "очистить у
+        // себя" ниже, и то, что видит фронт) всё работает с уже привычной,
+        // нешифрованной обёрткой (encodeURIComponent от JSON), как и раньше.
+        if (Array.isArray(messages) && messages.length) {
+            messages = await Promise.all(messages.map(raw => decryptStoredMessage(raw, env)));
+        }
 
         let rooms    = { result: [] };
         let contacts = { result: [] };
