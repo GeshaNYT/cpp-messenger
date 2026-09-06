@@ -22,6 +22,9 @@
             --ge-primary-light: #339cff;
             --ge-primary-soft: rgba(0, 132, 255, 0.1);
             --ge-accent-gradient: linear-gradient(135deg, #0084ff 0%, #00c6ff 100%);
+            /* Та же стилистика, что и синий градиент по умолчанию, но в красных тонах —
+               для аватара удалённых аккаунтов. */
+            --ge-deleted-gradient: linear-gradient(135deg, #fa3e3e 0%, #ff7a59 100%);
             
             /* Статусы */
             --ge-success: #42b72a;
@@ -823,7 +826,7 @@
         /* Аватар удалённого аккаунта — без зелёной точки "онлайн" (кто-то, кого
            больше не существует, не может быть "в сети") и с приглушённой иконкой
            вместо буквы/фото. */
-        .ge-user-av.ge-av-deleted { background: var(--bg-input) !important; color: var(--text-tertiary); }
+        .ge-user-av.ge-av-deleted { background: var(--ge-deleted-gradient) !important; color: #fff; }
         .ge-user-av.ge-av-deleted::after { display: none; }
 
         .ge-sidebar-nav {
@@ -5238,9 +5241,15 @@
                                     // Аккаунт живой (в том числе мог быть пересоздан заново той же
                                     // почтой) — снимаем возможную старую пометку "удалён" и
                                     // восстанавливаем нормальный вид композера/имени/аватарки.
+                                    // ВАЖНО: имя берём из СВЕЖЕГО профиля (data.profile.name), а не
+                                    // из prettyName — тот мог прийти уже устаревшим "Аккаунт удалён"
+                                    // прямо из списка чатов (если там его ещё не успели перепроверить),
+                                    // и раньше это "восстановление" просто записывало то же самое
+                                    // устаревшее значение обратно.
                                     delete geEngine.state.deletedAccountsCache[targetEmail];
                                     applyNormalComposerState();
-                                    if (nameEl) nameEl.innerText = prettyName || id;
+                                    const freshName = data.profile.name ? safeDecodeURIComponent(data.profile.name) : (prettyName || id);
+                                    if (nameEl) nameEl.innerText = freshName;
                                     activeAv.classList.remove('ge-av-deleted');
                                     const p = data.profile;
                                     const img = p.avImg ? safeDecodeURIComponent(p.avImg) : null;
@@ -5249,7 +5258,7 @@
                                         activeAv.style.background = '';
                                         activeAv.innerHTML = `<img src="${img}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
                                     } else {
-                                        activeAv.innerHTML = (prettyName || id)[0].toUpperCase();
+                                        activeAv.innerHTML = (freshName[0] || '?').toUpperCase();
                                         activeAv.style.background = color;
                                     }
                                 }
