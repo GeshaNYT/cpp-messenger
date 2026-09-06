@@ -2672,7 +2672,11 @@
         // открытого чата, в мини-профиле и рядом с именем отправителя в сообщениях.
         // Один источник правды, чтобы иконка выглядела одинаково по всему приложению.
         function deletedAccountIconSvg(px) {
-            return `<svg width="${px}" height="${px}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="16" y1="8" x2="8" y2="16"/></svg>`;
+            // display:block важен: у <svg> по умолчанию строчное поведение с отступом
+            // по базовой линии текста, из-за чего внутри круглой аватарки иконка
+            // визуально "съезжала" вниз/в сторону от центра, несмотря на flex-центрирование
+            // родителя.
+            return `<svg width="${px}" height="${px}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="16" y1="8" x2="8" y2="16"/></svg>`;
         }
         function deletedAccountAvatarHtml(sizePx, extraStyle) {
             const iconPx = Math.round(sizePx * 0.45);
