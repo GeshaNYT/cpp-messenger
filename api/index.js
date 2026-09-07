@@ -54,6 +54,38 @@ async function getUserId(db, email) {
     return userId;
 }
 
+// Определяет id личной комнаты для пары emailA/emailB, ПРЕДПОЧИТАЯ уже существующую
+// комнату новой. До перехода на userId комнаты строились из email — некоторые пары
+// пользователей уже могут иметь такую "старую" комнату с историей переписки. Если
+// создавать для них комнату заново по новой схеме (userId), получится дубликат:
+// два разных чата с одним и тем же человеком (старый с историей + новый пустой) —
+// например, ровно это происходит при "удалил контакт -> добавил обратно", если
+// комната была создана ДО перехода на userId. Поэтому здесь сначала проверяем,
+// нет ли уже существующей комнаты (по старой ИЛИ по новой схеме — есть ли в ней
+// сообщения или числится ли она в списке комнат хотя бы одного из участников), и
+// только если совсем ничего нет — создаём новую по актуальной (userId) схеме.
+async function resolvePrivateRoomId(db, emailA, emailB) {
+    const oldSafeA = emailA.replace(/[@.]/g, '').toLowerCase();
+    const oldSafeB = emailB.replace(/[@.]/g, '').toLowerCase();
+    const oldRoomId = `private-${[oldSafeA, oldSafeB].sort().join('-')}`;
+
+    const userIdA = await getUserId(db, emailA);
+    const userIdB = await getUserId(db, emailB);
+    const newRoomId = `private-${[userIdA, userIdB].sort().join('-')}`;
+
+    // Старую комнату проверяем ПЕРВОЙ (приоритет — сохранить более длинную историю).
+    for (const candidate of [oldRoomId, newRoomId]) {
+        const [hasMessages, inRoomsA, inRoomsB] = await Promise.all([
+            db('EXISTS', `room:${candidate}`),
+            db('SISMEMBER', `user_rooms:${emailA}`, candidate),
+            db('SISMEMBER', `user_rooms:${emailB}`, candidate),
+        ]);
+        if (hasMessages === 1 || inRoomsA === 1 || inRoomsB === 1) return candidate;
+    }
+    // Ни старой, ни новой комнаты ещё нет — совсем новая пара, создаём по актуальной схеме
+    return newRoomId;
+}
+
 // ── SHA-256 хеш пароля ───────────────────────────────────────
 // sha256Hex — низкоуровневый хелпер БЕЗ соли. Это ровно тот формат, что
 // использовался раньше (до этого обновления) — оставляем его как есть, чтобы
@@ -444,12 +476,17 @@ export default async function handler(request, response) {
             try {
                 const myContacts = (await db('SMEMBERS', `contacts:${emailLower}`)) ?? [];
                 const myUserId = await getUserId(db, emailLower);
+                const myOldSafe = emailLower.replace(/[@.]/g, '');
                 await Promise.all(myContacts.map(async c => {
                     try {
                         await db('SREM', `contacts:${c}`, emailLower);
                         const otherUserId = await getUserId(db, c);
                         const roomId = `private-${[myUserId, otherUserId].sort().join('-')}`;
                         await db('SREM', `user_rooms:${c}`, roomId);
+                        // На случай, если у этой пары ещё осталась комната по СТАРОЙ схеме
+                        // (на основе email, до перехода на userId) — чистим и её тоже.
+                        const oldRoomId = `private-${[myOldSafe, c.replace(/[@.]/g, '')].sort().join('-')}`;
+                        if (oldRoomId !== roomId) await db('SREM', `user_rooms:${c}`, oldRoomId);
                         await db('HDEL', `contact_requests:${c}`, emailLower);
                     } catch {}
                 }));
@@ -621,9 +658,7 @@ export default async function handler(request, response) {
             if (await db('SISMEMBER', 'all_users', target_email) !== 1)
                 return response.status(404).json({ status: 'error', message: 'User not found' });
 
-            const myId    = await getUserId(db, emailLower);
-            const otherId = await getUserId(db, target_email);
-            const roomId  = `private-${[myId, otherId].sort().join('-')}`;
+            const roomId = await resolvePrivateRoomId(db, emailLower, target_email);
 
             // Уже в контактах друг у друга — ничего заново отправлять не нужно
             const alreadyContacts = await db('SISMEMBER', `contacts:${emailLower}`, target_email);
@@ -676,9 +711,7 @@ export default async function handler(request, response) {
 
             await db('HDEL', `contact_requests:${emailLower}`, target_email);
 
-            const myId    = await getUserId(db, emailLower);
-            const otherId = await getUserId(db, target_email);
-            const roomId  = `private-${[myId, otherId].sort().join('-')}`;
+            const roomId = await resolvePrivateRoomId(db, emailLower, target_email);
 
             await db('SADD', `contacts:${emailLower}`,   target_email);
             await db('SADD', `user_rooms:${emailLower}`, roomId);
@@ -704,9 +737,7 @@ export default async function handler(request, response) {
             const jwtEmail   = await tryAuth(request, env.jwt);
             const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
 
-            const myId    = await getUserId(db, emailLower);
-            const otherId = await getUserId(db, target_email);
-            const roomId  = `private-${[myId, otherId].sort().join('-')}`;
+            const roomId = await resolvePrivateRoomId(db, emailLower, target_email);
 
             // Раньше удаляли контакт только у себя — собеседник продолжал считать нас
             // контактом (у него оставались и contacts, и user_rooms), и мог писать напрямую,
