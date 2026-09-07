@@ -9,6 +9,51 @@ import { SignJWT, jwtVerify } from 'jose';
 const JWT_ALG = 'HS256';
 const JWT_TTL = '7d';
 
+// ── Стабильный ID пользователя (НЕ email) ─────────────────────
+// Раньше id личной комнаты строился из email обеих сторон (private-<хеш1>-<хеш2>).
+// Из-за этого при удалении аккаунта и повторной регистрации ТОЙ ЖЕ почтой
+// получалась ТА ЖЕ самая комната — старая история переписки и статусы (включая
+// "аккаунт удалён" в кэше у собеседников) как будто "воскресали", хотя по факту
+// это уже другой человек/аккаунт. Теперь у каждого аккаунта есть свой userId,
+// который выдаётся один раз при регистрации и никогда не меняется, а id личной
+// комнаты строится из userId, а не из email — так что новый аккаунт с той же
+// почтой гарантированно получает НОВУЮ, чистую комнату.
+function generateUserId() {
+    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    // Резервный вариант, если randomUUID недоступен в конкретном рантайме
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Генерирует userId и явно проверяет в базе, что он ещё никем не занят (через
+// обратный индекс id_email) — на случай столкновения. Столкновение для случайного
+// 128-битного UUID практически невозможно (вероятность пренебрежимо мала), но раз
+// проверка дешёвая — лучше перестраховаться и не полагаться только на теорию
+// вероятностей. При совпадении просто пробуем снова (ограничение попыток — просто
+// защита от бесконечного цикла на случай сбоя самой проверки, а не ожидаемый сценарий).
+async function generateUniqueUserId(db) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const candidate = generateUserId();
+        const taken = await db('EXISTS', `id_email:${candidate}`);
+        if (!taken) return candidate;
+    }
+    // Сюда мы практически никогда не попадём — но на всякий случай не блокируем
+    // регистрацию/операцию полностью, а возвращаем последнюю сгенерированную попытку.
+    return generateUserId();
+}
+
+// Возвращает userId аккаунта, генерируя и сохраняя его при первом обращении —
+// это покрывает и новые регистрации, и аккаунты, созданные ДО введения этого поля.
+async function getUserId(db, email) {
+    let userId = await db('HGET', `profile:${email}`, 'userId');
+    if (!userId) {
+        userId = await generateUniqueUserId(db);
+        await db('HSET', `profile:${email}`, 'userId', userId);
+        await db('SET', `id_email:${userId}`, email); // обратный индекс userId -> email
+    }
+    return userId;
+}
+
 // ── SHA-256 хеш пароля ───────────────────────────────────────
 // sha256Hex — низкоуровневый хелпер БЕЗ соли. Это ровно тот формат, что
 // использовался раньше (до этого обновления) — оставляем его как есть, чтобы
@@ -250,20 +295,23 @@ export default async function handler(request, response) {
 
             await db('SADD', 'all_users', emailLower);
             const salt = generateSalt();
+            const userId = await generateUniqueUserId(db);
             await db('HSET', `profile:${emailLower}`,
                 'name',     name,
                 'nickname', nickLower,
                 'avColor',  avColor || 'var(--ge-accent-gradient)',
                 'password', await hashPassword(password, salt),
                 'salt',     salt,
+                'userId',   userId,
             );
+            await db('SET', `id_email:${userId}`, emailLower); // обратный индекс userId -> email
             await db('SET', `nick:${nickLower}`, emailLower);
             // Снимаем "надгробную метку", если этот email раньше уже был удалён —
             // иначе новый аккаунт с той же почтой у старых контактов до сих пор
             // показывался бы как "Аккаунт удалён".
             await db('SREM', 'deleted_users', emailLower);
 
-            return response.status(200).json({ status: 'ok' });
+            return response.status(200).json({ status: 'ok', userId });
         }
 
         // ══════════════════════════════════════════════════════
@@ -316,6 +364,10 @@ export default async function handler(request, response) {
             if (!ok)
                 return response.status(401).json({ status: 'error', message: 'Неверный email или пароль' });
 
+            // userId нужен постоянно (личные комнаты строятся на его основе, а не на
+            // основе email) — бэкфилим на лету для аккаунтов, созданных до этого поля.
+            const userId = profile.userId || await getUserId(db, emailLower);
+
             const jwtToken = await signToken({ email: emailLower }, env.jwt);
 
             return response.status(200).json({
@@ -323,6 +375,7 @@ export default async function handler(request, response) {
                 token: jwtToken,   // фронт может сохранить, может игнорировать
                 user: {
                     email:    emailLower,
+                    userId,
                     name:     profile.name     ?? emailLower,
                     nickname: profile.nickname ?? '',
                     avColor:  profile.avColor  ?? 'var(--ge-accent-gradient)',
@@ -390,12 +443,12 @@ export default async function handler(request, response) {
             // аккаунт продолжал "висеть" у контакта в списке чатов вечно.
             try {
                 const myContacts = (await db('SMEMBERS', `contacts:${emailLower}`)) ?? [];
-                const myMailSafe = emailLower.replace(/[@.]/g, '');
+                const myUserId = await getUserId(db, emailLower);
                 await Promise.all(myContacts.map(async c => {
                     try {
                         await db('SREM', `contacts:${c}`, emailLower);
-                        const otherSafe = c.replace(/[@.]/g, '');
-                        const roomId = `private-${[myMailSafe, otherSafe].sort().join('-')}`;
+                        const otherUserId = await getUserId(db, c);
+                        const roomId = `private-${[myUserId, otherUserId].sort().join('-')}`;
                         await db('SREM', `user_rooms:${c}`, roomId);
                         await db('HDEL', `contact_requests:${c}`, emailLower);
                     } catch {}
@@ -439,6 +492,20 @@ export default async function handler(request, response) {
             // при повторной регистрации той же почты (см. action=register).
             await db('SADD', 'deleted_users', emailLower);
 
+            return response.status(200).json({ status: 'ok' });
+        }
+
+        // ══════════════════════════════════════════════════════
+        //  ПРИСУТСТВИЕ (онлайн/офлайн) — короткий "пинг" от клиента, пока
+        //  приложение открыто и активно. Статус "в сети" — это ПРОСТО наличие
+        //  свежей записи с TTL: если пинги перестают приходить (закрыли вкладку,
+        //  разрядился телефон, упала сеть), запись сама истечёт через 40 секунд
+        //  и человек автоматически станет "не в сети" — отдельно помечать выход
+        //  из сети не нужно, TTL делает это сам.
+        // ══════════════════════════════════════════════════════
+        if (action === 'heartbeat' && user_email) {
+            const emailLower = user_email.trim().toLowerCase();
+            await db('SET', `last_seen:${emailLower}`, String(Date.now()), 'EX', 40);
             return response.status(200).json({ status: 'ok' });
         }
 
@@ -488,13 +555,25 @@ export default async function handler(request, response) {
         //  ПОИСК ПОЛЬЗОВАТЕЛЯ  — публичный
         // ══════════════════════════════════════════════════════
         if (action === 'findUser' && request.query.query) {
-            const q = request.query.query.trim().toLowerCase();
+            let q = request.query.query.trim().toLowerCase();
+
+            // Если запрос — это userId (а не email/ник), резолвим его в реальный email
+            // через обратный индекс. Это нужно потому, что id личной комнаты теперь
+            // строится из userId, а не email — чтобы понять, с кем именно этот чат,
+            // клиенту нужно уметь искать профиль напрямую по userId.
+            const emailByUserId = await db('GET', `id_email:${q}`);
+            if (emailByUserId) q = emailByUserId;
 
             const byEmail = await db('SISMEMBER', 'all_users', q);
             if (byEmail === 1) {
                 const profile = parseHash(await db('HGETALL', `profile:${q}`));
                 delete profile.password;
                 delete profile.e2eBackup;
+                // userId нужен клиенту, чтобы строить id личной комнаты не по email, а по
+                // стабильному ID — бэкфилим на лету для аккаунтов, созданных раньше этого поля.
+                if (!profile.userId) profile.userId = await getUserId(db, q);
+                // online — есть ли свежий "пинг" присутствия (см. action=heartbeat)
+                profile.online = (await db('EXISTS', `last_seen:${q}`)) === 1;
                 return response.status(200).json({ status: 'found', email: q, profile });
             }
 
@@ -513,6 +592,8 @@ export default async function handler(request, response) {
             const profile = parseHash(await db('HGETALL', `profile:${foundEmail}`));
             delete profile.password;
             delete profile.e2eBackup;
+            if (!profile.userId) profile.userId = await getUserId(db, foundEmail);
+            profile.online = (await db('EXISTS', `last_seen:${foundEmail}`)) === 1;
             return response.status(200).json({ status: 'found', email: foundEmail, profile });
         }
 
@@ -540,8 +621,8 @@ export default async function handler(request, response) {
             if (await db('SISMEMBER', 'all_users', target_email) !== 1)
                 return response.status(404).json({ status: 'error', message: 'User not found' });
 
-            const myId    = emailLower.replace(/[@.]/g, '').toLowerCase();
-            const otherId = target_email.replace(/[@.]/g, '').toLowerCase();
+            const myId    = await getUserId(db, emailLower);
+            const otherId = await getUserId(db, target_email);
             const roomId  = `private-${[myId, otherId].sort().join('-')}`;
 
             // Уже в контактах друг у друга — ничего заново отправлять не нужно
@@ -565,7 +646,7 @@ export default async function handler(request, response) {
 
             // Иначе — отправляем заявку получателю, дожидаемся его подтверждения
             await db('HSET', `contact_requests:${target_email}`, emailLower, Date.now());
-            return response.status(200).json({ status: 'pending', message: 'Заявка отправлена' });
+            return response.status(200).json({ status: 'pending', message: 'Заявка отправлена', roomId });
         }
 
         // Список входящих заявок в контакты (для уведомления, "как во ВК")
@@ -595,8 +676,8 @@ export default async function handler(request, response) {
 
             await db('HDEL', `contact_requests:${emailLower}`, target_email);
 
-            const myId    = emailLower.replace(/[@.]/g, '').toLowerCase();
-            const otherId = target_email.replace(/[@.]/g, '').toLowerCase();
+            const myId    = await getUserId(db, emailLower);
+            const otherId = await getUserId(db, target_email);
             const roomId  = `private-${[myId, otherId].sort().join('-')}`;
 
             await db('SADD', `contacts:${emailLower}`,   target_email);
@@ -623,8 +704,8 @@ export default async function handler(request, response) {
             const jwtEmail   = await tryAuth(request, env.jwt);
             const emailLower = (jwtEmail ?? user_email ?? '').trim().toLowerCase();
 
-            const myId    = emailLower.replace(/[@.]/g, '').toLowerCase();
-            const otherId = target_email.replace(/[@.]/g, '').toLowerCase();
+            const myId    = await getUserId(db, emailLower);
+            const otherId = await getUserId(db, target_email);
             const roomId  = `private-${[myId, otherId].sort().join('-')}`;
 
             // Раньше удаляли контакт только у себя — собеседник продолжал считать нас
