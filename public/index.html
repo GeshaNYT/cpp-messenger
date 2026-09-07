@@ -4997,6 +4997,31 @@
                             }
                         }
 
+                        // Точка "онлайн/офлайн" в шапке ОТКРЫТОГО чата раньше выставлялась
+                        // один раз при открытии (chat.open()) и больше никогда не обновлялась,
+                        // пока чат оставался открытым — в отличие от списка чатов, который сам
+                        // переопрашивается каждые ~12 сек. Досинхронизируем и шапку по тому же
+                        // темпу, отдельным троттлингом (не на каждый тик, чтобы не долбить сервер).
+                        if (geEngine.chat._openChatTargetEmail && !geEngine.state.deletedAccountsCache[geEngine.chat._openChatTargetEmail]) {
+                            const targetEmail = geEngine.chat._openChatTargetEmail;
+                            const needsSweep = (Date.now() - (geEngine.chat._lastOpenChatStatusSweep || 0)) > 12000;
+                            if (needsSweep) {
+                                geEngine.chat._lastOpenChatStatusSweep = Date.now();
+                                try {
+                                    const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
+                                    const data = await res.json();
+                                    if (data.status === 'found' && !data.profile?.deleted) {
+                                        geEngine.state.onlineStatus[targetEmail] = !!data.profile.online;
+                                        const activeAv = document.getElementById('ge-active-av');
+                                        if (activeAv) {
+                                            activeAv.classList.remove('ge-status-online', 'ge-status-offline');
+                                            activeAv.classList.add(onlineStatusClass(targetEmail));
+                                        }
+                                    }
+                                } catch {}
+                            }
+                        }
+
                         // Если приглашение, которое мы отправили, приняли — собеседник теперь
                         // в serverContacts, и пометку "ждём ответа" пора снять (а не показывать
                         // её вечно на уже активном чате).
