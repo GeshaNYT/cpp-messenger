@@ -811,21 +811,28 @@
             position: relative;
         }
 
-        .ge-user-av::after {
+        /* Точка статуса больше не показывается всегда и не всегда зелёная — раньше
+           она была чисто декоративной (зелёная точка рисовалась на КАЖДОЙ аватарке
+           независимо от реального статуса). Теперь она появляется только там, где
+           явно проставлен один из этих двух классов, и цвет отражает реальный статус
+           присутствия (см. action=heartbeat на бэкенде). */
+        .ge-user-av.ge-status-online::after,
+        .ge-user-av.ge-status-offline::after {
             content: '';
             position: absolute;
             bottom: -4px;
             right: -4px;
             width: 18px;
             height: 18px;
-            background: var(--ge-online);
             border: 4px solid var(--bg-panel);
             border-radius: 50%;
         }
+        .ge-user-av.ge-status-online::after { background: var(--ge-online); }
+        .ge-user-av.ge-status-offline::after { background: var(--ge-error); }
 
-        /* Аватар удалённого аккаунта — без зелёной точки "онлайн" (кто-то, кого
-           больше не существует, не может быть "в сети") и с приглушённой иконкой
-           вместо буквы/фото. */
+        /* Аватар удалённого аккаунта — без точки статуса (кто-то, кого больше не
+           существует, не может быть "в сети" или "не в сети") и с приглушённой
+           иконкой вместо буквы/фото. */
         .ge-user-av.ge-av-deleted { background: var(--ge-deleted-gradient) !important; color: #fff; }
         .ge-user-av.ge-av-deleted::after { display: none; }
 
@@ -2499,10 +2506,10 @@
             <header class="ge-sidebar-header">
                 <div class="ge-profile-wrapper">
                     <div class="ge-user-profile">
-                        <div class="ge-user-av" id="ge-my-av">?</div>
+                        <div class="ge-user-av ge-status-online" id="ge-my-av">?</div>
                         <div>
                             <b id="ge-my-name" style="font-size: 22px;">Пользователь</b>
-                            <div style="font-size: 13px; color: var(--ge-online); font-weight: 800;">● ОНЛАЙН</div>
+                            <div style="font-size: 13px; color: var(--ge-online); font-weight: 800;" id="ge-my-status">● ОНЛАЙН</div>
                         </div>
                     </div>
                     
@@ -2631,17 +2638,51 @@
     </main>
 
     <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
-        // Извлекает "safe"-идентификатор (email без @ и .) собеседника из id приватной комнаты.
-        // Комната всегда называется private-<mySafe>-<otherSafe> (отсортировано), но наивное
-        // split('-') ломается, если у кого-то в email есть дефис в локальной части — тогда частей
-        // получается больше двух. Используем startsWith/endsWith по известному mySafe вместо split.
-        function otherPrivateSafe(rid, myMailSafe) {
+        // Извлекает id собеседника (userId) из id приватной комнаты. Комната называется
+        // private-<myUserId>-<otherUserId> (отсортировано по строке). UUID сами по себе
+        // содержат дефисы, но это не проблема: используем startsWith/endsWith по ИЗВЕСТНОЙ
+        // полной строке myUserId, а не наивный split('-') по всем дефисам подряд.
+        function otherPrivateSafe(rid, myUserId) {
             const combined = rid.replace('private-', '');
-            if (combined.startsWith(myMailSafe + '-')) return combined.slice(myMailSafe.length + 1);
-            if (combined.endsWith('-' + myMailSafe)) return combined.slice(0, combined.length - myMailSafe.length - 1);
+            if (combined.startsWith(myUserId + '-')) return combined.slice(myUserId.length + 1);
+            if (combined.endsWith('-' + myUserId)) return combined.slice(0, combined.length - myUserId.length - 1);
             // Резервный вариант (не должен срабатывать при нормальных данных)
             const parts = combined.split('-');
-            return parts.find(p => p !== myMailSafe) || null;
+            return parts.find(p => p !== myUserId) || null;
+        }
+        // Резолвит email собеседника для приватной комнаты по её id. Room id теперь строится
+        // из userId (не email) — именно поэтому аккаунт, удалённый и заново зарегистрированный
+        // на ту же почту, получает СОВЕРШЕННО НОВУЮ комнату, а не "воскрешает" старую переписку.
+        // Раньше (пока id строился из email) достаточно было пересчитать хеш email — теперь,
+        // раз у нас есть только чужой userId, единственный способ узнать email — либо взять из
+        // персистентного кэша roomEmailMap (если когда-то уже резолвили), либо перебрать своих
+        // текущих контактов и спросить сервер, у кого из них такой userId.
+        async function resolvePrivateRoomEmail(rid) {
+            if (geEngine.state.roomEmailMap[rid]) return geEngine.state.roomEmailMap[rid];
+            const myUserId = geEngine.state.session?.userId;
+            if (!myUserId) return null;
+            const otherUserId = otherPrivateSafe(rid, myUserId);
+            if (!otherUserId) return null;
+
+            if (!geEngine.state.userIdByEmail) geEngine.state.userIdByEmail = {};
+            for (const email of geEngine.state.serverContacts) {
+                let uid = geEngine.state.userIdByEmail[email];
+                if (!uid) {
+                    try {
+                        const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(email)}`);
+                        const data = await res.json();
+                        if (data.status === 'found' && data.profile?.userId) {
+                            uid = data.profile.userId;
+                            geEngine.state.userIdByEmail[email] = uid;
+                        }
+                    } catch {}
+                }
+                if (uid && uid === otherUserId) {
+                    geEngine.chat._rememberRoomEmail(rid, email);
+                    return email;
+                }
+            }
+            return null;
         }
         // decodeURIComponent падает исключением, если в строке встречается "%", за которым
         // не следуют два hex-символа (например, имя пользователя "100% топ" или похожее).
@@ -2682,6 +2723,13 @@
             const iconPx = Math.round(sizePx * 0.45);
             return `<div class="ge-user-av ge-av-deleted" style="width:${sizePx}px;height:${sizePx}px;${extraStyle || ''}">${deletedAccountIconSvg(iconPx)}</div>`;
         }
+        // Класс точки статуса для аватарки контакта по email — 'ge-status-online' /
+        // 'ge-status-offline', либо '' если статус ещё неизвестен (тогда точки просто
+        // не будет — лучше её не показывать вообще, чем один раз ошибочно "соврать").
+        function onlineStatusClass(email) {
+            if (!email || !(email in geEngine.state.onlineStatus)) return '';
+            return geEngine.state.onlineStatus[email] ? 'ge-status-online' : 'ge-status-offline';
+        }
 
         const geEngine = {
             state: {
@@ -2703,6 +2751,8 @@
                 // памяти (не переживает перезагрузку страницы, что нормально: просто
                 // перепроверим один раз при следующем открытии чата).
                 deletedAccountsCache: {},
+                // email -> true/false, реальный статус "в сети" из последнего findUser
+                onlineStatus: {},
                 createdRooms: JSON.parse(localStorage.getItem('ge_created_rooms') || "[]"),
                 deletedRooms: JSON.parse(localStorage.getItem('ge_deleted_rooms') || "[]"),
                 pinnedRooms: JSON.parse(localStorage.getItem('ge_pinned_rooms') || "[]"), // закреплённые чаты/группы, максимум 5
@@ -2879,6 +2929,9 @@
                                     document.getElementById('reg-fields-main').classList.remove('ge-hidden');
                                     return;
                                 }
+                                // userId выдаётся сервером при регистрации — на нём (а не на email)
+                                // строится id личных комнат, поэтому важно сохранить его в сессию.
+                                user.userId = regData.userId;
                             } catch (err) {
                                 alert('Ошибка соединения с сервером. Попробуйте снова.');
                                 return;
@@ -2889,6 +2942,7 @@
                             name: user.name, 
                             nickname: user.nickname, 
                             email: user.email, 
+                            userId: user.userId,
                             avColor: user.avColor || 'var(--ge-accent-gradient)',
                             avImg: user.avImg || null,
                             bio: user.bio || ''
@@ -3338,11 +3392,9 @@
                         return;
                     }
                     if (rid.startsWith('private-')) {
-                        const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                        const otherSafe = otherPrivateSafe(rid, myMailSafe);
-                        const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe)
-                            || geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherSafe)?.email
-                            || geEngine.state.roomEmailMap[rid];
+                        // Комната уже открыта — email собеседника уже разрешён и лежит в
+                        // _openChatTargetEmail (см. chat.open()), пересчитывать не нужно.
+                        const targetEmail = geEngine.chat._openChatTargetEmail || geEngine.state.roomEmailMap[rid];
                         if (!targetEmail) return;
                         const name = document.getElementById('ge-active-name').innerText;
                         geEngine.ui.openUserProfile(targetEmail, name);
@@ -3354,7 +3406,7 @@
                     geEngine.ui._userProfileTarget = { email, name };
 
                     const av = document.getElementById('ge-user-profile-av');
-                    av.classList.remove('ge-av-deleted');
+                    av.classList.remove('ge-av-deleted', 'ge-status-online', 'ge-status-offline');
                     document.getElementById('ge-user-profile-name').innerText = name || email;
                     av.innerHTML = ((name && name[0]) || '?').toUpperCase();
                     av.style.background = 'var(--ge-accent-gradient)';
@@ -3385,6 +3437,8 @@
                             return;
                         }
                         delete geEngine.state.deletedAccountsCache[email];
+                        geEngine.state.onlineStatus[email] = !!profile.online;
+                        av.classList.add(onlineStatusClass(email));
 
                         if (profile.avImg) {
                             av.style.background = '';
@@ -3407,24 +3461,37 @@
                 closeUserProfile() {
                     geEngine.ui._closeModal('ge-modal-user-profile');
                 },
-                userProfileOpenChat() {
+                async userProfileOpenChat() {
                     const t = geEngine.ui._userProfileTarget;
                     if (!t) return;
                     geEngine.ui.closeUserProfile();
-                    const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                    const otherSafe = t.email.replace(/[@.]/g, '').toLowerCase();
-                    const roomId = `private-${[myMailSafe, otherSafe].sort().join('-')}`;
+                    // Room id строится из userId, а не email — нужно узнать userId
+                    // собеседника (обычно уже известен из профиля, который мы только что
+                    // смотрели, но на всякий случай подстрахуемся через findUser).
+                    let otherUserId = geEngine.state.userIdByEmail?.[t.email];
+                    if (!otherUserId) {
+                        try {
+                            const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(t.email)}`);
+                            const data = await res.json();
+                            if (data.status === 'found' && data.profile?.userId) otherUserId = data.profile.userId;
+                        } catch {}
+                    }
+                    if (!otherUserId || !geEngine.state.session.userId) return; // не смогли определить — не создаём "битую" комнату
+                    if (!geEngine.state.userIdByEmail) geEngine.state.userIdByEmail = {};
+                    geEngine.state.userIdByEmail[t.email] = otherUserId;
+                    const roomId = `private-${[geEngine.state.session.userId, otherUserId].sort().join('-')}`;
+                    geEngine.chat._rememberRoomEmail(roomId, t.email);
                     geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                     localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                     if (!geEngine.state.localRooms.includes(roomId)) geEngine.state.localRooms.push(roomId);
                     localStorage.setItem('ge_local_rooms', JSON.stringify(geEngine.state.localRooms));
                     geEngine.chat.open(roomId, t.name || t.email, false, t.email);
                 },
-                userProfileCall(type) {
+                async userProfileCall(type) {
                     const t = geEngine.ui._userProfileTarget;
                     if (!t) return;
                     geEngine.ui.closeUserProfile();
-                    geEngine.ui.userProfileOpenChat();
+                    await geEngine.ui.userProfileOpenChat();
                     // Звонки возможны только в приватном чате — небольшая задержка, чтобы чат
                     // успел открыться и geEngine.state.activeRoom обновился
                     setTimeout(() => geEngine.calls.initiate(type), 250);
@@ -3450,12 +3517,9 @@
                                 name = safeDecodeURIComponent(profile.name);
                             } else {
                                 // Профиль ещё не подгружен — НЕ показываем сырой roomId (в нём
-                                // куски email обеих сторон, выглядит как мусор). Пробуем хотя бы
-                                // email через уже известные источники, иначе честное "Загрузка…".
-                                const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                                const otherSafe = otherPrivateSafe(rid, myMailSafe);
-                                const realEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe)
-                                    || geEngine.state.roomEmailMap[rid];
+                                // userId обеих сторон, выглядит как мусор). Используем то, что уже
+                                // знаем из персистентного кэша, иначе честное "Загрузка…".
+                                const realEmail = geEngine.state.roomEmailMap[rid];
                                 name = realEmail ? realEmail.split('@')[0] : 'Загрузка…';
                             }
                         } else if (rid !== 'general') {
@@ -3897,11 +3961,7 @@
                     if (privateRoomsToFetch.length) {
                         if (needsProfileSweep) geEngine.ui._lastProfilesSweep = Date.now();
                         await Promise.all(privateRoomsToFetch.map(async rid => {
-                            const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                            const otherSafe = otherPrivateSafe(rid, myMailSafe);
-                            if (!otherSafe) return;
-                            const targetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe)
-                                || geEngine.state.roomEmailMap[rid];
+                            const targetEmail = await resolvePrivateRoomEmail(rid);
                             if (!targetEmail) return;
                             try {
                                 const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
@@ -3910,6 +3970,7 @@
                                     contactProfiles[rid] = data.profile || {};
                                     if (data.profile?.deleted) geEngine.state.deletedAccountsCache[targetEmail] = true;
                                     else delete geEngine.state.deletedAccountsCache[targetEmail];
+                                    geEngine.state.onlineStatus[targetEmail] = !!data.profile?.online;
                                 }
                             } catch {}
                         }));
@@ -3951,11 +4012,9 @@
                         let subtitle = isGroup ? 'Групповой канал' : 'Активный зашифрованный канал';
 
                         if (rid.startsWith('private-')) {
-                            const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                            const otherMailSafePart = otherPrivateSafe(rid, myMailSafe);
-                            resolvedTargetEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart)
-                                || geEngine.state.roomEmailMap[rid] || '';
-                            if (resolvedTargetEmail) geEngine.chat._rememberRoomEmail(rid, resolvedTargetEmail);
+                            // Email уже разрешён (и закэширован в roomEmailMap) выше, в асинхронном
+                            // цикле подгрузки профилей — здесь просто читаем готовый результат.
+                            resolvedTargetEmail = geEngine.state.roomEmailMap[rid] || '';
 
                             const profile = contactProfiles[rid];
                             if (profile && profile.deleted) {
@@ -3979,19 +4038,11 @@
                                     if (resolvedTargetEmail) geEngine.chat._rememberRoomEmail(rid, resolvedTargetEmail);
                                 }
                             } else {
-                                const user = geEngine.state.usersDB.find(u => u.email.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart);
-                                if (user) {
-                                    displayName = user.name; avColor = user.avColor;
-                                } else {
-                                    // Профиль ещё не подгружен (обычно на долю секунды для нового чата).
-                                    // Раньше тут пытались вырезать имя из "safe"-строки email грубым
-                                    // split('gmailcom'), что для не-gmail адресов показывало кашу
-                                    // вместо имени. Теперь честно показываем "Загрузка…" — реальное
-                                    // имя подставится, как только придёт ответ сервера.
-                                    const realEmail = geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherMailSafePart)
-                                        || geEngine.state.roomEmailMap[rid];
-                                    displayName = realEmail ? realEmail.split('@')[0] : 'Загрузка…';
-                                }
+                                // Профиль ещё не подгружен (обычно на долю секунды для нового чата).
+                                // Показываем хотя бы email из уже разрешённого resolvedTargetEmail,
+                                // иначе честное "Загрузка…" — реальное имя подставится, как только
+                                // придёт ответ сервера.
+                                displayName = resolvedTargetEmail ? resolvedTargetEmail.split('@')[0] : 'Загрузка…';
                             }
                         } else if (rid !== 'general') {
                             // Реальная группа — показываем название с сервера, а не сырой ID
@@ -4004,11 +4055,12 @@
                             }
                         }
 
+                        const statusCls = (!isGroup && !isDeletedProfile) ? onlineStatusClass(resolvedTargetEmail) : '';
                         const avHtml = isDeletedProfile
                             ? deletedAccountAvatarHtml(50, 'font-size:18px;')
                             : avImg
-                                ? `<div class="ge-user-av" style="width:50px;height:50px;overflow:hidden;padding:0;"><img src="${avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" /></div>`
-                                : `<div class="ge-user-av" style="width:50px;height:50px;font-size:18px;background:${avColor};">${displayName[0].toUpperCase()}</div>`;
+                                ? `<div class="ge-user-av ${statusCls}" style="width:50px;height:50px;overflow:hidden;padding:0;"><img src="${avImg}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" /></div>`
+                                : `<div class="ge-user-av ${statusCls}" style="width:50px;height:50px;font-size:18px;background:${avColor};">${displayName[0].toUpperCase()}</div>`;
 
                         const isPinned = geEngine.state.pinnedRooms.includes(rid);
                         const pinIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="transform:rotate(45deg);"><path d="M16 3l5 5-5.5 1.5L12 14l-2-2 4.5-4.5L16 3z"/><path d="M9 15l-6 6"/><path d="M12.5 8.5L9 12l3 3 3.5-3.5"/></svg>`;
@@ -4350,22 +4402,9 @@
                 _getTargetEmail() {
                     const room = geEngine.state.activeRoom;
                     if (!room || !room.startsWith('private-')) return null;
-                    const myEmail = geEngine.state.session.email;
-                    const myMailSafe = myEmail.replace(/[@.]/g, '').toLowerCase();
-
-                    // Ищем среди серверных контактов тот, чей safe совпадает с частью roomId
-                    const allCandidates = [
-                        ...geEngine.state.serverContacts,
-                        ...geEngine.state.usersDB.map(u => u.email)
-                    ];
-
-                    for (const email of allCandidates) {
-                        if (email === myEmail) continue;
-                        const safe = email.replace(/[@.]/g, '').toLowerCase();
-                        const expectedRoom = `private-${[myMailSafe, safe].sort().join('-')}`;
-                        if (expectedRoom === room) return email;
-                    }
-                    return null;
+                    // Чат уже открыт (звонок возможен только из открытого чата) — email
+                    // собеседника уже разрешён и лежит в персистентном кэше (см. chat.open()).
+                    return geEngine.state.roomEmailMap[room] || null;
                 },
 
                 async _send(obj) {
@@ -4764,9 +4803,20 @@
                         ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}`
                         : '';
 
-                    const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                    const otherSafe = targetEmail.replace(/[@.]/g, '').toLowerCase();
-                    const roomId = `private-${[myMailSafe, otherSafe].sort().join('-')}`;
+                    // Room id строится из userId — резолвим, кэшируя результат для будущих вызовов.
+                    let otherUserId = geEngine.state.userIdByEmail?.[targetEmail];
+                    if (!otherUserId) {
+                        try {
+                            const res = await fetch(`/api/index?action=findUser&query=${encodeURIComponent(targetEmail)}`);
+                            const data = await res.json();
+                            if (data.status === 'found' && data.profile?.userId) otherUserId = data.profile.userId;
+                        } catch {}
+                    }
+                    if (!otherUserId || !geEngine.state.session.userId) return; // не смогли определить комнату для этого звонка
+                    if (!geEngine.state.userIdByEmail) geEngine.state.userIdByEmail = {};
+                    geEngine.state.userIdByEmail[targetEmail] = otherUserId;
+                    const roomId = `private-${[geEngine.state.session.userId, otherUserId].sort().join('-')}`;
+                    geEngine.chat._rememberRoomEmail(roomId, targetEmail);
 
                     if (postMessage) {
                         // Сообщение-карточка звонка — попадает прямо в переписку
@@ -5185,17 +5235,16 @@
                     const activeAv = document.getElementById('ge-active-av');
                     // Сброс к букве пока грузим (и снимаем возможный класс "удалён" с
                     // прошлого открытия другого чата — иначе бы залипал)
-                    activeAv.classList.remove('ge-av-deleted');
+                    activeAv.classList.remove('ge-av-deleted', 'ge-status-online', 'ge-status-offline');
                     activeAv.innerHTML = (prettyName || id)[0].toUpperCase();
                     activeAv.style.background = 'var(--ge-accent-gradient)';
 
                     // Если приватный чат — грузим профиль собеседника
                     if (id.startsWith('private-')) {
-                        const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                        const otherSafe = otherPrivateSafe(id, myMailSafe);
                         const targetEmail = explicitTargetEmail
-                            || geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe)
-                            || geEngine.state.roomEmailMap[id] || null;
+                            || geEngine.state.roomEmailMap[id]
+                            || await resolvePrivateRoomEmail(id)
+                            || null;
                         if (targetEmail) geEngine.chat._rememberRoomEmail(id, targetEmail);
 
                         // Если собеседник ещё не в контактах — прячем композер и показываем
@@ -5254,7 +5303,9 @@
                                     applyNormalComposerState();
                                     const freshName = data.profile.name ? safeDecodeURIComponent(data.profile.name) : (prettyName || id);
                                     if (nameEl) nameEl.innerText = freshName;
-                                    activeAv.classList.remove('ge-av-deleted');
+                                    activeAv.classList.remove('ge-av-deleted', 'ge-status-online', 'ge-status-offline');
+                                    geEngine.state.onlineStatus[targetEmail] = !!data.profile.online;
+                                    activeAv.classList.add(onlineStatusClass(targetEmail));
                                     const p = data.profile;
                                     const img = p.avImg ? safeDecodeURIComponent(p.avImg) : null;
                                     const color = p.avColor ? safeDecodeURIComponent(p.avColor) : 'var(--ge-accent-gradient)';
@@ -5440,18 +5491,11 @@
 
                     // Если приватная комната — удаляем с сервера (только у себя)
                     if (rid.startsWith('private-')) {
-                        const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                        let targetEmail = null;
-                        const allCandidates = [
-                            ...geEngine.state.serverContacts,
-                            ...geEngine.state.usersDB.map(u => u.email)
-                        ];
-                        for (const email of allCandidates) {
-                            if (email === geEngine.state.session.email) continue;
-                            const safe = email.replace(/[@.]/g, '').toLowerCase();
-                            const expectedRoom = `private-${[myMailSafe, safe].sort().join('-')}`;
-                            if (expectedRoom === rid) { targetEmail = email; break; }
-                        }
+                        // Email собеседника уже должен быть в персистентном кэше (эта комната
+                        // была как минимум отрисована в списке, чтобы по ней вообще нажали
+                        // "Удалить контакт") — серверу для removeContact нужен именно email,
+                        // а не сам roomId (сервер сам находит нужную комнату через userId).
+                        const targetEmail = geEngine.state.roomEmailMap[rid];
                         if (targetEmail) {
                             fetch(`/api/index?action=removeContact&user_email=${encodeURIComponent(geEngine.state.session.email)}&target_email=${encodeURIComponent(targetEmail)}`).catch(() => {});
                             // На случай, если пометка "приглашение отправлено" осталась в
@@ -5545,31 +5589,16 @@
                         const findData = await findRes.json();
 
                         if (findData.status !== 'found') {
-                            // Запасной вариант: ищем в локальной БД (для пользователей с того же браузера)
-                            const localUser = geEngine.state.usersDB.find(u =>
-                                u.email.toLowerCase() === query ||
-                                (u.nickname && u.nickname.toLowerCase() === query)
-                            );
-                            if (!localUser) {
-                                return alert("Пользователь не найден. Убедитесь что он зарегистрирован в GeLink.");
-                            }
-                            // Если нашли локально — используем локальные данные
-                            const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                            const otherMailSafe = localUser.email.replace(/[@.]/g, '').toLowerCase();
-                            const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
-                            geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
-                            localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
-                            geEngine.chat.open(roomId, localUser.name, false, localUser.email);
-                            return;
+                            return alert("Пользователь не найден. Убедитесь что он зарегистрирован в GeLink.");
                         }
 
                         const targetEmail = findData.email;
                         const profile = findData.profile || {};
-                        // Имя: из профиля на сервере или из локальной БД
-                        const localUser = geEngine.state.usersDB.find(u => u.email.toLowerCase() === targetEmail);
-                        const displayName = (profile.name ? safeDecodeURIComponent(profile.name) : null)
-                            || (localUser ? localUser.name : null)
-                            || targetEmail;
+                        const displayName = (profile.name ? safeDecodeURIComponent(profile.name) : null) || targetEmail;
+                        if (profile.userId) {
+                            if (!geEngine.state.userIdByEmail) geEngine.state.userIdByEmail = {};
+                            geEngine.state.userIdByEmail[targetEmail] = profile.userId;
+                        }
 
                         if (targetEmail === geEngine.state.session.email) {
                             return alert("Нельзя добавить самого себя.");
@@ -5582,6 +5611,7 @@
 
                         if (addData.status === 'success') {
                             const roomId = addData.roomId;
+                            geEngine.chat._rememberRoomEmail(roomId, targetEmail);
                             geEngine.state.deletedRooms = geEngine.state.deletedRooms.filter(id => id !== roomId);
                             localStorage.setItem('ge_deleted_rooms', JSON.stringify(geEngine.state.deletedRooms));
                             geEngine.ui.showToast(`${displayName} добавлен в контакты`, 'success');
@@ -5590,9 +5620,9 @@
                             // Заявка уже отправлена этим же запросом — открываем чат сразу,
                             // как при клике из мини-профиля: композер скрыт, вместо него кнопка
                             // "Заявка отправлена — ждём ответа" (переиспользуем ту же логику).
-                            const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                            const otherMailSafe = targetEmail.replace(/[@.]/g, '').toLowerCase();
-                            const roomId = `private-${[myMailSafe, otherMailSafe].sort().join('-')}`;
+                            // roomId теперь приходит готовым от сервера (строится из userId).
+                            const roomId = addData.roomId;
+                            geEngine.chat._rememberRoomEmail(roomId, targetEmail);
                             const sent = JSON.parse(localStorage.getItem('ge_sent_invites') || '[]');
                             if (!sent.includes(targetEmail)) { sent.push(targetEmail); localStorage.setItem('ge_sent_invites', JSON.stringify(sent)); }
                             geEngine.chat._rememberPendingInvite(roomId, targetEmail, displayName);
@@ -6308,15 +6338,12 @@
                     }
                 },
 
-                // email собеседника для приватной комнаты — переиспользует ту же логику
-                // (текущие контакты -> постоянная карта roomEmailMap), что и остальной код.
+                // email собеседника для приватной комнаты — это чат уже должен быть открыт
+                // (E2E применяется только к уже открытым личным чатам), так что email уже
+                // должен быть в персистентном кэше roomEmailMap (см. chat.open()).
                 _peerEmailForRoom(rid) {
                     if (!rid || !rid.startsWith('private-') || !geEngine.state.session) return null;
-                    const myMailSafe = geEngine.state.session.email.replace(/[@.]/g, '').toLowerCase();
-                    const otherSafe = otherPrivateSafe(rid, myMailSafe);
-                    if (!otherSafe) return null;
-                    return geEngine.state.serverContacts.find(e => e.replace(/[@.]/g, '').toLowerCase() === otherSafe)
-                        || geEngine.state.roomEmailMap[rid] || null;
+                    return geEngine.state.roomEmailMap[rid] || null;
                 },
 
                 // Расшифровывает входящий массив сообщений комнаты, сохраняя ТУ ЖЕ
@@ -6871,12 +6898,38 @@
                     session.avColor,
                     session.avImg
                 );
+                // userId нужен для id личных комнат — у сессий, сохранённых ДО введения
+                // этого поля (localStorage со старой версии), его ещё нет. Подтягиваем
+                // один раз при загрузке и запоминаем в сессии.
+                if (!session.userId) {
+                    fetch(`/api/index?action=findUser&query=${encodeURIComponent(session.email)}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.status === 'found' && data.profile?.userId) {
+                                geEngine.state.session.userId = data.profile.userId;
+                                localStorage.setItem('ge_v9_token', JSON.stringify(geEngine.state.session));
+                            }
+                        }).catch(() => {});
+                }
                 // Готовим ключи E2E-шифрования: загружаем существующие с этого устройства,
                 // либо восстанавливаем из резервной копии на сервере (если знаем пароль —
                 // передан из auth.verifyOTP при свежем входе/регистрации), либо генерируем
                 // новые. Не блокируем остальную загрузку приложения, если что-то пошло не так.
                 geEngine.e2e.ensureKeys(passwordForE2E).catch(() => {});
                 geEngine.chat.refresh();
+                // Точка "онлайн/офлайн" была чисто декоративной (всегда зелёная) — теперь
+                // отражает реальное присутствие. Пингуем сервер, пока вкладка активна;
+                // TTL записи на сервере — 40 сек, пингуем каждые 15 — если пинги перестают
+                // приходить (закрыли вкладку/упала сеть), запись сама истечёт и статус
+                // автоматически станет "офлайн" без каких-либо дополнительных действий.
+                const sendHeartbeat = () => {
+                    if (document.hidden) return;
+                    fetch(`/api/index?action=heartbeat&user_email=${encodeURIComponent(geEngine.state.session.email)}`).catch(() => {});
+                };
+                sendHeartbeat();
+                setInterval(sendHeartbeat, 15000);
+                document.addEventListener('visibilitychange', () => { if (!document.hidden) sendHeartbeat(); });
+
                 // Опрос сервера — раз в 3 секунды вместо 6, сообщения и список чатов
                 // приходят быстрее. Это безопасно: тяжёлые фоновые проверки (сверка списка
                 // чатов, профили групп) не участятся — они защищены собственным троттлингом
